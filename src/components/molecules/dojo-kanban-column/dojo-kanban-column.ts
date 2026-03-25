@@ -46,7 +46,12 @@ export class DojoKanbanColumn extends HTMLElement {
   }
 
   connectedCallback(): void {
-    this._render();
+    // Guarda de idempotencia: evita re-render (y re-registro del listener slotchange)
+    // si el elemento se mueve en el DOM. Los listeners DnD sí se re-registran
+    // porque disconnectedCallback los limpia antes de cada desconexión.
+    if (this._shadow.childElementCount === 0) {
+      this._render();
+    }
     this._attachDragListeners();
   }
 

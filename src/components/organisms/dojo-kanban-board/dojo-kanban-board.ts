@@ -234,6 +234,8 @@ export class DojoKanbanBoard extends HTMLElement {
 
   private async _loadBoard(): Promise<void> {
     this._showLoading();
+    // Limpiar datos previos para evitar entradas stale ante reintentos o cambios de columnas
+    this._tasksByColumn.clear();
 
     try {
       const columns = await getAllColumns();
@@ -298,7 +300,8 @@ export class DojoKanbanBoard extends HTMLElement {
     return tasks.filter(task => {
       if (priority && task.priority !== priority) return false;
       if (labelIds && labelIds.length > 0) {
-        const hasLabel = labelIds.some(id => task.labelIds.includes(id));
+        const taskLabelIds = task.labelIds ?? [];
+        const hasLabel = labelIds.some(id => taskLabelIds.includes(id));
         if (!hasLabel) return false;
       }
       return true;

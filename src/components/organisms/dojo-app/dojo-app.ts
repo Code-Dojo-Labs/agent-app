@@ -25,6 +25,8 @@ export class DojoApp extends HTMLElement {
   }
 
   connectedCallback(): void {
+    // Guarda de idempotencia: evita re-render al mover el elemento en el DOM
+    if (this._shadow.childElementCount > 0) return;
     this._render();
   }
 

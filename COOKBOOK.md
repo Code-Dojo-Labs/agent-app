@@ -764,4 +764,4 @@ $ npm run build
 
 `dojo-kanban-board` carga las tareas de **todas** las columnas en el `connectedCallback` para tener disponible el total de tareas por columna y poder mostrar el formato `X / Y` cuando se activa un filtro. Esto es aceptable para el tamaño de datos de un tablero Kanban personal (decenas o cientos de tareas), donde la consulta a IndexedDB es sub-milisegundo. Si el dataset crece, se puede memoizar por columna y recargar solo la columna afectada.
 
-*El siguiente paso será la creación del PR #2 y su revisión por el agente Reviewer.*
+*Este PR fue creado como [PR #19](https://github.com/Code-Dojo-Labs/agent-app/pull/19) y revisado por el agente Reviewer.*

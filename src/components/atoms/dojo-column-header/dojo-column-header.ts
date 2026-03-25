@@ -90,7 +90,6 @@ export class DojoColumnHeader extends HTMLElement {
         font-size: 1rem;
         line-height: 1;
         flex-shrink: 0;
-        aria-hidden: true;
       }
       .name {
         flex: 1;
