@@ -335,7 +335,7 @@ export class DojoKanbanBoard extends HTMLElement {
    */
   private _refreshColumnCards(columnId: string): void {
     const colEl = this._shadow.querySelector(
-      `dojo-kanban-column[column-id="${columnId}"]`
+      `dojo-kanban-column[column-id="${CSS.escape(columnId)}"]`
     );
     if (!colEl) return;
     colEl.querySelectorAll('dojo-task-card').forEach(el => el.remove());

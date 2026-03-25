@@ -45,6 +45,8 @@ export class DojoKanbanColumn extends HTMLElement {
   private _shadow: ShadowRoot;
   /** ID de la tarjeta ante la cual se soltará la tarea en curso (null = al final) */
   private _dropBeforeId: string | null = null;
+  /** Último valor enviado a _setDropIndicator para evitar mutaciones DOM redundantes */
+  private _lastDropIndicatorId: string | null | undefined = undefined;
 
   constructor() {
     super();
@@ -348,6 +350,10 @@ export class DojoKanbanColumn extends HTMLElement {
 
   /** Pone el indicador de drop en la tarjeta correcta. */
   private _setDropIndicator(beforeId: string | null): void {
+    // Guard: evitar mutaciones DOM si la posición no ha cambiado
+    if (beforeId === this._lastDropIndicatorId) return;
+    this._lastDropIndicatorId = beforeId;
+
     const slot = this._shadow.querySelector('slot');
     if (!slot) return;
     const cards = (slot as HTMLSlotElement).assignedElements();
@@ -364,6 +370,7 @@ export class DojoKanbanColumn extends HTMLElement {
 
   /** Elimina todos los indicadores de drop de las tarjetas asignadas al slot. */
   private _clearDropIndicators(): void {
+    this._lastDropIndicatorId = undefined; // limpiar cache
     const slot = this._shadow.querySelector('slot');
     if (!slot) return;
     (slot as HTMLSlotElement).assignedElements()

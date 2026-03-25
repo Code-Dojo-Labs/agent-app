@@ -43,6 +43,10 @@ export class DojoTaskCard extends HTMLElement {
     }
     this.setAttribute('draggable', 'true');
     this.setAttribute('role', 'listitem');
+    // WCAG 2.1 SC 2.1.1 (Keyboard, Level A): permite foco por teclado
+    if (!this.hasAttribute('tabindex')) {
+      this.setAttribute('tabindex', '0');
+    }
     this.addEventListener('dragstart', this._onDragStart);
     this.addEventListener('dragend',   this._onDragEnd);
     this.addEventListener('click',     this._onClick);
