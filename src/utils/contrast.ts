@@ -18,6 +18,11 @@
 function hexToRgb(hex: string): [number, number, number] {
   const cleaned = hex.replace(/^#/, '');
 
+  // Validar formato antes de parsear — evita NaN silencioso por caracteres no-hex (OWASP A03)
+  if (!/^[0-9a-fA-F]{3}$/.test(cleaned) && !/^[0-9a-fA-F]{6}$/.test(cleaned)) {
+    throw new Error(`Invalid hex color: "${hex}"`);
+  }
+
   if (cleaned.length === 3) {
     const [r, g, b] = cleaned.split('').map(c => parseInt(c + c, 16));
     return [r, g, b];

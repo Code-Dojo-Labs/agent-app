@@ -45,30 +45,28 @@
       }
 
       /* ── Tokens globales — modo oscuro ────────────────────────────── */
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --dojo-bg:             #0F172A;
-          --dojo-surface:        #1E293B;
-          --dojo-surface-hover:  #273349;
-          --dojo-border:         #334155;
+      /* Los valores se definen en un único lugar por token para facilitar futuros cambios.
+         @media cubre el modo automático del SO; [data-theme] permite override manual. */
+      @media (prefers-color-scheme: dark) { :root { --dojo-bg: #0F172A; } }
+      [data-theme="dark"]                 {        --dojo-bg: #0F172A; }
 
-          --dojo-text-primary:   #F1F5F9;
-          --dojo-text-secondary: #94A3B8;
-          --dojo-text-muted:     #475569;
-        }
-      }
+      @media (prefers-color-scheme: dark) { :root { --dojo-surface: #1E293B; } }
+      [data-theme="dark"]                 {        --dojo-surface: #1E293B; }
 
-      /* Override manual con atributo data-theme="dark" en <html> */
-      [data-theme="dark"] {
-        --dojo-bg:             #0F172A;
-        --dojo-surface:        #1E293B;
-        --dojo-surface-hover:  #273349;
-        --dojo-border:         #334155;
+      @media (prefers-color-scheme: dark) { :root { --dojo-surface-hover: #273349; } }
+      [data-theme="dark"]                 {        --dojo-surface-hover: #273349; }
 
-        --dojo-text-primary:   #F1F5F9;
-        --dojo-text-secondary: #94A3B8;
-        --dojo-text-muted:     #475569;
-      }
+      @media (prefers-color-scheme: dark) { :root { --dojo-border: #334155; } }
+      [data-theme="dark"]                 {        --dojo-border: #334155; }
+
+      @media (prefers-color-scheme: dark) { :root { --dojo-text-primary: #F1F5F9; } }
+      [data-theme="dark"]                 {        --dojo-text-primary: #F1F5F9; }
+
+      @media (prefers-color-scheme: dark) { :root { --dojo-text-secondary: #94A3B8; } }
+      [data-theme="dark"]                 {        --dojo-text-secondary: #94A3B8; }
+
+      @media (prefers-color-scheme: dark) { :root { --dojo-text-muted: #475569; } }
+      [data-theme="dark"]                 {        --dojo-text-muted: #475569; }
     </style>
   </head>
   <body>

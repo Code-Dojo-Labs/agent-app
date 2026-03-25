@@ -5,7 +5,7 @@
  * Los IDs se generan con `crypto.randomUUID()` en el cliente.
  */
 
-import { idbRequest, idbTransaction, getStore } from './database.js';
+import { idbRequest, idbTransaction, getStore, openDatabase } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
 import type { Task, Priority } from '../types/models.js';
 
@@ -101,16 +101,20 @@ export async function deleteTask(id: string): Promise<void> {
  * @param orderedIds - IDs de las tareas en el nuevo orden deseado.
  */
 export async function reorderTasks(statusId: string, orderedIds: string[]): Promise<void> {
-  const tasks = await getTasksByStatus(statusId);
+  // Una única transacción readwrite para eliminar la ventana de inconsistencia
+  // que existía al usar getTasksByStatus() (readonly) + getStore() (readwrite) por separado.
+  const db    = await openDatabase();
+  const tx    = db.transaction('tasks', 'readwrite');
+  const store = tx.objectStore('tasks');
+  const index = store.index('by-status');
+
+  const tasks   = await idbRequest<Task[]>(index.getAll(statusId));
   const taskMap = new Map(tasks.map(t => [t.id, t]));
+  const now     = new Date().toISOString();
 
-  const { store, tx } = await getStore('tasks', 'readwrite');
-
-  orderedIds.forEach((id, index) => {
+  orderedIds.forEach((id, order) => {
     const task = taskMap.get(id);
-    if (task) {
-      store.put({ ...task, order: index, updatedAt: new Date().toISOString() });
-    }
+    if (task) store.put({ ...task, order, updatedAt: now });
   });
 
   await idbTransaction(tx);

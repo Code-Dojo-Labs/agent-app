@@ -16,24 +16,43 @@ const DB_VERSION = 1;
 /** Instancia singleton de la base de datos (se inicializa una sola vez). */
 let _db: IDBDatabase | null = null;
 
+/** Promesa en vuelo de apertura — evita abrir múltiples conexiones concurrentes. */
+let _openPromise: Promise<IDBDatabase> | null = null;
+
 /**
  * Abre (o reutiliza) la conexión a IndexedDB.
- * Crea el esquema en `onupgradeneeded` si la base de datos es nueva.
+ * Memoiza la promesa en vuelo para que llamadas concurrentes esperen
+ * la misma conexión en lugar de abrir varias en paralelo.
  */
 export function openDatabase(): Promise<IDBDatabase> {
-  if (_db) return Promise.resolve(_db);
+  if (_db)          return Promise.resolve(_db);
+  if (_openPromise) return _openPromise;   // todas las llamadas concurrentes esperan la misma promesa
 
-  return new Promise((resolve, reject) => {
+  _openPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onerror = () => reject(request.error);
+    request.onerror = () => {
+      _openPromise = null;
+      reject(request.error);
+    };
 
     request.onsuccess = () => {
       _db = request.result;
 
-      // Manejar cierre inesperado de la conexión (ej. otra pestaña actualiza la versión)
-      _db.onclose = () => { _db = null; };
+      // Manejar cierre inesperado de la conexión
+      _db.onclose = () => { _db = null; _openPromise = null; };
+
+      // Propagar errores globales de la instancia DB
       _db.onerror = (event) => console.error('[IndexedDB] Error global:', event);
+
+      // Cerrar la conexión cuando otra pestaña solicite una actualización de versión
+      // para evitar que quede bloqueada indefinidamente en el evento `blocked`.
+      _db.onversionchange = () => {
+        _db?.close();
+        _db = null;
+        _openPromise = null;
+        console.warn('[IndexedDB] Base de datos actualizada en otra pestaña. Recarga la página.');
+      };
 
       resolve(_db);
     };
@@ -62,6 +81,8 @@ export function openDatabase(): Promise<IDBDatabase> {
       // if (oldVersion < 2) { ... }
     };
   });
+
+  return _openPromise;
 }
 
 /**

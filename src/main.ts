@@ -33,6 +33,30 @@ async function bootstrap(): Promise<void> {
     console.info('[Dojo Kanban] App inicializada correctamente.');
   } catch (error) {
     console.error('[Dojo Kanban] Error durante la inicialización:', error);
+
+    // Mostrar mensaje de error en el DOM (WCAG 2.1 — 4.1.3 Status Messages).
+    // Todo el contenido es estático — no contiene input del usuario.
+    // Será reemplazado por <dojo-error> Web Component cuando esté implementado.
+    const errEl = document.createElement('div');
+    errEl.setAttribute('role', 'alert');
+    errEl.style.cssText = 'padding:2rem;font-family:system-ui;color:#DC2626;text-align:center';
+
+    const title = document.createElement('h1');
+    title.style.cssText = 'margin-bottom:.5rem;font-size:1.25rem';
+    title.textContent = 'Error al inicializar la aplicación';
+
+    const msg = document.createElement('p');
+    msg.textContent = 'No se pudo conectar al almacenamiento local. Comprueba que no estás en modo privado o que el almacenamiento no está lleno.';
+
+    const btn = document.createElement('button');
+    btn.style.cssText = 'margin-top:1rem;padding:.5rem 1rem;cursor:pointer';
+    btn.textContent = 'Reintentar';
+    btn.addEventListener('click', () => location.reload());
+
+    errEl.appendChild(title);
+    errEl.appendChild(msg);
+    errEl.appendChild(btn);
+    document.body.appendChild(errEl);
   }
 }
 
