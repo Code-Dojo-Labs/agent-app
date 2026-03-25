@@ -30,8 +30,9 @@
 
 import type { Column, Task } from '../../../types/models.js';
 import { getAllColumns, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
-import { getTasksByStatus, updateTask, deleteTask } from '../../../db/task.repository.js';
+import { getTasksByStatus, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
 import '../../molecules/dojo-kanban-column/dojo-kanban-column.js';
+import '../../atoms/dojo-task-card/dojo-task-card.js';
 import '../../atoms/dojo-add-column-button/dojo-add-column-button.js';
 import '../../organisms/dojo-column-dialog/dojo-column-dialog.js';
 
@@ -180,6 +181,8 @@ export class DojoKanbanBoard extends HTMLElement {
     this._shadow.addEventListener('dojo:column-delete',        (e) => this._onColumnDeleteRequest(e as CustomEvent));
     this._shadow.addEventListener('dojo:column-reorder',       (e) => this._handleReorder(e as CustomEvent));
     this._shadow.addEventListener('dojo:add-column',           () => this._onAddColumnRequest());
+    // US-03: Drag & Drop de tareas
+    this._shadow.addEventListener('dojo:column-drop',          (e) => this._handleTaskDrop(e as CustomEvent));
   }
 
   // ── Estados visuales ─────────────────────────────────────────────────────
@@ -296,6 +299,10 @@ export class DojoKanbanBoard extends HTMLElement {
       colEl.setAttribute('total-count', String(total));
       if (col.color) colEl.setAttribute('accent-color', col.color);
 
+      // US-03: Renderizar tarjetas de tarea en la columna
+      const tasks = this._tasksByColumn.get(col.id) ?? [];
+      this._renderTaskCards(colEl, tasks);
+
       track.appendChild(colEl);
     }
 
@@ -306,7 +313,37 @@ export class DojoKanbanBoard extends HTMLElement {
     this._setMainContent(track);
   }
 
-  // ── Conteo con filtros ────────────────────────────────────────────────────
+  // ── Renderizado y refresco de tarjetas de tarea (US-03) ───────────────────────────────────────
+
+  /**
+   * Crea y agrega `dojo-task-card` como hijos directos del elemento de columna.
+   * Las tarjetas se proyectan en el default slot del componente.
+   */
+  private _renderTaskCards(colEl: Element, tasks: Task[]): void {
+    const sorted = [...tasks].sort((a, b) => a.order - b.order);
+    for (const task of sorted) {
+      const card = document.createElement('dojo-task-card');
+      card.setAttribute('task-id',       task.id);
+      card.setAttribute('task-title',    task.title);
+      card.setAttribute('task-priority', task.priority);
+      colEl.appendChild(card);
+    }
+  }
+
+  /**
+   * Reemplaza las tarjetas de una columna ya renderizada sin recrear el elemento columna.
+   */
+  private _refreshColumnCards(columnId: string): void {
+    const colEl = this._shadow.querySelector(
+      `dojo-kanban-column[column-id="${columnId}"]`
+    );
+    if (!colEl) return;
+    colEl.querySelectorAll('dojo-task-card').forEach(el => el.remove());
+    const tasks = this._tasksByColumn.get(columnId) ?? [];
+    this._renderTaskCards(colEl, tasks);
+  }
+
+  // ── Conteo con filtros ──────────────────────────────────────────────────────────────────────────
 
   private _getColumnCounts(columnId: string): { visible: number; total: number } {
     const tasks = this._tasksByColumn.get(columnId) ?? [];
@@ -337,6 +374,110 @@ export class DojoKanbanBoard extends HTMLElement {
       col.setAttribute('count', String(visible));
       col.setAttribute('total-count', String(total));
     });
+  }
+
+  // ── Handler: Drop de tarea (US-03) ───────────────────────────────────────
+
+  /**
+   * Maneja `dojo:column-drop` para mover tareas entre columnas o reordenarlas
+   * dentro de la misma. Detecta el tipo de operación por comparación de columnId.
+   */
+  private async _handleTaskDrop(e: CustomEvent): Promise<void> {
+    const { columnId: targetColumnId, taskId, beforeTaskId } = e.detail as {
+      columnId:     string;
+      taskId:       string;
+      beforeTaskId: string | null;
+    };
+
+    // Localizar la columna origen desde el caché
+    let sourceColumnId: string | null = null;
+    for (const [colId, tasks] of this._tasksByColumn) {
+      if (tasks.some(t => t.id === taskId)) {
+        sourceColumnId = colId;
+        break;
+      }
+    }
+    if (!sourceColumnId) return;
+
+    try {
+      if (sourceColumnId === targetColumnId) {
+        // ── Reordenamiento dentro de la misma columna ─────────────────────
+        const tasks      = this._tasksByColumn.get(targetColumnId) ?? [];
+        const orderedIds = this._computeReorderedIds(tasks, taskId, beforeTaskId);
+        await reorderTasks(targetColumnId, orderedIds);
+        const taskMap = new Map(tasks.map(t => [t.id, t]));
+        this._tasksByColumn.set(
+          targetColumnId,
+          orderedIds.map((id, order) => ({ ...taskMap.get(id)!, order })),
+        );
+      } else {
+        // ── Movimiento entre columnas ──────────────────────────────────────
+        const sourceTasks = this._tasksByColumn.get(sourceColumnId) ?? [];
+        const targetTasks = this._tasksByColumn.get(targetColumnId) ?? [];
+        const movedTask   = sourceTasks.find(t => t.id === taskId);
+        if (!movedTask) return;
+
+        const newTargetTasks = this._insertAtPosition(
+          [...targetTasks],
+          { ...movedTask, statusId: targetColumnId },
+          beforeTaskId,
+        );
+        const newSourceTasks = sourceTasks.filter(t => t.id !== taskId);
+
+        await updateTask(taskId, { statusId: targetColumnId });
+        await reorderTasks(targetColumnId, newTargetTasks.map(t => t.id));
+        if (newSourceTasks.length > 0) {
+          await reorderTasks(sourceColumnId, newSourceTasks.map(t => t.id));
+        }
+
+        this._tasksByColumn.set(
+          sourceColumnId,
+          newSourceTasks.map((t, i) => ({ ...t, order: i })),
+        );
+        this._tasksByColumn.set(
+          targetColumnId,
+          newTargetTasks.map((t, i) => ({ ...t, order: i, statusId: targetColumnId })),
+        );
+
+        this._refreshColumnCards(sourceColumnId);
+      }
+
+      this._refreshColumnCards(targetColumnId);
+      this._updateColumnCounts();
+    } catch (err) {
+      console.error('[dojo-kanban-board] Error al procesar drop de tarea:', err);
+    }
+  }
+
+  /**
+   * Calcula el array de IDs resultante al mover `movingId` antes de `beforeId`.
+   * Si `beforeId` es null, la tarea se añade al final.
+   */
+  private _computeReorderedIds(
+    tasks:    Task[],
+    movingId: string,
+    beforeId: string | null,
+  ): string[] {
+    const others = tasks.filter(t => t.id !== movingId);
+    if (beforeId === null) return [...others.map(t => t.id), movingId];
+    const idx = others.findIndex(t => t.id === beforeId);
+    if (idx === -1)        return [...others.map(t => t.id), movingId];
+    const result = others.map(t => t.id);
+    result.splice(idx, 0, movingId);
+    return result;
+  }
+
+  /**
+   * Inserta `task` en `tasks` antes del elemento con id `beforeId`.
+   * Si `beforeId` es null o no existe, inserta al final.
+   */
+  private _insertAtPosition(tasks: Task[], task: Task, beforeId: string | null): Task[] {
+    if (beforeId === null) return [...tasks, task];
+    const idx = tasks.findIndex(t => t.id === beforeId);
+    if (idx === -1)        return [...tasks, task];
+    const result = [...tasks];
+    result.splice(idx, 0, task);
+    return result;
   }
 
   // ── Handlers de gestión de columnas ────────────────────────────────────────
