@@ -27,6 +27,7 @@
  * | dojo:column-rename   | { columnId }                                    | Usuario eligió "Renombrar"     |
  * | dojo:column-delete   | { columnId }                                    | Usuario eligió "Eliminar"      |
  * | dojo:column-reorder  | { sourceId, targetId }                          | Columna arrastrada a posición  |
+ * | dojo:add-task        | { columnId }                                    | Usuario quiere crear una tarea |
  *
  * ## CSS Custom Properties heredadas
  * --dojo-surface, --dojo-border, --dojo-radius, --dojo-bg, --dojo-shadow
@@ -34,6 +35,7 @@
 
 import '../../atoms/dojo-column-header/dojo-column-header.js';
 import '../../atoms/dojo-column-menu/dojo-column-menu.js';
+import '../../atoms/dojo-add-task-button/dojo-add-task-button.js';
 
 export class DojoKanbanColumn extends HTMLElement {
   static readonly TAG = 'dojo-kanban-column';
@@ -161,6 +163,12 @@ export class DojoKanbanColumn extends HTMLElement {
         text-align: center;
         pointer-events: none;
       }
+
+      /* Zona inferior: botón agregar tarea */
+      .col-footer {
+        padding: 0.375rem 0.5rem 0.5rem;
+        border-top: 1px solid var(--dojo-border);
+      }
     `;
     this._shadow.appendChild(style);
 
@@ -219,6 +227,15 @@ export class DojoKanbanColumn extends HTMLElement {
     });
 
     this._shadow.appendChild(content);
+
+    // ── Zona inferior: botón "Agregar tarea" ──────────────────────────────
+    const footer = document.createElement('div');
+    footer.className = 'col-footer';
+
+    const addTaskBtn = document.createElement('dojo-add-task-button') as HTMLElement;
+    addTaskBtn.setAttribute('column-id', this.columnId);
+    footer.appendChild(addTaskBtn);
+    this._shadow.appendChild(footer);
   }
 
   // ── Actualización dinámica del header ────────────────────────────────────
