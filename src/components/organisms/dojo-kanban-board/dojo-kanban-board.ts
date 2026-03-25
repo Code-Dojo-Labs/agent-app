@@ -29,9 +29,11 @@
  */
 
 import type { Column, Task } from '../../../types/models.js';
-import { getAllColumns } from '../../../db/column.repository.js';
-import { getTasksByStatus } from '../../../db/task.repository.js';
+import { getAllColumns, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
+import { getTasksByStatus, updateTask, deleteTask } from '../../../db/task.repository.js';
 import '../../molecules/dojo-kanban-column/dojo-kanban-column.js';
+import '../../atoms/dojo-add-column-button/dojo-add-column-button.js';
+import '../../organisms/dojo-column-dialog/dojo-column-dialog.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
 
@@ -49,6 +51,8 @@ export class DojoKanbanBoard extends HTMLElement {
   private _activeFilter: ActiveFilter = {};
   /** columnId → lista de todas las tareas de esa columna (sin filtrar) */
   private _tasksByColumn: Map<string, Task[]> = new Map();
+  /** Lista ordenada de columnas actualmente cargadas */
+  private _columns: Column[] = [];
 
   constructor() {
     super();
@@ -165,6 +169,17 @@ export class DojoKanbanBoard extends HTMLElement {
 
     // Área principal — empieza en estado loading
     this._showLoading();
+
+    // Diálogo de gestión de columnas (montado una sola vez)
+    const dialog = document.createElement('dojo-column-dialog');
+    this._shadow.appendChild(dialog);
+    this._shadow.addEventListener('dojo:dialog-create-column', (e) => this._handleCreate(e as CustomEvent));
+    this._shadow.addEventListener('dojo:dialog-rename-column', (e) => this._handleRename(e as CustomEvent));
+    this._shadow.addEventListener('dojo:dialog-delete-column', (e) => this._handleDelete(e as CustomEvent));
+    this._shadow.addEventListener('dojo:column-rename',        (e) => this._onColumnRenameRequest(e as CustomEvent));
+    this._shadow.addEventListener('dojo:column-delete',        (e) => this._onColumnDeleteRequest(e as CustomEvent));
+    this._shadow.addEventListener('dojo:column-reorder',       (e) => this._handleReorder(e as CustomEvent));
+    this._shadow.addEventListener('dojo:add-column',           () => this._onAddColumnRequest());
   }
 
   // ── Estados visuales ─────────────────────────────────────────────────────
@@ -248,6 +263,7 @@ export class DojoKanbanBoard extends HTMLElement {
         this._tasksByColumn.set(col.id, taskResults[i]);
       });
 
+      this._columns = columns;
       this._renderColumns(columns);
       this.removeAttribute('aria-busy');
 
@@ -283,6 +299,10 @@ export class DojoKanbanBoard extends HTMLElement {
       track.appendChild(colEl);
     }
 
+    // Botón "Añadir columna" al final del track
+    const addBtn = document.createElement('dojo-add-column-button');
+    track.appendChild(addBtn);
+
     this._setMainContent(track);
   }
 
@@ -317,6 +337,122 @@ export class DojoKanbanBoard extends HTMLElement {
       col.setAttribute('count', String(visible));
       col.setAttribute('total-count', String(total));
     });
+  }
+
+  // ── Handlers de gestión de columnas ────────────────────────────────────────
+
+  private _getDialog(): HTMLElement | null {
+    return this._shadow.querySelector('dojo-column-dialog');
+  }
+
+  private _onAddColumnRequest(): void {
+    const dialog = this._getDialog() as any;
+    if (dialog?.openCreate) dialog.openCreate();
+  }
+
+  private _onColumnRenameRequest(e: CustomEvent): void {
+    const { columnId } = e.detail as { columnId: string };
+    const col = this._columns.find(c => c.id === columnId);
+    if (!col) return;
+    const dialog = this._getDialog() as any;
+    if (dialog?.openRename) dialog.openRename(col.id, col.name);
+  }
+
+  private _onColumnDeleteRequest(e: CustomEvent): void {
+    const { columnId } = e.detail as { columnId: string };
+    const col = this._columns.find(c => c.id === columnId);
+    if (!col) return;
+    const otherColumns = this._columns.filter(c => c.id !== columnId);
+    const dialog = this._getDialog() as any;
+    if (dialog?.openDelete) dialog.openDelete(col.id, col.name, otherColumns);
+  }
+
+  private async _handleCreate(e: CustomEvent): Promise<void> {
+    const { name, icon } = e.detail as { name: string; icon: string };
+    const nextOrder = this._columns.length > 0
+      ? Math.max(...this._columns.map(c => c.order)) + 1
+      : 0;
+    try {
+      const newCol = await createColumn({ name, icon, order: nextOrder });
+      this._columns.push(newCol);
+      this._tasksByColumn.set(newCol.id, []);
+      this._renderColumns(this._columns);
+    } catch (err) {
+      console.error('[dojo-kanban-board] Error al crear columna:', err);
+    }
+  }
+
+  private async _handleRename(e: CustomEvent): Promise<void> {
+    const { columnId, name } = e.detail as { columnId: string; name: string };
+    try {
+      const updated = await updateColumn(columnId, { name });
+      const idx = this._columns.findIndex(c => c.id === columnId);
+      if (idx !== -1) this._columns[idx] = updated;
+      // Actualizar solo el atributo del elemento del DOM
+      const colEl = this._shadow.querySelector(`dojo-kanban-column[column-id="${columnId}"]`);
+      if (colEl) colEl.setAttribute('column-name', name);
+    } catch (err) {
+      console.error('[dojo-kanban-board] Error al renombrar columna:', err);
+    }
+  }
+
+  private async _handleDelete(e: CustomEvent): Promise<void> {
+    const { columnId, action, targetColumnId } = e.detail as {
+      columnId: string;
+      action: 'move' | 'delete';
+      targetColumnId?: string;
+    };
+    try {
+      const tasks = this._tasksByColumn.get(columnId) ?? [];
+
+      if (action === 'move' && targetColumnId) {
+        // Mover todas las tareas a la columna destino
+        const targetTasks = this._tasksByColumn.get(targetColumnId) ?? [];
+        const startOrder  = targetTasks.length;
+        await Promise.all(
+          tasks.map((t, i) => updateTask(t.id, { statusId: targetColumnId, order: startOrder + i }))
+        );
+        // Actualizar cache
+        this._tasksByColumn.set(targetColumnId, [
+          ...targetTasks,
+          ...tasks.map((t, i) => ({ ...t, statusId: targetColumnId, order: startOrder + i })),
+        ]);
+      } else {
+        // Eliminar todas las tareas de la columna
+        await Promise.all(tasks.map(t => deleteTask(t.id)));
+      }
+
+      await deleteColumn(columnId);
+      this._columns = this._columns.filter(c => c.id !== columnId);
+      this._tasksByColumn.delete(columnId);
+      this._renderColumns(this._columns);
+    } catch (err) {
+      console.error('[dojo-kanban-board] Error al eliminar columna:', err);
+    }
+  }
+
+  private async _handleReorder(e: CustomEvent): Promise<void> {
+    const { sourceId, targetId } = e.detail as { sourceId: string; targetId: string };
+    const srcIdx = this._columns.findIndex(c => c.id === sourceId);
+    const tgtIdx = this._columns.findIndex(c => c.id === targetId);
+    if (srcIdx === -1 || tgtIdx === -1) return;
+
+    // Reordenar en memoria
+    const moved = this._columns.splice(srcIdx, 1)[0];
+    this._columns.splice(tgtIdx, 0, moved);
+
+    // Persistir nuevos values de `order`
+    try {
+      await Promise.all(
+        this._columns.map((col, idx) => updateColumn(col.id, { order: idx }))
+      );
+      this._columns = this._columns.map((col, idx) => ({ ...col, order: idx }));
+      this._renderColumns(this._columns);
+    } catch (err) {
+      console.error('[dojo-kanban-board] Error al reordenar columnas:', err);
+      // Recargar desde IndexedDB para mantener consistencia
+      await this._loadBoard();
+    }
   }
 }
 
