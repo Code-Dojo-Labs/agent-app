@@ -1,0 +1,63 @@
+/**
+ * main.ts — Entry point de la aplicación Dojo Kanban.
+ *
+ * Responsabilidades:
+ *   1. Inicializar la base de datos IndexedDB.
+ *   2. Insertar columnas por defecto si es la primera ejecución.
+ *   3. Registrar todos los Web Components (Custom Elements).
+ *   4. Montar el componente raíz <dojo-app> en el DOM.
+ *
+ * Este archivo es el único módulo referenciado desde public/index.html:
+ *   <script type="module" src="./main.js"></script>
+ */
+
+import { openDatabase } from './db/database.js';
+import { seedDefaultColumns } from './db/column.repository.js';
+
+// ── Inicialización ─────────────────────────────────────────────────────────
+
+async function bootstrap(): Promise<void> {
+  try {
+    // 1. Abrir (o crear) la base de datos
+    await openDatabase();
+
+    // 2. Seed de columnas por defecto (solo si el store está vacío)
+    await seedDefaultColumns();
+
+    // 3. Registrar Web Components
+    //    Los componentes se importarán aquí a medida que se implementen.
+    //    Ejemplo:
+    //    import './components/organisms/kanban-board/kanban-board.js';
+
+    // 4. Montar la app (el elemento <dojo-app> ya está en el HTML)
+    console.info('[Dojo Kanban] App inicializada correctamente.');
+  } catch (error) {
+    console.error('[Dojo Kanban] Error durante la inicialización:', error);
+
+    // Mostrar mensaje de error en el DOM (WCAG 2.1 — 4.1.3 Status Messages).
+    // Todo el contenido es estático — no contiene input del usuario.
+    // Será reemplazado por <dojo-error> Web Component cuando esté implementado.
+    const errEl = document.createElement('div');
+    errEl.setAttribute('role', 'alert');
+    errEl.style.cssText = 'padding:2rem;font-family:system-ui;color:#DC2626;text-align:center';
+
+    const title = document.createElement('h1');
+    title.style.cssText = 'margin-bottom:.5rem;font-size:1.25rem';
+    title.textContent = 'Error al inicializar la aplicación';
+
+    const msg = document.createElement('p');
+    msg.textContent = 'No se pudo conectar al almacenamiento local. Comprueba que no estás en modo privado o que el almacenamiento no está lleno.';
+
+    const btn = document.createElement('button');
+    btn.style.cssText = 'margin-top:1rem;padding:.5rem 1rem;cursor:pointer';
+    btn.textContent = 'Reintentar';
+    btn.addEventListener('click', () => location.reload());
+
+    errEl.appendChild(title);
+    errEl.appendChild(msg);
+    errEl.appendChild(btn);
+    document.body.appendChild(errEl);
+  }
+}
+
+bootstrap();

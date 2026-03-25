@@ -1,6 +1,6 @@
 # COOKBOOK — ToDo List con Web Components
 
-> **Versión:** 0.3.0  
+> **Versión:** 0.6.0  
 > **Última actualización:** 2026-03-25  
 > **Mantenido por:** Agente `documentalista`
 
@@ -15,6 +15,9 @@
    - [Paso 1 — Definición de Requerimientos](#paso-1--definición-de-requerimientos)
    - [Paso 2 — Inicialización del COOKBOOK](#paso-2--inicialización-del-cookbook)
    - [Paso 3 — Definición del Stack Tecnológico](#paso-3--definición-del-stack-tecnológico)
+   - [Paso 4 — Creación de Historias de Usuario](#paso-4--creación-de-historias-de-usuario)
+   - [Paso 5 — Implementación del Skeleton del Proyecto (US-00 / Issue #1)](#paso-5--implementación-del-skeleton-del-proyecto-us-00--issue-1)
+   - [Paso 6 — Apertura del Pull Request #18](#paso-6--apertura-del-pull-request-18)
 
 ---
 
@@ -497,4 +500,171 @@ requirements/tech-stack.md
 
 ---
 
-*El siguiente paso registrado aquí será la implementación del primer componente por el agente Builder.*
+---
+
+### Paso 4 — Creación de Historias de Usuario
+
+**Fecha:** 2026-03-25  
+**Agente ejecutor:** `documentalista`  
+**Estado:** ✅ Completado
+
+#### Descripción
+
+Se creó la carpeta `user-stories/` dentro de `requirements/`, con 11 historias de usuario redactadas en formato **Como / Quiero / Para** y criterios de aceptación en **Gherkin** (`Feature` / `Scenario` / `Given-When-Then`). La historia de usuario US-00 documenta el stack tecnológico como restricción funcional del proyecto.
+
+#### Archivos generados
+
+| Archivo | Historia | RF / Área |
+|---|---|---|
+| [`user-stories/index.md`](./requirements/user-stories/index.md) | Índice con tabla de todas las historias | — |
+| [`US-00-tech-stack.md`](./requirements/user-stories/US-00-tech-stack.md) | Stack Tecnológico — Zero Dependencies | Infraestructura |
+| [`US-01-kanban-board.md`](./requirements/user-stories/US-01-kanban-board.md) | Visualización del tablero Kanban | RF-01 |
+| [`US-02-column-management.md`](./requirements/user-stories/US-02-column-management.md) | Gestión de columnas (CRUD) | RF-02 |
+| [`US-03-drag-and-drop.md`](./requirements/user-stories/US-03-drag-and-drop.md) | Arrastrar tarjetas entre columnas | RF-01 |
+| [`US-04-create-task.md`](./requirements/user-stories/US-04-create-task.md) | Crear tarea con título y prioridad | RF-03 |
+| [`US-05-edit-task.md`](./requirements/user-stories/US-05-edit-task.md) | Editar tarea existente | RF-03 |
+| [`US-06-delete-task.md`](./requirements/user-stories/US-06-delete-task.md) | Eliminar tarea con confirmación | RF-03 |
+| [`US-07-label-management.md`](./requirements/user-stories/US-07-label-management.md) | Gestión de etiquetas (CRUD) | RF-04 |
+| [`US-08-label-colors.md`](./requirements/user-stories/US-08-label-colors.md) | Colores de etiqueta con garantía WCAG AA | RF-04 |
+| [`US-09-persistence.md`](./requirements/user-stories/US-09-persistence.md) | Persistencia con IndexedDB | RF-05 |
+| [`US-10-filter-search.md`](./requirements/user-stories/US-10-filter-search.md) | Filtrado y búsqueda de tareas | RF-05 |
+
+#### Convenciones aplicadas
+
+- **Nomenclatura:** `US-[número de 2 dígitos]-[slug-descriptivo].md`
+- **Formato de historia:** `Como [rol] / Quiero [acción] / Para [beneficio]`
+- **Formato de criterios:** Gherkin estricto con `Feature`, `Scenario`, `Given`, `When`, `Then`, `And`
+- **Cobertura:** Todas las historias tienen al menos 4 escenarios; las historias críticas tienen hasta 10
+
+#### Archivos afectados
+
+| Archivo | Acción |
+|---|---|
+| `requirements/user-stories/` | Carpeta creada con 12 archivos |
+| `requirements/index.md` | Actualizado a v1.1 con referencia a `user-stories/` |
+
+---
+
+### Paso 5 — Implementación del Skeleton del Proyecto (US-00 / Issue #1)
+
+**Fecha:** 2026-03-25  
+**Agente ejecutor:** `builder`  
+**Issue asociado:** [#1 — US-00 Stack Tecnológico](https://github.com/Code-Dojo-Labs/agent-app/issues/1)  
+**Rama:** `feat/1-stack-tecnologico-zero-dependencies`  
+**Commit:** `feat(infra): setup Zero Dependencies project skeleton` (`2b02ba0`)  
+**Estado:** ✅ Completado — pendiente de PR y revisión
+
+#### Descripción
+
+El agente Builder implementó la infraestructura base del proyecto conforme a la US-00 y al stack definido en `requirements/tech-stack.md`. Se estableció la estructura de carpetas completa de `src/`, la configuración de TypeScript, el HTML raíz y toda la capa de acceso a datos (IndexedDB + Repositories). La compilación es limpia (`tsc --noEmit` sin errores) y el output en `dist/` son ES Modules puros.
+
+#### Criterios de aceptación cubiertos (US-00)
+
+| Escenario Gherkin | Estado |
+|---|---|
+| Proyecto compilado sin bundler externo | ✅ Solo `tsc`, output en `/dist` como ES Modules |
+| Configuración estricta de TypeScript | ✅ `tsconfig.json` con `ES2022`, `strict: true`, `outDir: ./dist` |
+| Componentes UI como Web Components | 🔄 Arquitectura preparada; componentes se implementan en siguientes issues |
+| Persistencia con IndexedDB nativo | ✅ `database.ts` + 3 repositories con API nativa, sin wrappers |
+| Drag and drop con API nativa HTML5 | 🔄 Pendiente de issue de tablero Kanban |
+| Validación de contraste WCAG implementada manualmente | ✅ `contrast.ts` con `relativeLuminance`, `contrastRatio`, `pickTextColor` |
+| Parser de Markdown implementado de forma propia | ✅ `markdown.ts` XSS-safe via DOM API, sin `innerHTML` |
+| Módulos cargados como ES Modules nativos | ✅ `<script type="module">` en `public/index.html` |
+| Servidor de desarrollo sin dependencias de producción | ✅ Script `serve` usa `python3 -m http.server` |
+
+#### Archivos creados
+
+| Archivo | Propósito |
+|---|---|
+| `package.json` | `typescript` como única devDependency; scripts `build`, `watch`, `serve` |
+| `tsconfig.json` | Target ES2022, strict mode, rootDir `./src`, outDir `./dist`, declaration |
+| `public/index.html` | HTML raíz con tokens CSS globales `--dojo-*`, dark mode y `<script type="module">` |
+| `src/types/models.ts` | Interfaces `Task`, `Column`, `Label`, tipo `Priority`, constante `DEFAULT_COLUMNS` |
+| `src/db/database.ts` | `openDatabase()` (singleton), `idbRequest<T>()`, `idbTransaction()`, `getStore()` |
+| `src/db/task.repository.ts` | CRUD completo de tareas + `reorderTasks()` para Drag and Drop |
+| `src/db/column.repository.ts` | CRUD de columnas + `seedDefaultColumns()` (inserción de datos por defecto) |
+| `src/db/label.repository.ts` | CRUD de etiquetas con validación de unicidad case-insensitive |
+| `src/utils/uuid.ts` | `generateUUID()` wrapper sobre `crypto.randomUUID()` |
+| `src/utils/contrast.ts` | Implementación WCAG 2.1: `relativeLuminance`, `contrastRatio`, `meetsWcagAA`, `pickTextColor`, `isLabelColorAccessible` |
+| `src/utils/markdown.ts` | Parser de Markdown propio: headings, bold, italic, código, listas, enlaces con sanitización XSS; `markdownToPlainText()` para accesibilidad |
+| `src/main.ts` | Entry point: `openDatabase()` → `seedDefaultColumns()` → registro de Web Components |
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `.gitignore` | Añadidos `dist/` y `node_modules/` (formato correcto sin prefijo `./`) |
+
+#### Estructura resultante de `src/`
+
+```
+src/
+├── types/
+│   └── models.ts          # interfaces Task, Column, Label, Priority
+├── db/
+│   ├── database.ts         # openDatabase(), idbRequest<T>(), idbTransaction()
+│   ├── task.repository.ts
+│   ├── column.repository.ts
+│   └── label.repository.ts
+├── utils/
+│   ├── uuid.ts             # crypto.randomUUID() wrapper
+│   ├── contrast.ts         # WCAG 2.1 contrast ratio
+│   └── markdown.ts         # Parser Markdown XSS-safe
+└── main.ts                 # Entry point de la aplicación
+```
+
+#### Resultado del build
+
+```
+$ npm run build
+→ tsc && cp public/index.html dist/index.html
+→ 19 archivos generados en dist/
+→ 0 errores TypeScript · 0 vulnerabilidades npm
+```
+
+#### Notas de seguridad (OWASP)
+
+- **XSS (A03):** El parser de Markdown nunca usa `innerHTML` con input del usuario. Todo el contenido se inserta con `createElement` + `textContent`. Las URLs de enlaces se validan contra una lista de protocolos permitidos (`http:`, `https:`).
+- **Inyección (A03):** La validación de unicidad de etiquetas opera en memoria antes de escribir en IndexedDB, evitando condiciones de carrera en escrituras concurrentes.
+- **Datos sensibles (A02):** Ningún dato de configuración, credencial o token se incluye en el código fuente.
+
+---
+
+*El siguiente paso será la creación del Pull Request para el Issue #1 y su revisión por el agente Reviewer.*
+
+---
+
+### Paso 6 — Apertura del Pull Request #18
+
+**Fecha:** 2026-03-25  
+**Agente ejecutor:** `gitjmz` (PR) + `documentalista` (registro)  
+**Issue asociado:** [#1 — US-00 Stack Tecnológico](https://github.com/Code-Dojo-Labs/agent-app/issues/1)  
+**PR:** [#18 — feat(infra): Zero Dependencies project skeleton](https://github.com/Code-Dojo-Labs/agent-app/pull/18)  
+**Estado:** 🔄 Abierto — pendiente de revisión por agente Reviewer
+
+#### Descripción
+
+El agente `gitjmz` creó el Pull Request formal para incorporar la rama `feat/1-stack-tecnologico-zero-dependencies` en la rama `prod`. El PR fue redactado con una descripción técnica completa que incluye tabla de cambios por capa, resultado del build, criterios de aceptación US-00 y notas de seguridad OWASP.
+
+#### Datos del PR
+
+| Campo | Valor |
+|---|---|
+| Número | #18 |
+| Título | `feat(infra): Zero Dependencies project skeleton — US-00 Stack Tecnológico` |
+| URL | https://github.com/Code-Dojo-Labs/agent-app/pull/18 |
+| Rama origen | `feat/1-stack-tecnologico-zero-dependencies` |
+| Rama destino | `prod` |
+| Issue vinculado | `Closes #1` |
+| Commits incluidos | `feat(infra): setup Zero Dependencies project skeleton` (`2b02ba0`)<br>`docs(cookbook): update to v0.5.0 with steps 4 and 5` (`79c2950`) |
+| Archivos cambiados | 15 archivos · +979 / -1 líneas |
+
+#### Siguiente acción
+
+El agente **Reviewer** tiene asignada la auditoría de este PR. Debe:
+1. Leer el diff completo del PR.
+2. Clasificar los hallazgos en 🔴 Bloqueante / 🟡 Importante / 🔵 Sugerencia.
+3. Publicar el reporte como comentario formal en [PR #18](https://github.com/Code-Dojo-Labs/agent-app/pull/18).
+4. Emitir veredicto: Aprobado ✅ / Cambios solicitados 🔄 / Solo comentarios 💬.
+
+> **Restricción:** El merge a `prod` está **bloqueado** hasta que el Reviewer emita su veredicto y el humano apruebe.
