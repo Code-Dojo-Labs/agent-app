@@ -1,6 +1,6 @@
 # COOKBOOK — ToDo List con Web Components
 
-> **Versión:** 0.6.0  
+> **Versión:** 0.7.0  
 > **Última actualización:** 2026-03-25  
 > **Mantenido por:** Agente `documentalista`
 
@@ -18,6 +18,7 @@
    - [Paso 4 — Creación de Historias de Usuario](#paso-4--creación-de-historias-de-usuario)
    - [Paso 5 — Implementación del Skeleton del Proyecto (US-00 / Issue #1)](#paso-5--implementación-del-skeleton-del-proyecto-us-00--issue-1)
    - [Paso 6 — Apertura del Pull Request #18](#paso-6--apertura-del-pull-request-18)
+   - [Paso 7 — Implementación de la Visualización del Tablero Kanban (US-01 / Issue #2)](#paso-7--implementación-de-la-visualización-del-tablero-kanban-us-01--issue-2)
 
 ---
 
@@ -668,3 +669,99 @@ El agente **Reviewer** tiene asignada la auditoría de este PR. Debe:
 4. Emitir veredicto: Aprobado ✅ / Cambios solicitados 🔄 / Solo comentarios 💬.
 
 > **Restricción:** El merge a `prod` está **bloqueado** hasta que el Reviewer emita su veredicto y el humano apruebe.
+
+---
+
+### Paso 7 — Implementación de la Visualización del Tablero Kanban (US-01 / Issue #2)
+
+**Fecha:** 2026-03-25
+**Agente ejecutor:** `builder`
+**Issue asociado:** [#2 — US-01 Visualización del tablero Kanban](https://github.com/Code-Dojo-Labs/agent-app/issues/2)
+**Rama:** `feat/2-visualizacion-tablero-kanban`
+**Estado:** ✅ Implementado — pendiente de PR y revisión
+
+#### Descripción
+
+El agente Builder implementó los tres Web Components necesarios para la visualización del tablero Kanban (US-01), siguiendo la arquitectura **Atomic Design** (Átomo → Molécula → Organismo). Todos los componentes usan Shadow DOM, CSS Custom Properties del sistema de theming y cumplen con los criterios de accesibilidad WCAG 2.1.
+
+#### Criterios de aceptación cubiertos (US-01)
+
+| Escenario Gherkin | Estado |
+|---|---|
+| Tablero cargado con columnas por defecto | ✅ `dojo-kanban-board` carga desde IndexedDB con `getAllColumns()` |
+| Cabecera de columna con ícono, nombre y conteo | ✅ `dojo-column-header` muestra los tres elementos con ARIA |
+| Scroll vertical independiente por columna | ✅ `.content` en `dojo-kanban-column` con `overflow-y: auto` |
+| Scroll horizontal del tablero | ✅ `.board-track` con `overflow-x: auto` |
+| Conteo actualizado con filtro activo (X / Y) | ✅ `activeFilter` setter en `dojo-kanban-board` actualiza conteos en tiempo real |
+
+#### Componentes creados (Atomic Design)
+
+| Nivel | Componente | Tag HTML | Archivo |
+|---|---|---|---|
+| Átomo | Column Header | `<dojo-column-header>` | `src/components/atoms/dojo-column-header/dojo-column-header.ts` |
+| Molécula | Kanban Column | `<dojo-kanban-column>` | `src/components/molecules/dojo-kanban-column/dojo-kanban-column.ts` |
+| Organismo | Kanban Board | `<dojo-kanban-board>` | `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` |
+| Organismo | App Root | `<dojo-app>` | `src/components/organisms/dojo-app/dojo-app.ts` |
+
+#### Detalles de implementación por componente
+
+**`dojo-column-header` (Átomo)**
+- Atributos observados: `icon`, `column-name`, `count`, `total-count`, `accent-color`
+- Conteo en formato `X / Y` cuando `count !== total-count` (filtro activo)
+- Badge con `aria-label` descriptivo para lectores de pantalla
+- Borde superior de color con `accent-color` (opcional, para futura colorización de columnas)
+
+**`dojo-kanban-column` (Molécula)**
+- Scroll vertical independiente con scrollbar customizado (cross-browser)
+- Estado visual `drag-over` con outline dashed cuando se arrastra una tarea sobre la columna
+- Mensaje "Sin tareas" oculto automáticamente cuando el slot tiene contenido (`slotchange`)
+- Evento `dojo:column-drop` con `{ columnId, taskId }` para futura implementación DnD
+- Listeners de drag & drop desregistrados en `disconnectedCallback` (sin memory leaks)
+
+**`dojo-kanban-board` (Organismo)**
+- Carga columnas y tareas en paralelo con `Promise.all`
+- Estados: `loading` (spinner + `aria-busy`) → `columns` → `error` (mensaje + botón reintentar)
+- Setter `activeFilter` actualiza conteos en tiempo real sin recargar IndexedDB
+- Eventos: `dojo:board-ready` (éxito) y `dojo:board-error` (fallo)
+
+**`dojo-app` (Organismo raíz)**
+- Header fijo con logo, título y subtítulo
+- Área de tablero con `flex: 1` y `min-height: 0` para ocupar el espacio restante
+- Roles ARIA: `role="banner"` en header, `role="main"` en área del tablero
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `src/main.ts` | Registro dinámico de `dojo-app` via `await import()` |
+
+#### Estructura `src/components/`
+
+```
+src/components/
+├── atoms/
+│   └── dojo-column-header/
+│       └── dojo-column-header.ts   # Cabecera de columna
+├── molecules/
+│   └── dojo-kanban-column/
+│       └── dojo-kanban-column.ts   # Columna con scroll + DnD drop target
+└── organisms/
+    ├── dojo-kanban-board/
+    │   └── dojo-kanban-board.ts    # Tablero completo + carga IndexedDB
+    └── dojo-app/
+        └── dojo-app.ts             # Root component (header + board area)
+```
+
+#### Resultado del build
+
+```
+$ npm run build
+→ tsc && cp public/index.html dist/index.html
+→ 0 errores TypeScript · build limpio
+```
+
+#### Decisión de diseño: Carga de tareas en bootstrap del board
+
+`dojo-kanban-board` carga las tareas de **todas** las columnas en el `connectedCallback` para tener disponible el total de tareas por columna y poder mostrar el formato `X / Y` cuando se activa un filtro. Esto es aceptable para el tamaño de datos de un tablero Kanban personal (decenas o cientos de tareas), donde la consulta a IndexedDB es sub-milisegundo. Si el dataset crece, se puede memoizar por columna y recargar solo la columna afectada.
+
+*El siguiente paso será la creación del PR #2 y su revisión por el agente Reviewer.*
