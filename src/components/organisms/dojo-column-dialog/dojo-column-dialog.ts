@@ -45,6 +45,11 @@ export class DojoColumnDialog extends HTMLElement {
   private _currentName = '';
   private _otherColumns: Column[] = [];
 
+  // B-1: referencia estable para poder añadir y quitar el listener
+  private _onDocKeydown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape' && this._isOpen()) this._close();
+  };
+
   constructor() {
     super();
     this._shadow = this.attachShadow({ mode: 'open' });
@@ -52,6 +57,11 @@ export class DojoColumnDialog extends HTMLElement {
 
   connectedCallback(): void {
     if (this._shadow.childElementCount === 0) this._render();
+  }
+
+  disconnectedCallback(): void {
+    // B-1: garantizar limpieza aunque el dialog se desconecte mientras está abierto
+    document.removeEventListener('keydown', this._onDocKeydown);
   }
 
   // ── API pública ───────────────────────────────────────────────────────────
@@ -250,11 +260,6 @@ export class DojoColumnDialog extends HTMLElement {
       if (e.target === backdrop) this._close();
     });
 
-    // Cerrar con Escape
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this._isOpen()) this._close();
-    });
-
     const dialog = document.createElement('div');
     dialog.className = 'dialog';
     backdrop.appendChild(dialog);
@@ -427,6 +432,9 @@ export class DojoColumnDialog extends HTMLElement {
 
     const radioGroup = document.createElement('div');
     radioGroup.className = 'radio-group';
+    // I-2: semántica ARIA para lectores de pantalla
+    radioGroup.setAttribute('role', 'radiogroup');
+    radioGroup.setAttribute('aria-label', 'Qué hacer con las tareas');
 
     if (this._otherColumns.length > 0) {
       // Opción: Mover tareas
@@ -451,7 +459,12 @@ export class DojoColumnDialog extends HTMLElement {
         opt.textContent = `${col.icon} ${col.name}`;
         targetSelect.appendChild(opt);
       });
-      targetSelect.addEventListener('change', () => { targetColumnId = targetSelect.value; });
+      // B-2: seleccionar una columna destino activa automáticamente la opción "mover"
+      targetSelect.addEventListener('change', () => {
+        targetColumnId = targetSelect.value;
+        moveRadio.checked = true;
+        actionChoice = 'move';
+      });
       targetField.appendChild(targetSelect);
       radioGroup.appendChild(targetField);
 
@@ -523,11 +536,15 @@ export class DojoColumnDialog extends HTMLElement {
                                    'Eliminar columna'
       );
     }
+    // B-1: registrar listener de Escape solo mientras el dialog está abierto
+    document.addEventListener('keydown', this._onDocKeydown);
   }
 
   private _close(): void {
     const backdrop = this._shadow.querySelector<HTMLElement>('.backdrop');
     if (backdrop) backdrop.setAttribute('aria-hidden', 'true');
+    // B-1: limpiar listener al cerrar
+    document.removeEventListener('keydown', this._onDocKeydown);
   }
 
   private _isOpen(): boolean {

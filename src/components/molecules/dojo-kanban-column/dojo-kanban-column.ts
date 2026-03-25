@@ -50,13 +50,12 @@ export class DojoKanbanColumn extends HTMLElement {
   }
 
   connectedCallback(): void {
-    // Guarda de idempotencia: evita re-render (y re-registro del listener slotchange)
-    // si el elemento se mueve en el DOM. Los listeners DnD sí se re-registran
-    // porque disconnectedCallback los limpia antes de cada desconexión.
     if (this._shadow.childElementCount === 0) {
       this._render();
     }
     this._attachDragListeners();
+    // I-1: registrar aquí (no en _render) para que funcione también al reconectar
+    this._attachColumnDragListeners();
   }
 
   disconnectedCallback(): void {
@@ -191,7 +190,7 @@ export class DojoKanbanColumn extends HTMLElement {
 
     // Habilitar drag de columna
     this.setAttribute('draggable', 'true');
-    this._attachColumnDragListeners();
+    // (los listeners de DnD de columna se registran en connectedCallback)
 
     // ── Zona de contenido ──────────────────────────────────────────────────
     const content = document.createElement('div');
