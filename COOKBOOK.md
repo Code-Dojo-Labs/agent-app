@@ -1,6 +1,6 @@
 # COOKBOOK — ToDo List con Web Components
 
-> **Versión:** 0.5.0  
+> **Versión:** 0.6.0  
 > **Última actualización:** 2026-03-25  
 > **Mantenido por:** Agente `documentalista`
 
@@ -17,6 +17,7 @@
    - [Paso 3 — Definición del Stack Tecnológico](#paso-3--definición-del-stack-tecnológico)
    - [Paso 4 — Creación de Historias de Usuario](#paso-4--creación-de-historias-de-usuario)
    - [Paso 5 — Implementación del Skeleton del Proyecto (US-00 / Issue #1)](#paso-5--implementación-del-skeleton-del-proyecto-us-00--issue-1)
+   - [Paso 6 — Apertura del Pull Request #18](#paso-6--apertura-del-pull-request-18)
 
 ---
 
@@ -630,3 +631,40 @@ $ npm run build
 ---
 
 *El siguiente paso será la creación del Pull Request para el Issue #1 y su revisión por el agente Reviewer.*
+
+---
+
+### Paso 6 — Apertura del Pull Request #18
+
+**Fecha:** 2026-03-25  
+**Agente ejecutor:** `gitjmz` (PR) + `documentalista` (registro)  
+**Issue asociado:** [#1 — US-00 Stack Tecnológico](https://github.com/Code-Dojo-Labs/agent-app/issues/1)  
+**PR:** [#18 — feat(infra): Zero Dependencies project skeleton](https://github.com/Code-Dojo-Labs/agent-app/pull/18)  
+**Estado:** 🔄 Abierto — pendiente de revisión por agente Reviewer
+
+#### Descripción
+
+El agente `gitjmz` creó el Pull Request formal para incorporar la rama `feat/1-stack-tecnologico-zero-dependencies` en la rama `prod`. El PR fue redactado con una descripción técnica completa que incluye tabla de cambios por capa, resultado del build, criterios de aceptación US-00 y notas de seguridad OWASP.
+
+#### Datos del PR
+
+| Campo | Valor |
+|---|---|
+| Número | #18 |
+| Título | `feat(infra): Zero Dependencies project skeleton — US-00 Stack Tecnológico` |
+| URL | https://github.com/Code-Dojo-Labs/agent-app/pull/18 |
+| Rama origen | `feat/1-stack-tecnologico-zero-dependencies` |
+| Rama destino | `prod` |
+| Issue vinculado | `Closes #1` |
+| Commits incluidos | `feat(infra): setup Zero Dependencies project skeleton` (`2b02ba0`)<br>`docs(cookbook): update to v0.5.0 with steps 4 and 5` (`79c2950`) |
+| Archivos cambiados | 15 archivos · +979 / -1 líneas |
+
+#### Siguiente acción
+
+El agente **Reviewer** tiene asignada la auditoría de este PR. Debe:
+1. Leer el diff completo del PR.
+2. Clasificar los hallazgos en 🔴 Bloqueante / 🟡 Importante / 🔵 Sugerencia.
+3. Publicar el reporte como comentario formal en [PR #18](https://github.com/Code-Dojo-Labs/agent-app/pull/18).
+4. Emitir veredicto: Aprobado ✅ / Cambios solicitados 🔄 / Solo comentarios 💬.
+
+> **Restricción:** El merge a `prod` está **bloqueado** hasta que el Reviewer emita su veredicto y el humano apruebe.
