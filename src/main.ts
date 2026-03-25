@@ -24,10 +24,8 @@ async function bootstrap(): Promise<void> {
     // 2. Seed de columnas por defecto (solo si el store está vacío)
     await seedDefaultColumns();
 
-    // 3. Registrar Web Components
-    //    Los componentes se importarán aquí a medida que se implementen.
-    //    Ejemplo:
-    //    import './components/organisms/kanban-board/kanban-board.js';
+    // 3. Registrar Web Components — US-01 Visualización del tablero Kanban
+    await import('./components/organisms/dojo-app/dojo-app.js');
 
     // 4. Montar la app (el elemento <dojo-app> ya está en el HTML)
     console.info('[Dojo Kanban] App inicializada correctamente.');
