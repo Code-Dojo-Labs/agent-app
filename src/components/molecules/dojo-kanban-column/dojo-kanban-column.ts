@@ -21,12 +21,12 @@
  * (default) | Tarjetas de tarea (`<dojo-task-card>`) proyectadas aquí      |
  *
  * ## Eventos despachados
- * | Nombre               | Detalle                       | Descripción                    |
- * |----------------------|-------------------------------|--------------------------------|
- * | dojo:column-drop     | { columnId, taskId }          | Tarea dropeada en la columna   |
- * | dojo:column-rename   | { columnId }                  | Usuario eligió "Renombrar"     |
- * | dojo:column-delete   | { columnId }                  | Usuario eligió "Eliminar"      |
- * | dojo:column-reorder  | { sourceId, targetId }        | Columna arrastrada a posición  |
+ * | Nombre               | Detalle                                         | Descripción                    |
+ * |----------------------|-------------------------------------------------|--------------------------------|
+ * | dojo:column-drop     | { columnId, taskId, beforeTaskId: string|null } | Tarea dropeada en la columna   |
+ * | dojo:column-rename   | { columnId }                                    | Usuario eligió "Renombrar"     |
+ * | dojo:column-delete   | { columnId }                                    | Usuario eligió "Eliminar"      |
+ * | dojo:column-reorder  | { sourceId, targetId }                          | Columna arrastrada a posición  |
  *
  * ## CSS Custom Properties heredadas
  * --dojo-surface, --dojo-border, --dojo-radius, --dojo-bg, --dojo-shadow
@@ -43,6 +43,10 @@ export class DojoKanbanColumn extends HTMLElement {
   }
 
   private _shadow: ShadowRoot;
+  /** ID de la tarjeta ante la cual se soltará la tarea en curso (null = al final) */
+  private _dropBeforeId: string | null = null;
+  /** Último valor enviado a _setDropIndicator para evitar mutaciones DOM redundantes */
+  private _lastDropIndicatorId: string | null | undefined = undefined;
 
   constructor() {
     super();
@@ -279,54 +283,116 @@ export class DojoKanbanColumn extends HTMLElement {
     this.addEventListener('drop',       this._onColumnDrop);
   }
 
-  // ── Drag & Drop (drop target) ─────────────────────────────────────────────
+  // ── Drop target para tareas ──────────────────────────────────────────────
 
   private _onDragOver = (e: DragEvent): void => {
+    // Reaccionar solo ante arrastres de tarjetas de tarea
+    if (!e.dataTransfer?.types.includes('text/dojo-task-id')) return;
     e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = 'move';
     this.setAttribute('drag-over', '');
+    // Calcular posición y actualizar indicador visual
+    this._dropBeforeId = this._getDropBeforeId(e);
+    this._setDropIndicator(this._dropBeforeId);
   };
 
   private _onDragLeave = (e: DragEvent): void => {
-    // Solo quitar el atributo cuando el puntero sale del host o de sus hijos
     if (!this.contains(e.relatedTarget as Node)) {
       this.removeAttribute('drag-over');
+      this._clearDropIndicators();
+      this._dropBeforeId = null;
     }
   };
 
   private _onDrop = (e: DragEvent): void => {
     e.preventDefault();
     this.removeAttribute('drag-over');
+    this._clearDropIndicators();
 
-    const taskId = e.dataTransfer?.getData('text/plain');
+    const taskId = e.dataTransfer?.getData('text/dojo-task-id');
     if (!taskId) return;
+
+    const beforeTaskId = this._dropBeforeId;
+    this._dropBeforeId = null;
 
     this.dispatchEvent(new CustomEvent('dojo:column-drop', {
       bubbles:  true,
       composed: true,
       detail: {
-        columnId: this.columnId,
+        columnId:   this.columnId,
         taskId,
+        beforeTaskId,
       },
     }));
   };
 
+  // ── Utilidades de posición de drop ────────────────────────────────────────
+
+  /**
+   * Calcula ante qué tarjeta se soltará la tarea arrastrada.
+   * Cuando el puntero está por encima del centro de una tarjeta,
+   * se inserta antes de esa tarjeta; si está debajo del centro de
+   * la última tarjeta, se inserta al final (retorna null).
+   */
+  private _getDropBeforeId(e: DragEvent): string | null {
+    const slot = this._shadow.querySelector('slot');
+    if (!slot) return null;
+    const cards = (slot as HTMLSlotElement).assignedElements() as HTMLElement[];
+    for (const card of cards) {
+      const rect  = card.getBoundingClientRect();
+      const midY  = rect.top + rect.height / 2;
+      if (e.clientY < midY) {
+        return card.getAttribute('task-id') ?? null;
+      }
+    }
+    return null; // insertar al final
+  }
+
+  /** Pone el indicador de drop en la tarjeta correcta. */
+  private _setDropIndicator(beforeId: string | null): void {
+    // Guard: evitar mutaciones DOM si la posición no ha cambiado
+    if (beforeId === this._lastDropIndicatorId) return;
+    this._lastDropIndicatorId = beforeId;
+
+    const slot = this._shadow.querySelector('slot');
+    if (!slot) return;
+    const cards = (slot as HTMLSlotElement).assignedElements();
+    cards.forEach(card => card.removeAttribute('drop-indicator'));
+
+    if (beforeId !== null) {
+      const target = cards.find(c => c.getAttribute('task-id') === beforeId);
+      if (target) target.setAttribute('drop-indicator', 'top');
+    } else if (cards.length > 0) {
+      // Insertar al final: indicador bajo la última tarjeta
+      cards[cards.length - 1].setAttribute('drop-indicator', 'bottom');
+    }
+  }
+
+  /** Elimina todos los indicadores de drop de las tarjetas asignadas al slot. */
+  private _clearDropIndicators(): void {
+    this._lastDropIndicatorId = undefined; // limpiar cache
+    const slot = this._shadow.querySelector('slot');
+    if (!slot) return;
+    (slot as HTMLSlotElement).assignedElements()
+      .forEach(card => card.removeAttribute('drop-indicator'));
+  }
+
   private _attachDragListeners(): void {
-    this.addEventListener('dragover',   this._onDragOver);
-    this.addEventListener('dragleave',  this._onDragLeave);
-    this.addEventListener('drop',       this._onDrop);
+    this.addEventListener('dragover',  this._onDragOver);
+    this.addEventListener('dragleave', this._onDragLeave);
+    this.addEventListener('drop',      this._onDrop);
   }
 
   private _detachDragListeners(): void {
-    this.removeEventListener('dragover',   this._onDragOver);
-    this.removeEventListener('dragleave',  this._onDragLeave);
-    this.removeEventListener('drop',       this._onDrop);
-    // También limpiar los listeners de drag de columna
-    this.removeEventListener('dragstart',  this._onColumnDragStart);
-    this.removeEventListener('dragend',    this._onColumnDragEnd);
-    this.removeEventListener('dragover',   this._onColumnDragOver);
-    this.removeEventListener('dragleave',  this._onColumnDragLeave);
-    this.removeEventListener('drop',       this._onColumnDrop);
+    this.removeEventListener('dragover',  this._onDragOver);
+    this.removeEventListener('dragleave', this._onDragLeave);
+    this.removeEventListener('drop',      this._onDrop);
+    // Limpiar también los listeners de drag de columna
+    this.removeEventListener('dragstart', this._onColumnDragStart);
+    this.removeEventListener('dragend',   this._onColumnDragEnd);
+    this.removeEventListener('dragover',  this._onColumnDragOver);
+    this.removeEventListener('dragleave', this._onColumnDragLeave);
+    this.removeEventListener('drop',      this._onColumnDrop);
   }
 }
 
