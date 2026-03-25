@@ -775,7 +775,7 @@ $ npm run build
 **Agente ejecutor:** `builder`  
 **Issue asociado:** [#3 — US-02 Gestión de columnas del tablero](https://github.com/Code-Dojo-Labs/agent-app/issues/3)  
 **Rama:** `feat/3-gestion-columnas-tablero`  
-**Estado:** ✅ Implementado — pendiente de PR y revisión
+**Estado:** ✅ Mergeado a `prod` — PR [#20](https://github.com/Code-Dojo-Labs/agent-app/pull/20)
 
 #### Descripción
 
@@ -868,3 +868,23 @@ $ npm run build
 #### Decisión de diseño: Un solo `<dojo-column-dialog>` por tablero
 
 El `dojo-kanban-board` monta un único `<dojo-column-dialog>` en su shadow DOM y lo reutiliza para los tres modos (crear / renombrar / eliminar). Esto evita inflar el DOM con múltiples dialogs y centraliza la gestión de eventos, simplificando la limpieza de listeners.
+
+---
+
+#### Lecciones Aprendidas (extraídas del Review del PR #20)
+
+> Sección generada por `@documentalista` tras la revisión del Reviewer.
+
+| # | Hallazgo | Categoría | Lección |
+|---|---|---|---|
+| 1 | Memory leak en `document.addEventListener('keydown', ...)` con función anónima | 🔴 Bloqueante | **Todo listener en `document` o `window` debe almacenarse como propiedad de clase** (arrow function) para poder pasarla tanto a `addEventListener` como a `removeEventListener` con la misma referencia. Registrar en el momento de apertura (`_open`) y limpiar en cierre (`_close`) y en `disconnectedCallback`. Patrón ya correcto en `dojo-column-menu._onDocClick` — replicarlo en cualquier componente que escuche eventos globales. |
+| 2 | El estado de `actionChoice` no se actualizaba al interactuar con el `<select>` antes del radio | 🔴 Bloqueante | **Los controles dependientes deben sincronizar el estado del control padre.** Cuando un `<select>` de columna destino cambia, el radio "Mover" debe marcarse automáticamente (`moveRadio.checked = true; actionChoice = 'move'`). La UI siempre debe reflejar la intención del usuario, no asumir que el flujo de interacción es lineal. |
+| 3 | `_attachColumnDragListeners()` llamado dentro de `_render()`, no en `connectedCallback` | 🟡 Importante | **Los listeners que `disconnectedCallback` limpia deben registrarse en `connectedCallback`, no en funciones de render**. El guard de idempotencia (`childElementCount === 0`) evita que `_render()` se vuelva a llamar al reconectar, lo que dejaría sin escuchas al componente. Regla: render construye el DOM; `connectedCallback` conecta la lógica. |
+| 4 | El grupo de botones de radio carecía de `role="radiogroup"` y `aria-label` | 🟡 Importante | **Los grupos de controles interactivos requieren semántica ARIA explícita** aunque el contexto parezca obvio visualmente. Añadir siempre `role="radiogroup"` con `aria-label` descriptivo a cualquier agrupación de radios dentro de Shadow DOM. Los lectores de pantalla no infieren el grupo por proximidad en el DOM. |
+
+##### Patrones confirmados (best practices)
+
+- ✅ **Propiedad de clase para handlers globales:** `private _onXxx = (e: Event): void => { ... }` — permite `add`/`removeEventListener` con la misma referencia.
+- ✅ **Ciclo de vida claro:** `connectedCallback` para registrar listeners; `disconnectedCallback` para eliminarlos. `_render()` solo para construir markup.
+- ✅ **Listeners en `document` solo mientras son necesarios:** registrar al abrir modales/menús, eliminar al cerrar (no mantenerlos activos todo el tiempo).
+- ✅ **Accesibilidad en Shadow DOM:** `role`, `aria-label`, `aria-haspopup`, `aria-expanded` y `aria-modal` deben aplicarse aunque el componente esté aislado — los lectores de pantalla traversals el Shadow DOM con `composed: true`.
