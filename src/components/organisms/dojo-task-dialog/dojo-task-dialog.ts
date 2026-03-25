@@ -77,6 +77,9 @@ export class DojoTaskDialog extends HTMLElement {
     const backdrop = this._shadow.querySelector<HTMLElement>('.backdrop');
     if (!backdrop) return;
     backdrop.setAttribute('aria-hidden', 'false');
+    // Remover primero para evitar acumular listeners duplicados si se invoca
+    // openCreate() varias veces sin cerrar el diálogo entre llamadas.
+    document.removeEventListener('keydown', this._onDocKeydown);
     document.addEventListener('keydown', this._onDocKeydown);
   }
 
@@ -298,10 +301,10 @@ export class DojoTaskDialog extends HTMLElement {
     titleInput.setAttribute('aria-describedby', 'task-title-error');
 
     titleInput.addEventListener('input', () => {
-      const len = titleInput.value.length;
+      // Usar trim() para que el contador y la limpieza de error reflejen el valor real
+      const len = titleInput.value.trim().length;
       charCount.textContent = `${len} / ${MAX_TITLE}`;
       charCount.classList.toggle('near-limit', len >= MAX_TITLE * 0.9);
-      // Limpiar error si el usuario empieza a escribir
       if (len > 0) {
         titleInput.removeAttribute('aria-invalid');
         titleError.removeAttribute('aria-live');
@@ -325,10 +328,12 @@ export class DojoTaskDialog extends HTMLElement {
     descLabel.setAttribute('for', 'task-desc-input');
     descLabel.textContent = 'Descripción (Markdown, opcional)';
 
+    const MAX_DESC = 2000;
     const descInput = document.createElement('textarea');
     descInput.id = 'task-desc-input';
     descInput.placeholder = 'Describe la tarea…';
     descInput.rows = 3;
+    descInput.maxLength = MAX_DESC;
 
     descField.appendChild(descLabel);
     descField.appendChild(descInput);

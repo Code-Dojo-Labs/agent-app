@@ -621,6 +621,11 @@ export class DojoKanbanBoard extends HTMLElement {
       description: string;
       priority:    string;
     };
+    // Validar que la columna exista (puede haberse eliminado mientras el diálogo estaba abierto)
+    if (!this._columns.some(c => c.id === statusId)) {
+      console.warn('[dojo-kanban-board] statusId no corresponde a ninguna columna activa:', statusId);
+      return;
+    }
     const tasks = this._tasksByColumn.get(statusId) ?? [];
     try {
       const newTask = await createTask({
