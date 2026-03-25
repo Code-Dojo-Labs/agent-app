@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dojo Kanban</title>
+    <meta name="description" content="Tablero Kanban — Zero Dependencies, Web APIs nativas" />
+    <!--
+      Los estilos globales únicamente definen el reset base y las variables de tema.
+      Cada componente Web encapsula sus propios estilos en Shadow DOM.
+    -->
+    <style>
+      /* ── Reset mínimo ─────────────────────────────────────────────── */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html { font-size: 16px; }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background-color: var(--dojo-bg);
+        color: var(--dojo-text-primary);
+        min-height: 100dvh;
+      }
+
+      /* ── Tokens globales — modo claro ─────────────────────────────── */
+      :root {
+        --dojo-primary:        #1D4ED8;
+        --dojo-primary-hover:  #1E40AF;
+        --dojo-danger:         #DC2626;
+        --dojo-success:        #16A34A;
+        --dojo-warning:        #D97706;
+
+        --dojo-bg:             #F1F5F9;
+        --dojo-surface:        #FFFFFF;
+        --dojo-surface-hover:  #F7F8FA;
+        --dojo-border:         #E2E8F0;
+
+        --dojo-text-primary:   #172B4D;
+        --dojo-text-secondary: #5E6C84;
+        --dojo-text-muted:     #94A3B8;
+
+        --dojo-radius:         8px;
+        --dojo-radius-sm:      4px;
+
+        --dojo-shadow:         0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+        --dojo-shadow-md:      0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+      }
+
+      /* ── Tokens globales — modo oscuro ────────────────────────────── */
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --dojo-bg:             #0F172A;
+          --dojo-surface:        #1E293B;
+          --dojo-surface-hover:  #273349;
+          --dojo-border:         #334155;
+
+          --dojo-text-primary:   #F1F5F9;
+          --dojo-text-secondary: #94A3B8;
+          --dojo-text-muted:     #475569;
+        }
+      }
+
+      /* Override manual con atributo data-theme="dark" en <html> */
+      [data-theme="dark"] {
+        --dojo-bg:             #0F172A;
+        --dojo-surface:        #1E293B;
+        --dojo-surface-hover:  #273349;
+        --dojo-border:         #334155;
+
+        --dojo-text-primary:   #F1F5F9;
+        --dojo-text-secondary: #94A3B8;
+        --dojo-text-muted:     #475569;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- El componente raíz de la aplicación se registra en main.ts -->
+    <dojo-app></dojo-app>
+
+    <!--
+      type="module" garantiza:
+        1. ES Modules nativos (import/export).
+        2. Defer automático (no bloquea el parsing del HTML).
+        3. Ejecución en strict mode por defecto.
+    -->
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
