@@ -1,6 +1,6 @@
 # COOKBOOK — ToDo List con Web Components
 
-> **Versión:** 0.7.0  
+> **Versión:** 0.8.0  
 > **Última actualización:** 2026-03-25  
 > **Mantenido por:** Agente `documentalista`
 
@@ -19,6 +19,7 @@
    - [Paso 5 — Implementación del Skeleton del Proyecto (US-00 / Issue #1)](#paso-5--implementación-del-skeleton-del-proyecto-us-00--issue-1)
    - [Paso 6 — Apertura del Pull Request #18](#paso-6--apertura-del-pull-request-18)
    - [Paso 7 — Implementación de la Visualización del Tablero Kanban (US-01 / Issue #2)](#paso-7--implementación-de-la-visualización-del-tablero-kanban-us-01--issue-2)
+   - [Paso 8 — Implementación de la Gestión de Columnas del Tablero (US-02 / Issue #3)](#paso-8--implementación-de-la-gestión-de-columnas-del-tablero-us-02--issue-3)
 
 ---
 
@@ -765,3 +766,105 @@ $ npm run build
 `dojo-kanban-board` carga las tareas de **todas** las columnas en el `connectedCallback` para tener disponible el total de tareas por columna y poder mostrar el formato `X / Y` cuando se activa un filtro. Esto es aceptable para el tamaño de datos de un tablero Kanban personal (decenas o cientos de tareas), donde la consulta a IndexedDB es sub-milisegundo. Si el dataset crece, se puede memoizar por columna y recargar solo la columna afectada.
 
 *Este PR fue creado como [PR #19](https://github.com/Code-Dojo-Labs/agent-app/pull/19) y revisado por el agente Reviewer.*
+
+---
+
+### Paso 8 — Implementación de la Gestión de Columnas del Tablero (US-02 / Issue #3)
+
+**Fecha:** 2026-03-25  
+**Agente ejecutor:** `builder`  
+**Issue asociado:** [#3 — US-02 Gestión de columnas del tablero](https://github.com/Code-Dojo-Labs/agent-app/issues/3)  
+**Rama:** `feat/3-gestion-columnas-tablero`  
+**Estado:** ✅ Implementado — pendiente de PR y revisión
+
+#### Descripción
+
+El agente Builder implementó la gestión completa de columnas del tablero Kanban (US-02), añadiendo 3 nuevos Web Components y modificando los 2 componentes existentes del tablero. La solución cubre todos los escenarios Gherkin: crear, renombrar, eliminar (con mover o borrar tareas) y reordenar columnas mediante drag & drop.
+
+#### Criterios de aceptación cubiertos (US-02)
+
+| Escenario Gherkin | Estado |
+|---|---|
+| Crear nueva columna (nombre + icóno + UUID) | ✅ `DojoColumnDialog.openCreate()` → `createColumn()` en IndexedDB |
+| Renombrar columna existente | ✅ `DojoColumnDialog.openRename()` → `updateColumn()` + atributo DOM |
+| Eliminar columna sin tareas | ✅ `DojoColumnDialog.openDelete()` → `deleteColumn()` |
+| Eliminar columna con tareas — mover | ✅ `updateTask({ statusId, order })` en paralelo + `deleteColumn()` |
+| Eliminar columna con tareas — eliminar | ✅ `deleteTask()` en paralelo + `deleteColumn()` |
+| Reordenar columnas mediante arrastre | ✅ DnD nativo `dragstart/dragover/drop` → `updateColumn({ order })` |
+
+#### Componentes creados
+
+| Nivel | Componente | Tag HTML | Archivo |
+|---|---|---|---|
+| Átomo | Column Menu | `<dojo-column-menu>` | `src/components/atoms/dojo-column-menu/dojo-column-menu.ts` |
+| Átomo | Add Column Button | `<dojo-add-column-button>` | `src/components/atoms/dojo-add-column-button/dojo-add-column-button.ts` |
+| Organismo | Column Dialog | `<dojo-column-dialog>` | `src/components/organisms/dojo-column-dialog/dojo-column-dialog.ts` |
+
+#### Componentes modificados
+
+| Componente | Cambios |
+|---|---|
+| `dojo-kanban-column` | Añadido `<dojo-column-menu>` en fila de cabecera; DnD de columna (`dragstart/dragover/drop`) con atributo `[dragging]` y `[drag-column-over]`; eventos `dojo:column-rename`, `dojo:column-delete`, `dojo:column-reorder` |
+| `dojo-kanban-board` | Gestiona el ciclo completo de columnas (crear / renombrar / eliminar / reordenar); mantiene `_columns: Column[]` en memoria; monta un solo `<dojo-column-dialog>` compartido; añade `<dojo-add-column-button>` al final del track |
+
+#### Detalles de implementación
+
+**`dojo-column-menu` (Átomo)**
+- Botón trigger `⋮` con `aria-haspopup="menu"` y `aria-expanded` dinámico
+- Menú flotante con posicionamiento absoluto (`right: 0`)
+- Cierre automático al hacer clic fuera (`document.click`) con limpieza en `disconnectedCallback`
+- Opciones: ✏️ Renombrar y 🗑️ Eliminar (coloreada con `--dojo-danger`)
+- Guarda de idempotencia en `connectedCallback`
+
+**`dojo-add-column-button` (Átomo)**
+- Botón de 200 × 56 px con borde discontinuo `dashed` que se colorea al hover
+- Emite `dojo:add-column` con `bubbles + composed`
+- Guarda de idempotencia en `connectedCallback`
+
+**`dojo-column-dialog` (Organismo)**
+- API pública: `openCreate()`, `openRename(columnId, currentName)`, `openDelete(columnId, columnName, otherColumns[])`
+- Backdrop semitransparente con `role="dialog" aria-modal="true"`
+- Cierre con clic en backdrop o tecla `Escape`
+- Modo *crear*: campo de nombre + grid de 12 íconos preseleccionables (`role="option"` + `aria-pressed`)
+- Modo *renombrar*: campo de nombre prerelleno + focus + select al abrir
+- Modo *eliminar*: alerta `role="alert"` + radiogroup (mover tareas a columna destino | eliminar tareas)
+- Eventos: `dojo:dialog-create-column { name, icon }`, `dojo:dialog-rename-column { columnId, name }`, `dojo:dialog-delete-column { columnId, action, targetColumnId? }`
+- Animación de entrada `dlg-in` (scale + translateY) via `@keyframes`
+
+**Gestión de reorder en `dojo-kanban-board`**
+- Al recibir `dojo:column-reorder { sourceId, targetId }`, reordena `_columns[]` en memoria usando `splice`
+- Persiste con `Promise.all(columns.map((col, idx) => updateColumn(col.id, { order: idx })))`
+- Si la persistencia falla, recarga el tablero desde IndexedDB para garantizar consistencia
+
+**Gestión de eliminación en `dojo-kanban-board`**
+- Acción `move`: `updateTask({ statusId: targetColumnId, order: ... })` en paralelo + `deleteColumn()`
+- Acción `delete`: `deleteTask()` en paralelo + `deleteColumn()`
+- Actualiza `_tasksByColumn` en memoria tras la operación
+
+#### Estructura `src/components/` actualizada
+
+```
+src/components/
+├── atoms/
+│   ├── dojo-column-header/
+│   ├── dojo-column-menu/          # Átomo NEW — menú contextual ⋮
+│   └── dojo-add-column-button/    # Átomo NEW — botón "Añadir columna"
+├── molecules/
+│   └── dojo-kanban-column/        # MOD — menú + DnD columna
+└── organisms/
+    ├── dojo-kanban-board/         # MOD — gestión completa columnas
+    ├── dojo-column-dialog/        # Organismo NEW — modal de gestión
+    └── dojo-app/
+```
+
+#### Resultado del build
+
+```
+$ npm run build
+→ tsc && cp public/index.html dist/index.html
+→ 0 errores TypeScript · build limpio
+```
+
+#### Decisión de diseño: Un solo `<dojo-column-dialog>` por tablero
+
+El `dojo-kanban-board` monta un único `<dojo-column-dialog>` en su shadow DOM y lo reutiliza para los tres modos (crear / renombrar / eliminar). Esto evita inflar el DOM con múltiples dialogs y centraliza la gestión de eventos, simplificando la limpieza de listeners.
