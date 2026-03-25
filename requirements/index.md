@@ -1,0 +1,129 @@
+# Requirements — Kanban To-Do App
+
+> Versión: 1.1  
+> Fecha: 2026-03-25  
+> Estado: Borrador
+
+## Descripción general
+
+Aplicación web de gestión de tareas tipo Trello con tablero Kanban, orientada a usuarios individuales o equipos pequeños. Permite organizar tareas en columnas por estado, asignarles prioridad, etiquetas y descripciones. Toda la información se persiste localmente mediante **IndexedDB**, eliminando la necesidad de un backend.
+
+---
+
+## Contenido de este documento
+
+| Archivo | Descripción |
+|---|---|
+| [Requerimientos Funcionales](./functional-requirements.md) | Casos de uso, reglas de negocio y comportamiento esperado del sistema |
+| [Modelo de Datos](./data-model.md) | Esquema de entidades, relaciones y configuración de IndexedDB |
+| [Stack Tecnológico](./tech-stack.md) | Tecnologías, herramientas de desarrollo y estructura de carpetas |
+| [Historias de Usuario](./user-stories/index.md) | 11 historias en formato Como/Quiero/Para con criterios Gherkin |
+| [UI/UX](./ui-ux.md) | Especificaciones del tablero Kanban, componentes y guía de estilos |
+| [Mejoras Sugeridas](./improvements.md) | Propuestas de funcionalidades que potenciarían el proyecto |
+
+---
+
+## Resumen de funcionalidades
+
+### Tablero Kanban
+- Columnas representan el **estado** de las tareas.
+- Las tareas pueden moverse entre columnas mediante **drag & drop**.
+- Cada columna muestra el conteo de tareas activas.
+
+### Tareas
+Cada tarea contiene los siguientes campos:
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| **Título** | Texto | Nombre corto e identificativo de la tarea |
+| **Descripción** | Texto enriquecido | Detalle ampliado, acepta Markdown |
+| **Estado** | Enum + icono | Columna actual de la tarea (ej. Pendiente, En progreso, Hecho) |
+| **Prioridad** | Enum + icono | Nivel de urgencia: Baja, Media, Alta, Urgente |
+| **Fecha de creación** | Fecha ISO 8601 | Generada automáticamente al crear la tarea |
+| **Etiquetas** | Lista de referencias | Una o más etiquetas de color asociadas a la tarea |
+
+### Etiquetas
+- Las etiquetas se crean una sola vez y se **reutilizan** en múltiples tareas.
+- Cada etiqueta tiene un nombre y un color que garantice **legibilidad de texto blanco** sobre él.
+- El color puede seleccionarse de una **paleta de 10 colores predefinidos** o definirse de forma **dinámica** mediante un selector de color (con validación de contraste).
+
+### Persistencia
+- Toda la información se almacena en **IndexedDB** (navegador).
+- No se requiere servidor ni base de datos externa.
+- Se expone una API interna de acceso a datos para desacoplar el almacenamiento de la UI.
+
+---
+
+## Definición de estados (columnas por defecto)
+
+| Icono | Estado | Descripción |
+|---|---|---|
+| 📋 | **Backlog** | Ideas o tareas aún no planificadas |
+| 🔲 | **Por hacer** | Tareas listas para ser trabajadas |
+| 🔄 | **En progreso** | Trabajo actualmente en curso |
+| 🔍 | **En revisión** | Tarea completada pendiente de validación |
+| ✅ | **Hecho** | Tarea finalizada |
+| 🚫 | **Bloqueado** | Tarea detenida por una dependencia externa |
+
+> Los estados son configurables por el usuario (ver [Modelo de Datos](./data-model.md)).
+
+---
+
+## Definición de prioridades
+
+| Icono | Prioridad | Descripción |
+|---|---|---|
+| ⬇️ | **Baja** | Sin urgencia, puede esperar |
+| ➡️ | **Media** | Importancia normal |
+| ⬆️ | **Alta** | Debe atenderse pronto |
+| 🔥 | **Urgente** | Bloquea avance o tiene deadline crítico |
+
+---
+
+## Paleta de colores para etiquetas
+
+Los siguientes 10 colores están predefinidos y garantizan una relación de contraste ≥ 4.5:1 con texto blanco (WCAG AA):
+
+| # | Nombre | Hex | Muestra |
+|---|---|---|---|
+| 1 | Rojo | `#B91C1C` | ![](https://via.placeholder.com/20/B91C1C/B91C1C) |
+| 2 | Naranja | `#C2410C` | |
+| 3 | Ámbar | `#B45309` | |
+| 4 | Verde | `#15803D` | |
+| 5 | Azul | `#1D4ED8` | |
+| 6 | Índigo | `#4338CA` | |
+| 7 | Violeta | `#6D28D9` | |
+| 8 | Rosa | `#BE185D` | |
+| 9 | Cian | `#0E7490` | |
+| 10 | Gris | `#374151` | |
+
+> Para colores personalizados se debe validar el contraste antes de guardar. Ver reglas en [Requerimientos Funcionales](./functional-requirements.md#etiquetas).
+
+---
+
+## Stack tecnológico
+
+> Detalle completo en [Stack Tecnológico](./tech-stack.md).
+
+| Capa | Tecnología | Nota |
+|---|---|---|
+| Lenguaje | **TypeScript 5.x** → JS ES Modules | Compilado con `tsc`, sin bundler |
+| Marcado | **HTML5** + Web Components | Custom Elements, Shadow DOM, `<template>` |
+| Estilos | **CSS3** con Custom Properties | Encapsulado en Shadow DOM, theming vía `--dojo-*` |
+| Persistencia | **IndexedDB** nativo | Sin wrappers; API encapsulada en el patrón Repository |
+| Drag & Drop | **HTML5 Drag and Drop API** | API nativa del navegador |
+| Markdown | **Parser propio** en TypeScript | Subconjunto CommonMark, sanitización manual del DOM |
+| Contraste | **Cálculo WCAG 2.1** propio | Fórmula de luminancia implementada en TypeScript |
+| Dev server | **VS Code Live Preview** / `python3 -m http.server` | Solo para desarrollo, no es una dependencia de producción |
+
+> **Restricción absoluta:** el proyecto tiene **Zero Dependencies** de producción. Solo se permite `typescript` en `devDependencies`. Ver [Stack Tecnológico](./tech-stack.md) para la lista completa de lo que está prohibido.
+
+---
+
+## Referencias
+
+- [Requerimientos Funcionales](./functional-requirements.md)
+- [Modelo de Datos](./data-model.md)
+- [Stack Tecnológico](./tech-stack.md)
+- [UI/UX](./ui-ux.md)
+- [Mejoras Sugeridas](./improvements.md)
