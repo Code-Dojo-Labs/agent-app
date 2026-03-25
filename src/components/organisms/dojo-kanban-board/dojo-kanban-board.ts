@@ -30,11 +30,12 @@
 
 import type { Column, Task } from '../../../types/models.js';
 import { getAllColumns, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
-import { getTasksByStatus, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
+import { getTasksByStatus, createTask, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
 import '../../molecules/dojo-kanban-column/dojo-kanban-column.js';
 import '../../atoms/dojo-task-card/dojo-task-card.js';
 import '../../atoms/dojo-add-column-button/dojo-add-column-button.js';
 import '../../organisms/dojo-column-dialog/dojo-column-dialog.js';
+import '../../organisms/dojo-task-dialog/dojo-task-dialog.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
 
@@ -183,6 +184,11 @@ export class DojoKanbanBoard extends HTMLElement {
     this._shadow.addEventListener('dojo:add-column',           () => this._onAddColumnRequest());
     // US-03: Drag & Drop de tareas
     this._shadow.addEventListener('dojo:column-drop',          (e) => this._handleTaskDrop(e as CustomEvent));
+    // US-04: Crear tarea
+    const taskDialog = document.createElement('dojo-task-dialog');
+    this._shadow.appendChild(taskDialog);
+    this._shadow.addEventListener('dojo:add-task',             (e) => this._onAddTaskRequest(e as CustomEvent));
+    this._shadow.addEventListener('dojo:dialog-create-task',   (e) => this._handleCreateTask(e as CustomEvent));
   }
 
   // ── Estados visuales ─────────────────────────────────────────────────────
@@ -485,7 +491,9 @@ export class DojoKanbanBoard extends HTMLElement {
   private _getDialog(): HTMLElement | null {
     return this._shadow.querySelector('dojo-column-dialog');
   }
-
+  private _getTaskDialog(): HTMLElement | null {
+    return this._shadow.querySelector('dojo-task-dialog');
+  }
   private _onAddColumnRequest(): void {
     const dialog = this._getDialog() as any;
     if (dialog?.openCreate) dialog.openCreate();
@@ -593,6 +601,46 @@ export class DojoKanbanBoard extends HTMLElement {
       console.error('[dojo-kanban-board] Error al reordenar columnas:', err);
       // Recargar desde IndexedDB para mantener consistencia
       await this._loadBoard();
+    }
+  }
+
+  // ── Handlers de creación de tarea (US-04) ─────────────────────────
+
+  private _onAddTaskRequest(e: CustomEvent): void {
+    const { columnId } = e.detail as { columnId: string };
+    const col = this._columns.find(c => c.id === columnId);
+    if (!col) return;
+    const taskDialog = this._getTaskDialog() as any;
+    if (taskDialog?.openCreate) taskDialog.openCreate(col.id, col.name);
+  }
+
+  private async _handleCreateTask(e: CustomEvent): Promise<void> {
+    const { statusId, title, description, priority } = e.detail as {
+      statusId:    string;
+      title:       string;
+      description: string;
+      priority:    string;
+    };
+    // Validar que la columna exista (puede haberse eliminado mientras el diálogo estaba abierto)
+    if (!this._columns.some(c => c.id === statusId)) {
+      console.warn('[dojo-kanban-board] statusId no corresponde a ninguna columna activa:', statusId);
+      return;
+    }
+    const tasks = this._tasksByColumn.get(statusId) ?? [];
+    try {
+      const newTask = await createTask({
+        title,
+        description,
+        statusId,
+        priority:  priority as Task['priority'],
+        labelIds:  [],
+        order:     tasks.length,
+      });
+      this._tasksByColumn.set(statusId, [...tasks, newTask]);
+      this._refreshColumnCards(statusId);
+      this._updateColumnCounts();
+    } catch (err) {
+      console.error('[dojo-kanban-board] Error al crear tarea:', err);
     }
   }
 }
