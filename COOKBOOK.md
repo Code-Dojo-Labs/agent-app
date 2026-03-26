@@ -1,7 +1,7 @@
 # COOKBOOK — ToDo List con Web Components
 
 > **Versión:** 1.0.0  
-> **Última actualización:** 2026-03-25  
+> **Última actualización:** 2026-03-26  
 > **Mantenido por:** Agente `documentalista`
 
 ---
@@ -26,6 +26,7 @@
    - [Paso 12 — Implementación de Crear Etiqueta (US-09 / Issue #10)](#paso-12--implementación-de-crear-etiqueta-us-09--issue-10)
    - [Paso 13 — Implementación de Reutilización de Etiquetas (US-10 / Issue #11)](#paso-13--implementación-de-reutilización-de-etiquetas-us-10--issue-11)
    - [Paso 14 — Implementación de Editar Etiqueta (US-11 / Issue #12)](#paso-14--implementación-de-editar-etiqueta-us-11--issue-12)
+   - [Paso 15 — Implementación de Eliminar Etiqueta (US-12 / Issue #13)](#paso-15--implementación-de-eliminar-etiqueta-us-12--issue-13)
 
 ---
 
@@ -1319,4 +1320,119 @@ Usuario hace clic en "Gestionar etiquetas" (header)
 | B: Panel dentro del board | El botón estaría en la barra de filtros, el panel en el shadow del board | Descartada |
 
 **Justificación:** El issue especifica "botón en el header de la aplicación". El header está en `dojo-app`. Para evitar que el organismo board asuma responsabilidades de gestión global, el panel de etiquetas se monta en el shadow de `dojo-app`, que actúa como coordinador de nivel de aplicación.
+
+---
+
+### Paso 15 — Implementación de Eliminar Etiqueta (US-12 / Issue #13)
+
+**Pull Request:** [#30 — [US-12] Eliminar etiqueta con limpieza atómica en IndexedDB](https://github.com/Code-Dojo-Labs/agent-app/pull/30)  
+**Rama:** `feat/13-eliminar-etiqueta`  
+**Fecha:** 2026-03-26
+
+#### Resumen
+
+Cubre la historia de usuario US-12: el usuario puede eliminar etiquetas desde el panel de gestión. La eliminación muestra primero un panel de confirmación inline que indica cuántas tareas se verán afectadas, y al confirmar realiza la limpieza de forma atómica en IndexedDB.
+
+#### Archivos modificados
+
+| Archivo | Tipo de cambio |
+|---|---|
+| `src/db/label.repository.ts` | Modificado — nueva función atómica `deleteLabel`, nueva función `countTasksByLabelId` |
+| `src/components/organisms/dojo-label-manager/dojo-label-manager.ts` | Modificado — botón eliminar + confirmación inline + evento `dojo:label-deleted` |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | Modificado — nuevo método `removeLabel()` |
+| `src/components/organisms/dojo-app/dojo-app.ts` | Modificado — escucha `dojo:label-deleted` y delega a `board.removeLabel()` |
+
+#### ADR-15: Transacción atómica multi-store para eliminación
+
+**Problema:** Al eliminar una etiqueta, el sistema debe mantener la integridad referencial entre el store `labels` y el campo `labelIds` del store `tasks`. Una solución naive (dos transacciones separadas) expone una ventana de inconsistencia si falla la segunda.
+
+**Decisión:** Usar una única transacción `readwrite` que abarque ambos stores simultáneamente:
+
+```typescript
+const tx = db.transaction(['labels', 'tasks'], 'readwrite');
+const labelStore = tx.objectStore('labels');
+const taskStore  = tx.objectStore('tasks');
+labelStore.delete(id);
+// ... limpiar labelIds en todas las tareas afectadas ...
+await idbTransaction(tx); // confirma o hace rollback de AMBOS stores
+```
+
+**Consecuencia:** Si la transacción falla, ninguno de los dos stores se modifica. La integridad es garantizada por el motor de IndexedDB.
+
+#### ADR-16: Confirmación inline en lugar de diálogo modal separado
+
+**Problema:** El criterio de aceptación requiere un "diálogo de confirmación". Existen dos opciones:
+- Reutilizar/extender `dojo-delete-confirm-dialog` (específico de tareas).
+- Implementar una confirmación inline dentro de `dojo-label-manager`.
+
+**Decisión:** Confirmación inline en el panel lateral, siguiendo el mismo patrón del formulario de edición ya establecido.
+
+**Justificación:** `dojo-delete-confirm-dialog` está acoplado semánticamente a tareas (`dojo:task-delete-confirm`). Extenderlo añadiría complejidad innecesaria. El patrón de "reemplazar fila con formulario" ya existe y resulta coherente con la UX del panel.
+
+#### Flujo de eliminación
+
+```
+Usuario clic 🗑️
+    │
+    ▼
+countTasksByLabelId() → async (carga el nº de tareas afectadas)
+    │
+    ▼
+Panel de confirmación inline (muestra aviso si hay tareas afectadas)
+    │
+    ├─ "Cancelar" → resetea _deletingId, reconstruye lista
+    │
+    └─ "Eliminar"
+           │
+           ▼
+       deleteLabel() [transacción atómica multi-store]
+           │
+           ▼
+       Actualizar _labels local → _buildContent()
+           │
+           ▼
+       CustomEvent dojo:label-deleted { labelId }
+           │
+           ▼
+       dojo-app → board.removeLabel(labelId)
+           │
+           ▼
+       Actualizar _labels + _tasksByColumn en caché
+       Refrescar chips DOM de tarjetas afectadas
+```
+
+#### API pública actualizada de `dojo-label-manager`
+
+| Evento despachado | Detalle | Descripción |
+|---|---|---|
+| `dojo:label-updated` | `{ label }` | Etiqueta editada |
+| `dojo:label-deleted` | `{ labelId }` | (**nuevo**) Etiqueta eliminada confirmada |
+
+#### `removeLabel()` en `dojo-kanban-board`
+
+Método que complementa al ya existente `refreshLabel()`:
+
+```typescript
+removeLabel(deletedLabelId: string): void {
+  this._labels = this._labels.filter(l => l.id !== deletedLabelId);
+  for (const [columnId, tasks] of this._tasksByColumn) {
+    for (const task of tasks) {
+      if ((task.labelIds ?? []).includes(deletedLabelId)) {
+        task.labelIds = task.labelIds.filter(lid => lid !== deletedLabelId);
+        // refrescar chip en el DOM...
+      }
+    }
+  }
+}
+```
+
+#### Criterios US-12 cubiertos
+
+| Scenario Gherkin | Estado |
+|---|---|
+| 1. Eliminar una etiqueta sin tareas asignadas | ✅ Confirmación sin aviso → eliminación directa |
+| 2. Diálogo muestra tareas afectadas | ✅ `countTasksByLabelId()` → aviso visual amarillo |
+| 3. Confirmar eliminación con tareas asignadas (limpieza atómica) | ✅ Transacción multi-store garantiza consistencia |
+| 4. Cancelar la eliminación | ✅ Botón "Cancelar" restaura la fila original |
+| 5. Chips desaparecen del tablero sin recarga | ✅ `board.removeLabel()` actualiza DOM reactivamente |
 

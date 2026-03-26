@@ -170,6 +170,12 @@ export class DojoApp extends HTMLElement {
       const { label } = (e as CustomEvent).detail as { label: Label };
       (board as any).refreshLabel?.(label);
     });
+
+    // Cuando se elimina una etiqueta, propagar al tablero para eliminar sus chips (US-12)
+    this._shadow.addEventListener('dojo:label-deleted', (e: Event) => {
+      const { labelId } = (e as CustomEvent).detail as { labelId: string };
+      (board as any).removeLabel?.(labelId);
+    });
   }
 }
 

@@ -6,9 +6,9 @@
  * en esta capa antes de escribir en IndexedDB.
  */
 
-import { idbRequest, idbTransaction, getStore } from './database.js';
+import { idbRequest, idbTransaction, getStore, openDatabase } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
-import type { Label } from '../types/models.js';
+import type { Label, Task } from '../types/models.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
 
@@ -78,9 +78,40 @@ export async function updateLabel(id: string, changes: UpdateLabelInput): Promis
   return updated;
 }
 
-/** Elimina una etiqueta por su ID. No lanza error si no existe. */
+/** Devuelve el número de tareas que tienen asignada una etiqueta. */
+export async function countTasksByLabelId(labelId: string): Promise<number> {
+  const db    = await openDatabase();
+  const tx    = db.transaction('tasks', 'readonly');
+  const store = tx.objectStore('tasks');
+  const tasks = await idbRequest<Task[]>(store.getAll());
+  return tasks.filter(t => (t.labelIds ?? []).includes(labelId)).length;
+}
+
+/**
+ * Elimina una etiqueta y limpia su referencia en todas las tareas asociadas.
+ * La operación es atómica: usa una transacción que abarca los stores
+ * "labels" y "tasks" para evitar inconsistencias.
+ */
 export async function deleteLabel(id: string): Promise<void> {
-  const { store, tx } = await getStore('labels', 'readwrite');
-  store.delete(id);
+  const db         = await openDatabase();
+  const tx         = db.transaction(['labels', 'tasks'], 'readwrite');
+  const labelStore = tx.objectStore('labels');
+  const taskStore  = tx.objectStore('tasks');
+
+  // Eliminar la etiqueta
+  labelStore.delete(id);
+
+  // Quitar el ID de la etiqueta de todas las tareas que la referenciaban
+  const allTasks = await idbRequest<Task[]>(taskStore.getAll());
+  for (const task of allTasks) {
+    if ((task.labelIds ?? []).includes(id)) {
+      taskStore.put({
+        ...task,
+        labelIds:  task.labelIds.filter(lid => lid !== id),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
   await idbTransaction(tx);
 }
