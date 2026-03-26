@@ -112,6 +112,30 @@ export class DojoKanbanBoard extends HTMLElement {
     }
   }
 
+  /**
+   * Elimina una etiqueta del caché local y actualiza los chips de todas
+   * las tarjetas que la tenían asignada. Llamado por dojo-app tras recibir
+   * el evento `dojo:label-deleted` desde dojo-label-manager (US-12).
+   */
+  removeLabel(deletedLabelId: string): void {
+    this._labels = this._labels.filter(l => l.id !== deletedLabelId);
+    for (const [columnId, tasks] of this._tasksByColumn) {
+      for (const task of tasks) {
+        if ((task.labelIds ?? []).includes(deletedLabelId)) {
+          // Actualizar el caché local de tareas
+          task.labelIds = task.labelIds.filter(lid => lid !== deletedLabelId);
+          const colEl = this._shadow.querySelector(
+            `dojo-kanban-column[column-id="${CSS.escape(columnId)}"]`
+          );
+          if (colEl) {
+            const cardEl = colEl.querySelector(`dojo-task-card[task-id="${CSS.escape(task.id)}"]`);
+            if (cardEl) (cardEl as any).taskLabels = this._getTaskLabels(task);
+          }
+        }
+      }
+    }
+  }
+
   // ── Render inicial (estructura vacía con loading) ─────────────────────────
 
   private _render(): void {

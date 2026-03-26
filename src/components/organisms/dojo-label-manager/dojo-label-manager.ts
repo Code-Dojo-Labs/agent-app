@@ -28,7 +28,7 @@
  */
 
 import type { Label } from '../../../types/models.js';
-import { getAllLabels, updateLabel } from '../../../db/label.repository.js';
+import { getAllLabels, updateLabel, deleteLabel, countTasksByLabelId } from '../../../db/label.repository.js';
 
 // ── Paleta de colores (idéntica a dojo-task-detail) ────────────────────────
 const PRESET_COLORS = [
@@ -53,6 +53,8 @@ export class DojoLabelManager extends HTMLElement {
   private _shadow: ShadowRoot;
   private _labels: Label[] = [];
   private _editingId: string | null = null;
+  private _deletingId: string | null = null;
+  private _deletingAffectedCount: number = 0;
 
   constructor() {
     super();
@@ -86,7 +88,8 @@ export class DojoLabelManager extends HTMLElement {
   async show(): Promise<void> {
     this._labels = await getAllLabels();
     this._labels.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
-    this._editingId = null;
+    this._editingId  = null;
+    this._deletingId = null;
     this.setAttribute('open', '');
     this._buildContent();
     requestAnimationFrame(() => {
@@ -96,7 +99,8 @@ export class DojoLabelManager extends HTMLElement {
 
   hide(): void {
     this.removeAttribute('open');
-    this._editingId = null;
+    this._editingId  = null;
+    this._deletingId = null;
   }
 
   // ── Render base ──────────────────────────────────────────────────────────
@@ -235,6 +239,86 @@ export class DojoLabelManager extends HTMLElement {
       .edit-btn:hover { background: var(--dojo-bg); color: var(--dojo-text-primary); }
       .edit-btn:focus-visible {
         outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
+
+      /* Botón eliminar */
+      .delete-btn {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.875rem;
+        color: var(--dojo-text-secondary);
+        flex-shrink: 0;
+        line-height: 1;
+        transition: background 0.15s, color 0.15s;
+      }
+      .delete-btn:hover { background: #FEE2E2; color: #B91C1C; }
+      .delete-btn:focus-visible {
+        outline: 2px solid #EF4444;
+        outline-offset: 2px;
+      }
+
+      /* Panel de confirmación de eliminación inline */
+      .delete-confirm {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+        padding: 0.5rem 0;
+      }
+      .delete-confirm-msg {
+        font-size: 0.8125rem;
+        color: var(--dojo-text-primary);
+        margin: 0;
+        line-height: 1.45;
+      }
+      .delete-confirm-warning {
+        font-size: 0.75rem;
+        color: #B45309;
+        margin: 0;
+        background: #FEF3C7;
+        border: 1px solid #F59E0B;
+        border-radius: var(--dojo-radius-sm, 4px);
+        padding: 0.3rem 0.5rem;
+      }
+      .delete-confirm-actions {
+        display: flex;
+        gap: 0.375rem;
+        justify-content: flex-end;
+        padding-top: 0.25rem;
+      }
+      .delete-btn-cancel {
+        padding: 0.25rem 0.625rem;
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.75rem;
+        cursor: pointer;
+        font-family: inherit;
+        border: 1px solid var(--dojo-border);
+        background: transparent;
+        color: var(--dojo-text-secondary);
+        transition: background 0.15s;
+      }
+      .delete-btn-cancel:hover { background: var(--dojo-bg); color: var(--dojo-text-primary); }
+      .delete-btn-confirm {
+        padding: 0.25rem 0.625rem;
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.75rem;
+        cursor: pointer;
+        font-family: inherit;
+        background: #EF4444;
+        border: 1px solid #EF4444;
+        color: #fff;
+        font-weight: 600;
+        transition: opacity 0.15s;
+      }
+      .delete-btn-confirm:hover { opacity: 0.88; }
+      .delete-btn-confirm:disabled { opacity: 0.55; cursor: not-allowed; }
+      .delete-btn-cancel:focus-visible,
+      .delete-btn-confirm:focus-visible {
+        outline: 2px solid #EF4444;
         outline-offset: 2px;
       }
 
@@ -444,6 +528,8 @@ export class DojoLabelManager extends HTMLElement {
 
     if (this._editingId === label.id) {
       item.appendChild(this._buildEditForm(label));
+    } else if (this._deletingId === label.id) {
+      item.appendChild(this._buildDeleteConfirm(label));
     } else {
       const dot = document.createElement('span');
       dot.className = 'label-dot';
@@ -461,19 +547,98 @@ export class DojoLabelManager extends HTMLElement {
       editBtn.textContent = '✏️';
       editBtn.setAttribute('aria-label', `Editar etiqueta "${label.name}"`);
       editBtn.addEventListener('click', () => {
-        this._editingId = label.id;
+        this._editingId  = label.id;
+        this._deletingId = null;
         this._buildContent();
         requestAnimationFrame(() => {
           this._shadow.querySelector<HTMLInputElement>('.edit-name-input')?.focus();
         });
       });
 
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.type = 'button';
+      deleteBtn.textContent = '🗑️';
+      deleteBtn.setAttribute('aria-label', `Eliminar etiqueta "${label.name}"`);
+      deleteBtn.addEventListener('click', async () => {
+        this._editingId  = null;
+        this._deletingId = label.id;
+        this._deletingAffectedCount = await countTasksByLabelId(label.id);
+        this._buildContent();
+        requestAnimationFrame(() => {
+          this._shadow.querySelector<HTMLButtonElement>('.delete-btn-cancel')?.focus();
+        });
+      });
+
       item.appendChild(dot);
       item.appendChild(nameEl);
       item.appendChild(editBtn);
+      item.appendChild(deleteBtn);
     }
 
     return item;
+  }
+
+  private _buildDeleteConfirm(label: Label): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'delete-confirm';
+
+    const msg = document.createElement('p');
+    msg.className = 'delete-confirm-msg';
+    msg.textContent = `¿Eliminar la etiqueta "${label.name}"?`;
+    container.appendChild(msg);
+
+    if (this._deletingAffectedCount > 0) {
+      const warning = document.createElement('p');
+      warning.className = 'delete-confirm-warning';
+      warning.setAttribute('role', 'alert');
+      warning.textContent =
+        `Esta etiqueta está asignada a ${this._deletingAffectedCount} ` +
+        `${this._deletingAffectedCount === 1 ? 'tarea' : 'tareas'}.`;
+      container.appendChild(warning);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'delete-confirm-actions';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'delete-btn-cancel';
+    cancelBtn.textContent = 'Cancelar';
+    cancelBtn.addEventListener('click', () => {
+      this._deletingId = null;
+      this._buildContent();
+    });
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.type = 'button';
+    confirmBtn.className = 'delete-btn-confirm';
+    confirmBtn.textContent = 'Eliminar';
+    confirmBtn.addEventListener('click', async () => {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = '…';
+      try {
+        await deleteLabel(label.id);
+        const deletedId = label.id;
+        this._labels = this._labels.filter(l => l.id !== deletedId);
+        this._deletingId = null;
+        this._buildContent();
+        this.dispatchEvent(new CustomEvent('dojo:label-deleted', {
+          bubbles: true, composed: true,
+          detail: { labelId: deletedId },
+        }));
+      } catch (err) {
+        console.error('[dojo-label-manager] Error al eliminar etiqueta:', err);
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Eliminar';
+      }
+    });
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+    container.appendChild(actions);
+
+    return container;
   }
 
   private _buildEditForm(label: Label): HTMLElement {
