@@ -22,6 +22,7 @@
    - [Paso 8 — Implementación de la Gestión de Columnas del Tablero (US-02 / Issue #3)](#paso-8--implementación-de-la-gestión-de-columnas-del-tablero-us-02--issue-3)
    - [Paso 9 — Implementación de la Eliminación de Tareas (US-06 / Issue #7)](#paso-9--implementación-de-la-eliminación-de-tareas-us-06--issue-7)
    - [Paso 10 — Implementación de Descripción Markdown con bloques de código (US-07 / Issue #8)](#paso-10--implementación-de-descripción-markdown-con-bloques-de-código-us-07--issue-8)
+   - [Paso 11 — Implementación de Prioridad de Tarea (US-08 / Issue #9)](#paso-11--implementación-de-prioridad-de-tarea-us-08--issue-9)
 
 ---
 
@@ -980,4 +981,45 @@ Todo el parser Markdown usa manipulación DOM explícita (`document.createElemen
 | 4. XSS: scripts no ejecutados | US-05 / markdown.ts (`textContent`) |
 | 5. Parser propio sin dependencias externas | US-05 / markdown.ts |
 | 6. Descripción vacía → mensaje "Sin descripción" | US-05 |
+
+---
+
+### Paso 11 — Implementación de Prioridad de Tarea (US-08 / Issue #9)
+
+**Issue asociado:** [#9 — US-08 Prioridad de tarea](https://github.com/Code-Dojo-Labs/agent-app/issues/9)  
+**PR:** ✅ Mergeado en `init` — [#26](https://github.com/Code-Dojo-Labs/agent-app/pull/26)  
+**Branch:** `feat/9-prioridad-tarea`
+
+#### Descripción
+
+Implementa la visualización de prioridad con iconos standardizados (⬇️/➡️/⬆️/🔥) en tarjetas Kanban y el panel de detalle, y añade una barra de filtros por prioridad sobre el tablero. El tipo `Priority` y el campo en el modelo ya existían.
+
+#### Cambios por archivo
+
+| Archivo | Cambios |
+|---|---|
+| `dojo-task-card.ts` | `PRIORITY_CONFIG` actualizado con iconos US-08; `priority-dot` → `priority-icon` con emoji |
+| `dojo-task-dialog.ts` | `PRIORITIES` actualizado con iconos `⬇️/➡️/⬆️/🔥` |
+| `dojo-task-detail.ts` | `PRIORITIES` actualizado con iconos `⬇️/➡️/⬆️/🔥` |
+| `dojo-kanban-board.ts` | `ActiveFilter.priority → priorities?: Priority[]`; `_filterTasks()` multi-prioridad; `activeFilter` setter refresca columnas; barra de filtros `_buildFilterBar()` |
+
+#### Barra de filtros
+
+```
+[ Prioridad: ] [ ⬇️ Baja ] [ ➡️ Media ] [ ⬆️ Alta ] [ 🔥 Urgente ] [ ✕ Limpiar ]
+```
+
+- Toggle chips con `aria-pressed` — permite seleccionar 0 a 4 prioridades simultáneamente
+- Al cambiar selección: `activeFilter.priorities` se actualiza → `_refreshColumnCards()` por cada columna + `_updateColumnCounts()`
+- "✕ Limpiar" aparece solo cuando hay filtros activos
+- `role="group"` + `aria-label` en el contenedor (accesibilidad)
+
+#### Criterios US-08 cubiertos
+
+| Scenario | Estado |
+|---|---|
+| 1. Prioridad por defecto "medium" al crear tarea | ✅ `dojo-task-dialog` (pre-existente) |
+| 2. Ícono y texto en la tarjeta (⬇️/➡️/⬆️/🔥) | ✅ este PR |
+| 3. Cambiar prioridad desde panel de detalle | ✅ `dojo-task-detail` (selector + auto-save pre-existente, iconos fijados aquí) |
+| 4. Filtrar por una o más prioridades | ✅ este PR (`_buildFilterBar` + `_filterTasks`) |
 

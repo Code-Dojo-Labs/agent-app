@@ -28,7 +28,7 @@
  * --dojo-shadow, --dojo-radius, --dojo-primary
  */
 
-import type { Column, Task } from '../../../types/models.js';
+import type { Column, Task, Priority } from '../../../types/models.js';
 import { getAllColumns, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
 import { getTasksByStatus, createTask, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
 import { getAllLabels } from '../../../db/label.repository.js';
@@ -43,7 +43,7 @@ import '../../organisms/dojo-delete-confirm-dialog/dojo-delete-confirm-dialog.js
 // ── Tipos internos ─────────────────────────────────────────────────────────
 
 interface ActiveFilter {
-  priority?: string;
+  priorities?: Priority[];
   labelIds?: string[];
 }
 
@@ -79,6 +79,7 @@ export class DojoKanbanBoard extends HTMLElement {
    */
   set activeFilter(filter: ActiveFilter) {
     this._activeFilter = filter;
+    this._columns.forEach(col => this._refreshColumnCards(col.id));
     this._updateColumnCounts();
   }
 
@@ -169,8 +170,73 @@ export class DojoKanbanBoard extends HTMLElement {
         font-size: 0.875rem;
       }
       .retry-btn:hover { opacity: 0.9; }
+
+      /* ── Barra de filtros ── */
+      .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-bottom: 1px solid var(--dojo-border);
+        background: var(--dojo-surface);
+        flex-wrap: wrap;
+        flex-shrink: 0;
+        min-height: 40px;
+      }
+      .filter-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--dojo-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+      }
+      .filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.625rem;
+        background: transparent;
+        border: 1px solid var(--dojo-border);
+        border-radius: 999px;
+        font-size: 0.75rem;
+        color: var(--dojo-text-secondary);
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.14s, color 0.14s, border-color 0.14s;
+        white-space: nowrap;
+      }
+      .filter-chip:hover {
+        background: var(--dojo-bg);
+        border-color: var(--dojo-text-secondary);
+        color: var(--dojo-text-primary);
+      }
+      .filter-chip.active {
+        background: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary, #1D4ED8);
+        color: #fff;
+        font-weight: 600;
+      }
+      .filter-chip:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
+      .filter-clear {
+        padding: 0.25rem 0.5rem;
+        background: transparent;
+        border: none;
+        font-size: 0.75rem;
+        color: var(--dojo-text-secondary);
+        cursor: pointer;
+        font-family: inherit;
+        text-decoration: underline;
+      }
+      .filter-clear:hover { color: var(--dojo-text-primary); }
     `;
     this._shadow.appendChild(style);
+
+    // Barra de filtros de prioridad (US-08)
+    this._shadow.appendChild(this._buildFilterBar());
 
     // Área principal — empieza en estado loading
     this._showLoading();
@@ -202,6 +268,76 @@ export class DojoKanbanBoard extends HTMLElement {
     this._shadow.appendChild(deleteDialog);
     this._shadow.addEventListener('dojo:task-delete-request',  (e) => this._onTaskDeleteRequest(e as CustomEvent));
     this._shadow.addEventListener('dojo:task-delete-confirm',  (e) => this._handleTaskDeleteConfirm(e as CustomEvent));
+  }
+
+  // ── Barra de filtros (US-08) ─────────────────────────────────────────────
+
+  private _buildFilterBar(): HTMLElement {
+    const FILTER_PRIORITIES: { value: Priority; icon: string; label: string }[] = [
+      { value: 'low',    icon: '⬇️', label: 'Baja'    },
+      { value: 'medium', icon: '➡️', label: 'Media'   },
+      { value: 'high',   icon: '⬆️', label: 'Alta'    },
+      { value: 'urgent', icon: '🔥', label: 'Urgente' },
+    ];
+
+    const bar = document.createElement('div');
+    bar.className = 'filter-bar';
+    bar.setAttribute('role', 'group');
+    bar.setAttribute('aria-label', 'Filtrar por prioridad');
+
+    const lbl = document.createElement('span');
+    lbl.className = 'filter-label';
+    lbl.textContent = 'Prioridad:';
+    bar.appendChild(lbl);
+
+    const selectedPriorities = new Set<Priority>();
+
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'filter-clear';
+    clearBtn.type = 'button';
+    clearBtn.textContent = '✕ Limpiar';
+    clearBtn.setAttribute('aria-label', 'Limpiar filtros de prioridad');
+    clearBtn.style.display = 'none';
+
+    for (const p of FILTER_PRIORITIES) {
+      const btn = document.createElement('button');
+      btn.className = 'filter-chip';
+      btn.type = 'button';
+      btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute('data-priority', p.value);
+      btn.textContent = `${p.icon} ${p.label}`;
+      btn.addEventListener('click', () => {
+        const isActive = selectedPriorities.has(p.value);
+        if (isActive) {
+          selectedPriorities.delete(p.value);
+          btn.classList.remove('active');
+          btn.setAttribute('aria-pressed', 'false');
+        } else {
+          selectedPriorities.add(p.value);
+          btn.classList.add('active');
+          btn.setAttribute('aria-pressed', 'true');
+        }
+        clearBtn.style.display = selectedPriorities.size > 0 ? '' : 'none';
+        const newPriorities = selectedPriorities.size > 0
+          ? (Array.from(selectedPriorities) as Priority[])
+          : undefined;
+        this.activeFilter = { ...this._activeFilter, priorities: newPriorities };
+      });
+      bar.appendChild(btn);
+    }
+
+    clearBtn.addEventListener('click', () => {
+      selectedPriorities.clear();
+      bar.querySelectorAll<HTMLButtonElement>('.filter-chip').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
+      clearBtn.style.display = 'none';
+      this.activeFilter = { ...this._activeFilter, priorities: undefined };
+    });
+    bar.appendChild(clearBtn);
+
+    return bar;
   }
 
   // ── Estados visuales ─────────────────────────────────────────────────────
@@ -339,8 +475,9 @@ export class DojoKanbanBoard extends HTMLElement {
    * Las tarjetas se proyectan en el default slot del componente.
    */
   private _renderTaskCards(colEl: Element, tasks: Task[]): void {
-    const sorted = [...tasks].sort((a, b) => a.order - b.order);
-    for (const task of sorted) {
+    const sorted   = [...tasks].sort((a, b) => a.order - b.order);
+    const filtered = this._filterTasks(sorted);
+    for (const task of filtered) {
       const card = document.createElement('dojo-task-card');
       card.setAttribute('task-id',       task.id);
       card.setAttribute('task-title',    task.title);
@@ -372,9 +509,9 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private _filterTasks(tasks: Task[]): Task[] {
-    const { priority, labelIds } = this._activeFilter;
+    const { priorities, labelIds } = this._activeFilter;
     return tasks.filter(task => {
-      if (priority && task.priority !== priority) return false;
+      if (priorities && priorities.length > 0 && !priorities.includes(task.priority)) return false;
       if (labelIds && labelIds.length > 0) {
         const taskLabelIds = task.labelIds ?? [];
         const hasLabel = labelIds.some(id => taskLabelIds.includes(id));
@@ -723,8 +860,13 @@ export class DojoKanbanBoard extends HTMLElement {
           sourceColumnId,
           tasks.map(t => t.id === taskId ? updated : t),
         );
-        // Refresco de tarjeta: solo re-renderizar si cambió título o prioridad
-        if (changes.title !== undefined || changes.priority !== undefined) {
+        // Refresco de tarjeta en la misma columna:
+        // Si hay filtro de prioridades activo y cambió la prioridad, refrescamos la columna
+        // completa para que las tarjetas que ya no cumplan el filtro desaparezcan (US-08 S4).
+        // En cualquier otro caso actualizamos solo los atributos para evitar re-render completo.
+        if (changes.priority !== undefined && this._activeFilter.priorities?.length) {
+          this._refreshColumnCards(sourceColumnId);
+        } else if (changes.title !== undefined || changes.priority !== undefined) {
           const colEl = this._shadow.querySelector(
             `dojo-kanban-column[column-id="${CSS.escape(sourceColumnId)}"]`
           );
