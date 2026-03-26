@@ -67,8 +67,17 @@ export class DojoLabelManager extends HTMLElement {
     if (name === 'open') {
       const panel = this._shadow.querySelector<HTMLElement>('.panel');
       const backdrop = this._shadow.querySelector<HTMLElement>('.backdrop');
-      if (panel) panel.setAttribute('aria-hidden', newVal === null ? 'true' : 'false');
-      if (backdrop) backdrop.classList.toggle('visible', newVal !== null);
+      const isOpen = newVal !== null;
+      if (panel) {
+        panel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+        // inert previene el foco por teclado cuando el panel está cerrado (WCAG 2.1 SC 2.1.2)
+        if (isOpen) {
+          panel.removeAttribute('inert');
+        } else {
+          panel.setAttribute('inert', '');
+        }
+      }
+      if (backdrop) backdrop.classList.toggle('visible', isOpen);
     }
   }
 
@@ -367,6 +376,7 @@ export class DojoLabelManager extends HTMLElement {
     panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-labelledby', 'lm-title');
     panel.setAttribute('aria-hidden', 'true');
+    panel.setAttribute('inert', ''); // Panel inactivo por defecto (WCAG 2.1 SC 2.1.2)
 
     // Header
     const panelHeader = document.createElement('div');
