@@ -47,6 +47,11 @@ interface ActiveFilter {
   labelIds?: string[];
 }
 
+/** Contrato de la propiedad taskLabels expuesta por dojo-task-card (US-10). */
+interface TaskCardElement extends HTMLElement {
+  taskLabels: Label[];
+}
+
 // ── Clase ──────────────────────────────────────────────────────────────────
 
 export class DojoKanbanBoard extends HTMLElement {
@@ -490,7 +495,7 @@ export class DojoKanbanBoard extends HTMLElement {
       card.setAttribute('task-id',       task.id);
       card.setAttribute('task-title',    task.title);
       card.setAttribute('task-priority', task.priority);
-      (card as any).taskLabels = this._getTaskLabels(task);
+      (card as TaskCardElement).taskLabels = this._getTaskLabels(task);
       colEl.appendChild(card);
     }
   }
@@ -904,7 +909,7 @@ export class DojoKanbanBoard extends HTMLElement {
             if (cardEl) {
               if (changes.title    !== undefined) cardEl.setAttribute('task-title',    updated.title);
               if (changes.priority !== undefined) cardEl.setAttribute('task-priority', updated.priority);
-              if (changes.labelIds !== undefined) (cardEl as any).taskLabels = this._getTaskLabels(updated);
+              if (changes.labelIds !== undefined) (cardEl as TaskCardElement).taskLabels = this._getTaskLabels(updated);
             }
           }
         }
