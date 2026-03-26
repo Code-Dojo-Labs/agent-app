@@ -860,8 +860,13 @@ export class DojoKanbanBoard extends HTMLElement {
           sourceColumnId,
           tasks.map(t => t.id === taskId ? updated : t),
         );
-        // Refresco de tarjeta: solo re-renderizar si cambió título o prioridad
-        if (changes.title !== undefined || changes.priority !== undefined) {
+        // Refresco de tarjeta en la misma columna:
+        // Si hay filtro de prioridades activo y cambió la prioridad, refrescamos la columna
+        // completa para que las tarjetas que ya no cumplan el filtro desaparezcan (US-08 S4).
+        // En cualquier otro caso actualizamos solo los atributos para evitar re-render completo.
+        if (changes.priority !== undefined && this._activeFilter.priorities?.length) {
+          this._refreshColumnCards(sourceColumnId);
+        } else if (changes.title !== undefined || changes.priority !== undefined) {
           const colEl = this._shadow.querySelector(
             `dojo-kanban-column[column-id="${CSS.escape(sourceColumnId)}"]`
           );
