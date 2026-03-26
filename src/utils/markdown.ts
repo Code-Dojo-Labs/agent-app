@@ -10,6 +10,7 @@
  *   **negrita**
  *   *cursiva*
  *   `código inline`
+ *   ```lang\ncódigo\n``` — bloques de código cercados
  *   - Listas no ordenadas
  *   [texto](url) — solo protocolos http: y https:
  *   Párrafos separados por líneas en blanco
@@ -141,6 +142,27 @@ export function parseMarkdown(markdown: string): DocumentFragment {
       flushParagraph();
       flushList();
       i++;
+      continue;
+    }
+
+    // ── Bloques de código cercados (```...```) ───────────────────────
+    if (line.match(/^```/)) {
+      flushParagraph();
+      flushList();
+      // Recopilar líneas hasta el cierre ```
+      const codeLines: string[] = [];
+      i++; // Saltar la línea de apertura
+      while (i < lines.length && !lines[i].match(/^```/)) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length) i++; // Saltar la línea de cierre
+      const pre  = document.createElement('pre');
+      const code = document.createElement('code');
+      // textContent: inserción segura sin riesgo XSS
+      code.textContent = codeLines.join('\n');
+      pre.appendChild(code);
+      fragment.appendChild(pre);
       continue;
     }
 

@@ -382,6 +382,22 @@ export class DojoTaskDetail extends HTMLElement {
         font-family: monospace;
         font-size: 0.8125rem;
       }
+      .desc-preview pre {
+        background: color-mix(in srgb, var(--dojo-border) 20%, transparent);
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        padding: 0.625rem 0.75rem;
+        overflow-x: auto;
+        margin: 0.375rem 0 0.625rem;
+      }
+      .desc-preview pre code {
+        background: transparent;
+        padding: 0;
+        border-radius: 0;
+        font-family: monospace;
+        font-size: 0.8125rem;
+        white-space: pre;
+      }
       .desc-preview ul  { padding-left: 1.25rem; margin: 0.375rem 0; }
       .desc-preview li  { margin-bottom: 0.2rem; }
       .desc-preview a   { color: var(--dojo-primary, #1D4ED8); }
