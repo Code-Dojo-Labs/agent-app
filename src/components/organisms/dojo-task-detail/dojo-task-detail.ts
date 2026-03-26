@@ -470,6 +470,37 @@ export class DojoTaskDetail extends HTMLElement {
         flex-shrink: 0;
       }
 
+      /* ── Footer de peligro (US-06) ── */
+      .panel-footer {
+        flex-shrink: 0;
+        padding: 0.875rem 1.25rem;
+        border-top: 1px solid var(--dojo-border);
+        display: flex;
+        justify-content: flex-end;
+      }
+      .delete-task-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.4375rem 0.875rem;
+        background: transparent;
+        border: 1px solid #EF4444;
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #EF4444;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.15s, color 0.15s;
+      }
+      .delete-task-btn:hover {
+        background: #FEE2E2;
+      }
+      .delete-task-btn:focus-visible {
+        outline: 2px solid #EF4444;
+        outline-offset: 2px;
+      }
+
       /* ── Metadatos (solo lectura) ── */
       .metadata {
         border-top: 1px solid var(--dojo-border);
@@ -542,6 +573,25 @@ export class DojoTaskDetail extends HTMLElement {
     body.appendChild(this._buildMetadata(task));
 
     panel.appendChild(body);
+
+    // ── Footer de eliminación (US-06) ──────────────────────────────────────
+    const footer = document.createElement('div');
+    footer.className = 'panel-footer';
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-task-btn';
+    deleteBtn.setAttribute('aria-label', `Eliminar tarea: ${task.title}`);
+    deleteBtn.textContent = '🗑 Eliminar tarea';
+    deleteBtn.addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('dojo:task-delete-request', {
+        bubbles:  true,
+        composed: true,
+        detail:   { taskId: task.id, taskTitle: task.title },
+      }));
+    });
+
+    footer.appendChild(deleteBtn);
+    panel.appendChild(footer);
   }
 
   // ── Secciones del formulario ──────────────────────────────────────────────

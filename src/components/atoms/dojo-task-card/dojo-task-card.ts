@@ -149,6 +149,37 @@ export class DojoTaskCard extends HTMLElement {
         outline-offset: 2px;
       }
 
+      /* Botón de eliminación rápida (US-06) */
+      .quick-delete-btn {
+        position: absolute;
+        top: 0.375rem;
+        right: 0.375rem;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 0.2rem 0.3rem;
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.8125rem;
+        color: var(--dojo-text-secondary);
+        line-height: 1;
+        opacity: 0;
+        transition: opacity 0.15s, background 0.15s, color 0.15s;
+        z-index: 1;
+      }
+      :host(:hover) .quick-delete-btn,
+      :host(:focus-within) .quick-delete-btn {
+        opacity: 1;
+      }
+      .quick-delete-btn:hover {
+        background: #FEE2E2;
+        color: #EF4444;
+      }
+      .quick-delete-btn:focus-visible {
+        outline: 2px solid #EF4444;
+        outline-offset: 2px;
+        opacity: 1;
+      }
+
       /* Indicador de posición de drop — línea en la parte superior */
       :host([drop-indicator="top"])::before {
         content: '';
@@ -210,6 +241,20 @@ export class DojoTaskCard extends HTMLElement {
       }
     `;
     this._shadow.appendChild(style);
+
+    // Botón de eliminación rápida (US-06)
+    const quickDeleteBtn = document.createElement('button');
+    quickDeleteBtn.className = 'quick-delete-btn';
+    quickDeleteBtn.setAttribute('aria-label', `Eliminar tarea: ${this.taskTitle}`);
+    quickDeleteBtn.textContent = '🗑';
+    quickDeleteBtn.addEventListener('click', (e: MouseEvent) => {
+      e.stopPropagation(); // Evitar que dispare dojo:task-open
+      this.dispatchEvent(new CustomEvent('dojo:task-delete-request', {
+        bubbles: true, composed: true,
+        detail: { taskId: this.taskId, taskTitle: this.taskTitle },
+      }));
+    });
+    this._shadow.appendChild(quickDeleteBtn);
 
     // Título
     const titleEl = document.createElement('p');

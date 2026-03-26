@@ -38,6 +38,7 @@ import '../../atoms/dojo-add-column-button/dojo-add-column-button.js';
 import '../../organisms/dojo-column-dialog/dojo-column-dialog.js';
 import '../../organisms/dojo-task-dialog/dojo-task-dialog.js';
 import '../../organisms/dojo-task-detail/dojo-task-detail.js';
+import '../../organisms/dojo-delete-confirm-dialog/dojo-delete-confirm-dialog.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
 
@@ -196,6 +197,11 @@ export class DojoKanbanBoard extends HTMLElement {
     this._shadow.appendChild(taskDetail);
     this._shadow.addEventListener('dojo:task-open',            (e) => this._onTaskOpen(e as CustomEvent));
     this._shadow.addEventListener('dojo:task-field-updated',   (e) => this._handleTaskFieldUpdated(e as CustomEvent));
+    // US-06: Eliminar tarea
+    const deleteDialog = document.createElement('dojo-delete-confirm-dialog');
+    this._shadow.appendChild(deleteDialog);
+    this._shadow.addEventListener('dojo:task-delete-request',  (e) => this._onTaskDeleteRequest(e as CustomEvent));
+    this._shadow.addEventListener('dojo:task-delete-confirm',  (e) => this._handleTaskDeleteConfirm(e as CustomEvent));
   }
 
   // ── Estados visuales ─────────────────────────────────────────────────────
@@ -505,6 +511,10 @@ export class DojoKanbanBoard extends HTMLElement {
   private _getTaskDetail(): HTMLElement | null {
     return this._shadow.querySelector('dojo-task-detail');
   }
+
+  private _getDeleteDialog(): HTMLElement | null {
+    return this._shadow.querySelector('dojo-delete-confirm-dialog');
+  }
   private _onAddColumnRequest(): void {
     const dialog = this._getDialog() as any;
     if (dialog?.openCreate) dialog.openCreate();
@@ -730,6 +740,42 @@ export class DojoKanbanBoard extends HTMLElement {
       this._updateColumnCounts();
     } catch (err) {
       console.error('[dojo-kanban-board] Error al actualizar tarea:', err);
+    }
+  }
+  // ── Handlers de eliminación de tarea (US-06) ─────────────────────────────
+
+  private _onTaskDeleteRequest(e: CustomEvent): void {
+    const { taskId, taskTitle } = e.detail as { taskId: string; taskTitle: string };
+    const dialog = this._getDeleteDialog() as any;
+    if (dialog?.show) dialog.show(taskId, taskTitle);
+  }
+
+  private async _handleTaskDeleteConfirm(e: CustomEvent): Promise<void> {
+    const { taskId } = e.detail as { taskId: string };
+
+    // Localizar columna desde el caché
+    let columnId: string | null = null;
+    for (const [colId, tasks] of this._tasksByColumn) {
+      if (tasks.some(t => t.id === taskId)) { columnId = colId; break; }
+    }
+    if (!columnId) return;
+
+    try {
+      await deleteTask(taskId);
+
+      // Actualizar caché
+      const remaining = (this._tasksByColumn.get(columnId) ?? []).filter(t => t.id !== taskId);
+      this._tasksByColumn.set(columnId, remaining.map((t, i) => ({ ...t, order: i })));
+
+      // Cerrar panel de detalle si estaba mostrando esta tarea
+      const detail = this._getTaskDetail() as any;
+      if (detail?.close) detail.close();
+
+      // Refrescar columna + conteos
+      this._refreshColumnCards(columnId);
+      this._updateColumnCounts();
+    } catch (err) {
+      console.error('[dojo-kanban-board] Error al eliminar tarea:', err);
     }
   }
 }
