@@ -987,7 +987,7 @@ Todo el parser Markdown usa manipulación DOM explícita (`document.createElemen
 ### Paso 11 — Implementación de Prioridad de Tarea (US-08 / Issue #9)
 
 **Issue asociado:** [#9 — US-08 Prioridad de tarea](https://github.com/Code-Dojo-Labs/agent-app/issues/9)  
-**PR:** ✅ Mergeado en `init` — [#26](https://github.com/Code-Dojo-Labs/agent-app/pull/26)  
+**PR:** ✅ Mergeado en `init` — [#26](https://github.com/Code-Dojo-Labs/agent-app/pull/26) (SHA: `d0e4406`)  
 **Branch:** `feat/9-prioridad-tarea`
 
 #### Descripción
