@@ -27,6 +27,7 @@
    - [Paso 13 — Implementación de Reutilización de Etiquetas (US-10 / Issue #11)](#paso-13--implementación-de-reutilización-de-etiquetas-us-10--issue-11)
    - [Paso 14 — Implementación de Editar Etiqueta (US-11 / Issue #12)](#paso-14--implementación-de-editar-etiqueta-us-11--issue-12)
    - [Paso 15 — Implementación de Eliminar Etiqueta (US-12 / Issue #13)](#paso-15--implementación-de-eliminar-etiqueta-us-12--issue-13)
+   - [Paso 16 — Implementación de Colores WCAG y Validación de Contraste (US-13 / Issue #14)](#paso-16--implementación-de-colores-wcag-y-validación-de-contraste-us-13--issue-14)
 
 ---
 
@@ -1436,3 +1437,99 @@ removeLabel(deletedLabelId: string): void {
 | 4. Cancelar la eliminación | ✅ Botón "Cancelar" restaura la fila original |
 | 5. Chips desaparecen del tablero sin recarga | ✅ `board.removeLabel()` actualiza DOM reactivamente |
 
+---
+
+### Paso 16 — Implementación de Colores WCAG y Validación de Contraste (US-13 / Issue #14)
+
+**Pull Request:** [#31 — [US-13] Colores de etiquetas con validación de contraste WCAG AA](https://github.com/Code-Dojo-Labs/agent-app/pull/31)  
+**Rama:** `feat/14-colores-etiquetas-contraste-wcag`  
+**Fecha:** 2026-03-26
+
+#### Resumen
+
+Cubre la historia de usuario US-13: la paleta de colores de etiquetas se actualiza a 10 tonos que cumplen WCAG AA (≥ 4.5:1 con texto blanco), y se implementa validación dinámica para colores personalizados que bloquea el guardado y sugiere una alternativa accesible.
+
+#### Archivos modificados
+
+| Archivo | Tipo de cambio |
+|---|---|
+| `src/utils/contrast.ts` | Modificado — nueva función `suggestAccessibleColor()` |
+| `src/components/organisms/dojo-label-manager/dojo-label-manager.ts` | Modificado — paleta WCAG, validación en color custom |
+| `src/components/organisms/dojo-task-detail/dojo-task-detail.ts` | Modificado — misma paleta y validación WCAG en creación |
+| `src/components/atoms/dojo-task-card/dojo-task-card.ts` | Modificado — texto chips siempre `#FFFFFF` |
+
+#### ADR-17: Paleta de 10 colores obligatorios vs. paleta libre de 12 colores
+
+**Problema:** El código anterior tenía 12 colores brillantes (`#EF4444`, `#F97316`…) que no necesariamente cumplían WCAG AA con texto blanco. El issue especifica exactamente 10 colores oscuros ya validados.
+
+**Decisión:** Reemplazar ambas paletas (`dojo-label-manager` y `dojo-task-detail`) con los mismos 10 colores del spec.
+
+**Consecuencia:** Las etiquetas creadas antes de este cambio que usen colores de la paleta antigua seguirán mostrándose con su color original. Solo los nuevos colores seleccionados pasarán por la validación.
+
+#### ADR-18: `suggestAccessibleColor` — algoritmo de oscurecimiento por factor
+
+**Algoritmo:**
+```typescript
+// Reducir los canales RGB un 10% por iteración hasta cumplir 4.5:1 con #FFFFFF
+for (let factor = 0.90; factor >= 0; factor -= 0.05) {
+  const adjusted = scale(originalRGB, factor);
+  if (meetsWcagAA('#FFFFFF', adjusted)) return adjusted;
+}
+```
+
+**Alternativas consideradas:**
+- Conversión a HSL y reducción de Lightness: más precisa perceptualmente, pero más compleja y sin librería externa no trivial.
+- Tabla de equivalencias manual: no escalable.
+
+**Justificación:** El escalado lineal de RGB es suficientemente preciso para el rango de colores requerido y mantiene el código dentro del principio Zero Dependencies.
+
+#### Flujo de validación WCAG en color personalizado
+
+```
+Usuario abre <input type="color"> y selecciona un color
+    │
+    ▼
+meetsWcagAA('#FFFFFF', color)?
+    │
+    ├─ Sí → contrastWarning oculto, botón Guardar activo
+    │
+    └─ No → suggestAccessibleColor(color) → X_hex
+           │
+           ▼
+        Advertencia visual amarilla:
+        "El color no tiene suficiente contraste…"
+        [swatch X_hex] [Usar versión accesible (X_hex)]
+        Botón Guardar: disabled
+           │
+           └─ Usuario clic "Usar versión accesible"
+                  │
+                  ▼
+              pendingColor = X_hex
+              Actualizar swatch + colorInput
+              Re-validar → pasa → ocultar warning, botón activo
+```
+
+#### Paleta de colores actualizada
+
+| Nombre | Hex | Contraste con #FFFFFF |
+|---|---|---|
+| Rojo | `#B91C1C` | ≥ 4.5:1 ✅ |
+| Naranja | `#C2410C` | ≥ 4.5:1 ✅ |
+| Ámbar | `#B45309` | ≥ 4.5:1 ✅ |
+| Verde | `#15803D` | ≥ 4.5:1 ✅ |
+| Azul | `#1D4ED8` | ≥ 4.5:1 ✅ |
+| Índigo | `#4338CA` | ≥ 4.5:1 ✅ |
+| Violeta | `#6D28D9` | ≥ 4.5:1 ✅ |
+| Rosa | `#BE185D` | ≥ 4.5:1 ✅ |
+| Cian | `#0E7490` | ≥ 4.5:1 ✅ |
+| Gris | `#374151` | ≥ 4.5:1 ✅ |
+
+#### Criterios US-13 cubiertos
+
+| Scenario Gherkin | Estado |
+|---|---|
+| 1. Seleccionar color de paleta predefinida | ✅ 10 colores sin validación adicional (ya cumplen) |
+| 2. Color personalizado con contraste válido → guardar | ✅ Sin interferencia |
+| 3. Color personalizado con contraste insuficiente → advertencia + sugerencia | ✅ |
+| 4. Texto siempre blanco en chips | ✅ `#FFFFFF` fijo en `dojo-task-card` |
+| 5. Sin dependencias externas de gestión de colores | ✅ Solo `contrast.ts` nativo |

@@ -29,7 +29,7 @@
  */
 
 import type { Label } from '../../../types/models.js';
-import { pickTextColor } from '../../../utils/contrast.js';
+// US-13: texto de chips siempre #FFFFFF (todos los colores de paleta cumplen ≥ 4.5:1 con blanco)
 
 export class DojoTaskCard extends HTMLElement {
   static readonly TAG = 'dojo-task-card';
@@ -314,7 +314,7 @@ export class DojoTaskCard extends HTMLElement {
         chip.setAttribute('title', lbl.name); // Tooltip para nombres truncados (WCAG 2.1 SC 1.4.4)
         if (HEX_COLOR_RE.test(lbl.color)) {
           chip.style.backgroundColor = lbl.color;
-          try { chip.style.color = pickTextColor(lbl.color); } catch { chip.style.color = '#fff'; }
+          chip.style.color = '#FFFFFF'; // US-13: texto siempre blanco (todos los colores cumplen ≥ 4.5:1 con #FFFFFF)
         } else {
           chip.style.backgroundColor = 'var(--dojo-border)';
         }

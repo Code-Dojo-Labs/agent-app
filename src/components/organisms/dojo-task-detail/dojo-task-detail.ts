@@ -28,7 +28,7 @@
 
 import type { Task, Column, Label, Priority } from '../../../types/models.js';
 import { parseMarkdown } from '../../../utils/markdown.js';
-import { pickTextColor } from '../../../utils/contrast.js';
+import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 import { createLabel } from '../../../db/label.repository.js';
 
 // ── Constantes ─────────────────────────────────────────────────────────────
@@ -580,6 +580,17 @@ export class DojoTaskDetail extends HTMLElement {
         font-size: 0.75rem;
         color: #EF4444;
       }
+      .label-contrast-warning {
+        font-size: 0.75rem;
+        color: #92400E;
+        background: #FEF3C7;
+        border: 1px solid #F59E0B;
+        border-radius: var(--dojo-radius-sm, 4px);
+        padding: 0.3rem 0.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
       .label-create-actions {
         display: flex;
         gap: 0.375rem;
@@ -973,15 +984,16 @@ export class DojoTaskDetail extends HTMLElement {
   }
 
   private _buildLabelsField(task: Task): HTMLElement {
+    // Paleta WCAG AA (contraste ≥ 4.5:1 con #FFFFFF) — US-13
     const PRESET_COLORS = [
-      '#EF4444', '#F97316', '#F59E0B', '#EAB308',
-      '#22C55E', '#10B981', '#3B82F6', '#6366F1',
-      '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16',
+      '#B91C1C', '#C2410C', '#B45309', '#15803D',
+      '#1D4ED8', '#4338CA', '#6D28D9', '#BE185D',
+      '#0E7490', '#374151',
     ];
     const PRESET_COLOR_NAMES = [
-      'Rojo', 'Naranja', 'Ámbar', 'Amarillo',
-      'Verde', 'Esmeralda', 'Azul', 'Índigo',
-      'Violeta', 'Rosa', 'Cian', 'Lima',
+      'Rojo', 'Naranja', 'Ámbar', 'Verde',
+      'Azul', 'Índigo', 'Violeta', 'Rosa',
+      'Cian', 'Gris',
     ];
 
     const section = document.createElement('div');
@@ -1155,10 +1167,19 @@ export class DojoTaskDetail extends HTMLElement {
           s.classList.toggle('selected', active);
           s.setAttribute('aria-pressed', String(active));
         });
+        // Validación WCAG 2.1 (US-13): contraste con texto blanco
+        updateContrastWarning(pendingColor);
       });
       customRow.appendChild(customLbl);
       customRow.appendChild(colorInput);
       form.appendChild(customRow);
+
+      // Advertencia de contraste WCAG (US-13)
+      const contrastWarning = document.createElement('div');
+      contrastWarning.className = 'label-contrast-warning';
+      contrastWarning.setAttribute('role', 'alert');
+      contrastWarning.style.display = 'none';
+      form.appendChild(contrastWarning);
 
       const errorEl = document.createElement('span');
       errorEl.className = 'label-error';
@@ -1182,6 +1203,45 @@ export class DojoTaskDetail extends HTMLElement {
           picker.querySelector<HTMLInputElement>('.labels-search')?.focus()
         );
       });
+
+      // Helper para validar y mostrar advertencia de contraste (US-13)
+      const updateContrastWarning = (color: string): void => {
+        const isPreset = PRESET_COLORS.includes(color as typeof PRESET_COLORS[number]);
+        if (isPreset || meetsWcagAA('#FFFFFF', color)) {
+          contrastWarning.style.display = 'none';
+          confirmBtn.disabled = false;
+          return;
+        }
+        const suggested = suggestAccessibleColor(color, '#FFFFFF');
+        contrastWarning.innerHTML = '';
+        const msg = document.createElement('span');
+        msg.textContent = 'El color no tiene suficiente contraste con texto blanco (mínimo 4.5:1 WCAG AA).';
+        contrastWarning.appendChild(msg);
+        const row = document.createElement('span');
+        row.style.cssText = 'display:inline-flex;align-items:center;gap:0.375rem;font-size:0.75rem;';
+        const sw = document.createElement('span');
+        sw.style.cssText = `display:inline-block;width:14px;height:14px;border-radius:3px;background:${suggested};border:1px solid rgba(0,0,0,.2);flex-shrink:0;`;
+        sw.setAttribute('aria-hidden', 'true');
+        const applyBtn = document.createElement('button');
+        applyBtn.type = 'button';
+        applyBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:.75rem;color:var(--dojo-primary,#1D4ED8);padding:0;font-family:inherit;text-decoration:underline;';
+        applyBtn.textContent = `Usar versión accesible (${suggested})`;
+        applyBtn.addEventListener('click', () => {
+          pendingColor = suggested;
+          colorInput.value = suggested;
+          palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
+            const active = s.dataset['color'] === suggested;
+            s.classList.toggle('selected', active);
+            s.setAttribute('aria-pressed', String(active));
+          });
+          updateContrastWarning(suggested);
+        });
+        row.appendChild(sw);
+        row.appendChild(applyBtn);
+        contrastWarning.appendChild(row);
+        contrastWarning.style.display = '';
+        confirmBtn.disabled = true;
+      };
 
       const confirmBtn = document.createElement('button');
       confirmBtn.type = 'button';

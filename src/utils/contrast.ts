@@ -105,3 +105,34 @@ export function pickTextColor(background: string): '#FFFFFF' | '#000000' {
 export function isLabelColorAccessible(bgColor: string): boolean {
   return meetsWcagAA('#FFFFFF', bgColor) || meetsWcagAA('#000000', bgColor);
 }
+
+/**
+ * Sugiere una versión más oscura de `bgColor` que cumpla contraste ≥ 4.5:1 con `foreground`.
+ * Si el color ya cumple el requisito, lo devuelve sin cambios.
+ * El ajuste reduce progresivamente la luminosidad escalando los componentes RGB hacia negro.
+ *
+ * @param bgColor    - Color de fondo en formato hex que puede no pasar el ratio.
+ * @param foreground - Color de texto a evaluar (por defecto "#FFFFFF").
+ * @returns El color original si ya es accesible, o el ajuste más oscuro que lo cumpla.
+ */
+export function suggestAccessibleColor(bgColor: string, foreground: string = '#FFFFFF'): string {
+  if (meetsWcagAA(foreground, bgColor)) return bgColor;
+
+  try {
+    const [r, g, b] = hexToRgb(bgColor);
+    for (let factor = 0.90; factor >= 0; factor -= 0.05) {
+      const nr = Math.round(r * factor);
+      const ng = Math.round(g * factor);
+      const nb = Math.round(b * factor);
+      const adjusted =
+        '#' +
+        nr.toString(16).padStart(2, '0') +
+        ng.toString(16).padStart(2, '0') +
+        nb.toString(16).padStart(2, '0');
+      if (meetsWcagAA(foreground, adjusted)) return adjusted;
+    }
+  } catch {
+    // Si el hex es inválido, devolver el original
+  }
+  return bgColor;
+}
