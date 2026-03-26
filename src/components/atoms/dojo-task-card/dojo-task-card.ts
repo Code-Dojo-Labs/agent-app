@@ -11,6 +11,11 @@
  * | task-title     | string | Título visible (máx. 120 chars)         |
  * | task-priority  | string | low | medium | high | urgent             |
  *
+ * ## Propiedades públicas
+ * | Propiedad   | Tipo     | Descripción                                     |
+ * |-------------|----------|-------------------------------------------------|
+ * | taskLabels  | Label[]  | Etiquetas asociadas; re-renderiza automáticamente|
+ *
  * ## Eventos despachados
  * | Nombre          | Detalle          | Descripción                      |
  * |-----------------|------------------|----------------------------------|
@@ -23,6 +28,9 @@
  * --dojo-priority-high, --dojo-priority-urgent
  */
 
+import type { Label } from '../../../types/models.js';
+import { pickTextColor } from '../../../utils/contrast.js';
+
 export class DojoTaskCard extends HTMLElement {
   static readonly TAG = 'dojo-task-card';
 
@@ -31,6 +39,15 @@ export class DojoTaskCard extends HTMLElement {
   }
 
   private _shadow: ShadowRoot;
+
+  /** Etiquetas asociadas a esta tarjeta (US-10) */
+  private _labels: Label[] = [];
+
+  get taskLabels(): Label[] { return this._labels; }
+  set taskLabels(labels: Label[]) {
+    this._labels = [...labels];
+    if (this.isConnected) this._render();
+  }
 
   constructor() {
     super();
@@ -237,6 +254,28 @@ export class DojoTaskCard extends HTMLElement {
         text-transform: uppercase;
         letter-spacing: 0.03em;
       }
+
+      /* Chips de etiquetas (US-10) */
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.1875rem;
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+      }
+      .task-label-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.1rem 0.375rem;
+        border-radius: 999px;
+        font-size: 0.625rem;
+        font-weight: 500;
+        line-height: 1.4;
+        max-width: 80px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     `;
     this._shadow.appendChild(style);
 
@@ -259,6 +298,27 @@ export class DojoTaskCard extends HTMLElement {
     titleEl.className = 'title';
     titleEl.textContent = this.taskTitle; // textContent es seguro contra XSS
     this._shadow.appendChild(titleEl);
+
+    // Chips de etiquetas (US-10)
+    if (this._labels.length > 0) {
+      const HEX_COLOR_RE = /^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/;
+      const chipRow = document.createElement('div');
+      chipRow.className = 'chip-row';
+      chipRow.setAttribute('aria-label', 'Etiquetas');
+      for (const lbl of this._labels) {
+        const chip = document.createElement('span');
+        chip.className = 'task-label-chip';
+        chip.textContent = lbl.name;
+        if (HEX_COLOR_RE.test(lbl.color)) {
+          chip.style.backgroundColor = lbl.color;
+          try { chip.style.color = pickTextColor(lbl.color); } catch { chip.style.color = '#fff'; }
+        } else {
+          chip.style.backgroundColor = 'var(--dojo-border)';
+        }
+        chipRow.appendChild(chip);
+      }
+      this._shadow.appendChild(chipRow);
+    }
 
     // Footer de prioridad
     const footer = document.createElement('div');
