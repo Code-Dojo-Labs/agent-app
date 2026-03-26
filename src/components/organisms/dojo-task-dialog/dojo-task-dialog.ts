@@ -27,10 +27,10 @@
 import type { Priority } from '../../../types/models.js';
 
 const PRIORITIES: { value: Priority; label: string }[] = [
-  { value: 'low',    label: '🔵 Baja'    },
-  { value: 'medium', label: '🟡 Media'   },
-  { value: 'high',   label: '🟠 Alta'    },
-  { value: 'urgent', label: '🔴 Urgente' },
+  { value: 'low',    label: '⬇️ Baja'    },
+  { value: 'medium', label: '➡️ Media'   },
+  { value: 'high',   label: '⬆️ Alta'    },
+  { value: 'urgent', label: '🔥 Urgente' },
 ];
 
 export class DojoTaskDialog extends HTMLElement {

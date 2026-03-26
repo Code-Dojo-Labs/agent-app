@@ -33,10 +33,10 @@ import { pickTextColor } from '../../../utils/contrast.js';
 // ── Constantes ─────────────────────────────────────────────────────────────
 
 const PRIORITIES: { value: Priority; label: string; icon: string }[] = [
-  { value: 'low',    label: 'Baja',    icon: '🔵' },
-  { value: 'medium', label: 'Media',   icon: '🟡' },
-  { value: 'high',   label: 'Alta',    icon: '🟠' },
-  { value: 'urgent', label: 'Urgente', icon: '🔴' },
+  { value: 'low',    label: 'Baja',    icon: '⬇️' },
+  { value: 'medium', label: 'Media',   icon: '➡️' },
+  { value: 'high',   label: 'Alta',    icon: '⬆️' },
+  { value: 'urgent', label: 'Urgente', icon: '🔥' },
 ];
 
 // ── Clase ──────────────────────────────────────────────────────────────────

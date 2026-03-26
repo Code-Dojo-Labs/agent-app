@@ -101,10 +101,10 @@ export class DojoTaskCard extends HTMLElement {
   // ── Prioridades ───────────────────────────────────────────────────────────
 
   private static readonly PRIORITY_CONFIG = {
-    low:    { label: 'Baja',    color: 'var(--dojo-priority-low,    #3B82F6)' },
-    medium: { label: 'Media',   color: 'var(--dojo-priority-medium, #F59E0B)' },
-    high:   { label: 'Alta',    color: 'var(--dojo-priority-high,   #F97316)' },
-    urgent: { label: 'Urgente', color: 'var(--dojo-priority-urgent, #EF4444)' },
+    low:    { icon: '⬇️', label: 'Baja',    color: 'var(--dojo-priority-low,    #3B82F6)' },
+    medium: { icon: '➡️', label: 'Media',   color: 'var(--dojo-priority-medium, #F59E0B)' },
+    high:   { icon: '⬆️', label: 'Alta',    color: 'var(--dojo-priority-high,   #F97316)' },
+    urgent: { icon: '🔥', label: 'Urgente', color: 'var(--dojo-priority-urgent, #EF4444)' },
   } as const;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -225,12 +225,10 @@ export class DojoTaskCard extends HTMLElement {
         gap: 0.375rem;
       }
 
-      .priority-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
+      .priority-icon {
+        font-size: 0.875rem;
+        line-height: 1;
         flex-shrink: 0;
-        background: ${pConfig.color};
       }
 
       .priority-label {
@@ -267,16 +265,17 @@ export class DojoTaskCard extends HTMLElement {
     footer.className = 'footer';
     footer.setAttribute('aria-label', `Prioridad: ${pConfig.label}`);
 
-    const dot = document.createElement('span');
-    dot.className = 'priority-dot';
-    dot.setAttribute('aria-hidden', 'true');
+    const iconEl = document.createElement('span');
+    iconEl.className = 'priority-icon';
+    iconEl.setAttribute('aria-hidden', 'true');
+    iconEl.textContent = pConfig.icon;
 
     const label = document.createElement('span');
     label.className = 'priority-label';
     label.setAttribute('aria-hidden', 'true');
     label.textContent = pConfig.label;
 
-    footer.appendChild(dot);
+    footer.appendChild(iconEl);
     footer.appendChild(label);
     this._shadow.appendChild(footer);
   }
