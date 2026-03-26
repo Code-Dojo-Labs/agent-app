@@ -1,6 +1,6 @@
 # COOKBOOK — ToDo List con Web Components
 
-> **Versión:** 0.8.0  
+> **Versión:** 1.0.0  
 > **Última actualización:** 2026-03-25  
 > **Mantenido por:** Agente `documentalista`
 
@@ -20,6 +20,8 @@
    - [Paso 6 — Apertura del Pull Request #18](#paso-6--apertura-del-pull-request-18)
    - [Paso 7 — Implementación de la Visualización del Tablero Kanban (US-01 / Issue #2)](#paso-7--implementación-de-la-visualización-del-tablero-kanban-us-01--issue-2)
    - [Paso 8 — Implementación de la Gestión de Columnas del Tablero (US-02 / Issue #3)](#paso-8--implementación-de-la-gestión-de-columnas-del-tablero-us-02--issue-3)
+   - [Paso 9 — Implementación de la Eliminación de Tareas (US-06 / Issue #7)](#paso-9--implementación-de-la-eliminación-de-tareas-us-06--issue-7)
+   - [Paso 10 — Implementación de Descripción Markdown con bloques de código (US-07 / Issue #8)](#paso-10--implementación-de-descripción-markdown-con-bloques-de-código-us-07--issue-8)
 
 ---
 
@@ -888,3 +890,94 @@ El `dojo-kanban-board` monta un único `<dojo-column-dialog>` en su shadow DOM y
 - ✅ **Ciclo de vida claro:** `connectedCallback` para registrar listeners; `disconnectedCallback` para eliminarlos. `_render()` solo para construir markup.
 - ✅ **Listeners en `document` solo mientras son necesarios:** registrar al abrir modales/menús, eliminar al cerrar (no mantenerlos activos todo el tiempo).
 - ✅ **Accesibilidad en Shadow DOM:** `role`, `aria-label`, `aria-haspopup`, `aria-expanded` y `aria-modal` deben aplicarse aunque el componente esté aislado — los lectores de pantalla traversals el Shadow DOM con `composed: true`.
+
+---
+
+### Paso 9 — Implementación de la Eliminación de Tareas (US-06 / Issue #7)
+
+**Issue asociado:** [#7 — US-06 Eliminar tarea](https://github.com/Code-Dojo-Labs/agent-app/issues/7)  
+**PR:** ✅ Mergeado en `init` — [#24](https://github.com/Code-Dojo-Labs/agent-app/pull/24) (SHA: `4f9eafd`)  
+**Branch:** `feat/7-eliminar-tarea`
+
+#### Descripción
+
+Implementa el flujo completo de eliminación de tareas con diálogo de confirmación. Incluye acceso desde el panel de detalle (botón en footer) y desde la tarjeta Kanban (botón rápido en hover). El diálogo es un modal `role="alertdialog"` accesible con focus trap, Escape/backdrop para cancelar y foco devuelto al disparador al cerrar.
+
+#### Archivos creados
+
+| Archivo | Tipo | Descripción |
+|---|---|---|
+| `src/components/organisms/dojo-delete-confirm-dialog/dojo-delete-confirm-dialog.ts` | Organismo NEW | Modal de confirmación de eliminación |
+
+#### Archivos modificados
+
+| Archivo | Cambios |
+|---|---|
+| `src/components/atoms/dojo-task-card/dojo-task-card.ts` | Botón `.quick-delete-btn` visible en hover; emite `dojo:task-delete-request` |
+| `src/components/organisms/dojo-task-detail/dojo-task-detail.ts` | Sección footer con botón "Eliminar tarea" (rojo); getter `currentTaskId` |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | Monta el dialog; handlers `_onTaskDeleteRequest` + `_handleTaskDeleteConfirm` |
+
+#### Flujo de eventos
+
+```
+dojo:task-delete-request { taskId, taskTitle }
+  → _onTaskDeleteRequest()
+    → dialog.show(taskId, taskTitle, triggerEl)
+      → (usuario confirma)
+        → dojo:task-delete-confirm { taskId }
+          → _handleTaskDeleteConfirm()
+            → deleteTask(taskId)  [IndexedDB]
+            → actualiza _tasksByColumn + refresca columna
+            → cierra panel de detalle si currentTaskId === taskId
+```
+
+#### Accesibilidad (WCAG 2.1 AA)
+
+- `aria-hidden="true"` cuando el dialog está cerrado (WCAG 4.1.2)
+- `aria-hidden="false"` al abrir vía `show()`
+- Focus devuelto al elemento disparador al cerrar (WCAG SC 2.4.3)
+- Focus trap Tab/Shift+Tab dentro del dialog
+- Escape y click en backdrop cierran sin confirmar
+
+#### Lecciones Aprendidas
+
+| # | Hallazgo | Lección |
+|---|---|---|
+| 1 | Panel de detalle cerraba aunque mostrara otra tarea | Añadir `currentTaskId` getter al componente; condición `detail.currentTaskId === taskId` antes de `close()` |
+| 2 | `role="alertdialog"` expuesto a AT con el dialog cerrado | Establecer `aria-hidden` en `_render()`, `show()` y `hide()` — CSS `opacity:0` no es suficiente para ATs |
+| 3 | Foco perdido tras cerrar dialog | `_triggerEl` capturado en `show()`; `requestAnimationFrame(() => trigger?.focus())` en `hide()` |
+
+---
+
+### Paso 10 — Implementación de Descripción Markdown con bloques de código (US-07 / Issue #8)
+
+**Issue asociado:** [#8 — US-07 Descripción Markdown XSS](https://github.com/Code-Dojo-Labs/agent-app/issues/8)  
+**PR:** ✅ Mergeado en `init` — [#25](https://github.com/Code-Dojo-Labs/agent-app/pull/25)  
+**Branch:** `feat/8-descripcion-markdown`
+
+#### Descripción
+
+Completa la implementación del editor/previsualización Markdown en el panel de detalle de tarea. La mayoría de la historia (tabs Editar/Vista previa, inline code, negrita, cursiva, listas, enlaces, XSS-safe via DOM API) fue implementada en US-05. Este paso añade **bloques de código cercados** (`\`\`\`lang...`\`\``) que faltaban para cumplir el escenario 2 de US-07.
+
+#### Archivos modificados
+
+| Archivo | Cambios |
+|---|---|
+| `src/utils/markdown.ts` | Soporte de bloques `\`\`\`lang...`\`\`` — detecta apertura/cierre, crea `<pre><code>` con `textContent` |
+| `src/components/organisms/dojo-task-detail/dojo-task-detail.ts` | Estilos CSS `.desc-preview pre` y `.desc-preview pre code` — fondo, borde, `overflow-x: auto` |
+
+#### Seguridad XSS
+
+Todo el parser Markdown usa manipulación DOM explícita (`document.createElement` + `textContent`), **nunca `innerHTML` con entrada del usuario**. Los bloques de código cercados usan `code.textContent = codeLines.join('\n')` — los caracteres `<`, `>`, `&` se escapan automáticamente.
+
+#### Criterios US-07 cubiertos
+
+| Scenario | Implementado en |
+|---|---|
+| 1. Textarea Markdown en modo edición | US-05 |
+| 2. Tab "Vista previa" con Markdown renderizado | US-05 + este PR (bloques código) |
+| 3. Alternancia sin perder contenido | US-05 |
+| 4. XSS: scripts no ejecutados | US-05 / markdown.ts (`textContent`) |
+| 5. Parser propio sin dependencias externas | US-05 / markdown.ts |
+| 6. Descripción vacía → mensaje "Sin descripción" | US-05 |
+
