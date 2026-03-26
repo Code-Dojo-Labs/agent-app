@@ -309,6 +309,7 @@ export class DojoTaskCard extends HTMLElement {
         const chip = document.createElement('span');
         chip.className = 'task-label-chip';
         chip.textContent = lbl.name;
+        chip.setAttribute('title', lbl.name); // Tooltip para nombres truncados (WCAG 2.1 SC 1.4.4)
         if (HEX_COLOR_RE.test(lbl.color)) {
           chip.style.backgroundColor = lbl.color;
           try { chip.style.color = pickTextColor(lbl.color); } catch { chip.style.color = '#fff'; }
