@@ -785,8 +785,6 @@ export class DojoTaskDetail extends HTMLElement {
     const picker = document.createElement('div');
     picker.className = 'labels-picker';
     picker.id = 'labels-picker-dropdown';
-    picker.setAttribute('role', 'listbox');
-    picker.setAttribute('aria-multiselectable', 'true');
     picker.setAttribute('aria-label', 'Selector de etiquetas disponibles');
 
     // Navegación por teclado dentro del picker (Fix #4: ArrowDown/ArrowUp + Escape)
