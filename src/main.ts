@@ -44,7 +44,9 @@ async function bootstrap(): Promise<void> {
     title.textContent = 'Error al inicializar la aplicación';
 
     const msg = document.createElement('p');
-    msg.textContent = 'No se pudo conectar al almacenamiento local. Comprueba que no estás en modo privado o que el almacenamiento no está lleno.';
+    msg.textContent = error instanceof Error && error.message.includes('IndexedDB')
+      ? error.message
+      : 'No se pudo conectar al almacenamiento local. Comprueba que no estás en modo privado o usa otro navegador.';
 
     const btn = document.createElement('button');
     btn.style.cssText = 'margin-top:1rem;padding:.5rem 1rem;cursor:pointer';

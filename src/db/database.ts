@@ -23,10 +23,20 @@ let _openPromise: Promise<IDBDatabase> | null = null;
  * Abre (o reutiliza) la conexión a IndexedDB.
  * Memoiza la promesa en vuelo para que llamadas concurrentes esperen
  * la misma conexión en lugar de abrir varias en paralelo.
+ *
+ * @throws {Error} Si IndexedDB no está disponible en el entorno actual
+ *   (p.ej. modo privado restringido en Safari/Firefox).
  */
 export function openDatabase(): Promise<IDBDatabase> {
   if (_db)          return Promise.resolve(_db);
   if (_openPromise) return _openPromise;   // todas las llamadas concurrentes esperan la misma promesa
+
+  // Verificación explícita de disponibilidad (modo privado en algunos navegadores)
+  if (!('indexedDB' in globalThis) || !globalThis.indexedDB) {
+    return Promise.reject(
+      new Error('IndexedDB no está disponible en este contexto. Por favor, sal del modo privado o usa otro navegador.')
+    );
+  }
 
   _openPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
