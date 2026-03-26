@@ -31,11 +31,13 @@
 import type { Column, Task } from '../../../types/models.js';
 import { getAllColumns, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
 import { getTasksByStatus, createTask, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
+import { getAllLabels } from '../../../db/label.repository.js';
 import '../../molecules/dojo-kanban-column/dojo-kanban-column.js';
 import '../../atoms/dojo-task-card/dojo-task-card.js';
 import '../../atoms/dojo-add-column-button/dojo-add-column-button.js';
 import '../../organisms/dojo-column-dialog/dojo-column-dialog.js';
 import '../../organisms/dojo-task-dialog/dojo-task-dialog.js';
+import '../../organisms/dojo-task-detail/dojo-task-detail.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
 
@@ -189,6 +191,11 @@ export class DojoKanbanBoard extends HTMLElement {
     this._shadow.appendChild(taskDialog);
     this._shadow.addEventListener('dojo:add-task',             (e) => this._onAddTaskRequest(e as CustomEvent));
     this._shadow.addEventListener('dojo:dialog-create-task',   (e) => this._handleCreateTask(e as CustomEvent));
+    // US-05: Editar tarea
+    const taskDetail = document.createElement('dojo-task-detail');
+    this._shadow.appendChild(taskDetail);
+    this._shadow.addEventListener('dojo:task-open',            (e) => this._onTaskOpen(e as CustomEvent));
+    this._shadow.addEventListener('dojo:task-field-updated',   (e) => this._handleTaskFieldUpdated(e as CustomEvent));
   }
 
   // ── Estados visuales ─────────────────────────────────────────────────────
@@ -494,6 +501,10 @@ export class DojoKanbanBoard extends HTMLElement {
   private _getTaskDialog(): HTMLElement | null {
     return this._shadow.querySelector('dojo-task-dialog');
   }
+
+  private _getTaskDetail(): HTMLElement | null {
+    return this._shadow.querySelector('dojo-task-detail');
+  }
   private _onAddColumnRequest(): void {
     const dialog = this._getDialog() as any;
     if (dialog?.openCreate) dialog.openCreate();
@@ -641,6 +652,84 @@ export class DojoKanbanBoard extends HTMLElement {
       this._updateColumnCounts();
     } catch (err) {
       console.error('[dojo-kanban-board] Error al crear tarea:', err);
+    }
+  }
+
+  // ── Handlers de edición de tarea (US-05) ──────────────────────────────────
+
+  private async _onTaskOpen(e: CustomEvent): Promise<void> {
+    const { taskId } = e.detail as { taskId: string };
+    // Buscar la tarea en el caché (ruta rápida — evita hit a IndexedDB)
+    let task: Task | undefined;
+    for (const tasks of this._tasksByColumn.values()) {
+      task = tasks.find(t => t.id === taskId);
+      if (task) break;
+    }
+    if (!task) return;
+    try {
+      const labels = await getAllLabels();
+      const detail = this._getTaskDetail() as any;
+      if (detail?.openTask) detail.openTask(task, this._columns, labels);
+    } catch (err) {
+      console.error('[dojo-kanban-board] Error al abrir detalle de tarea:', err);
+    }
+  }
+
+  private async _handleTaskFieldUpdated(e: CustomEvent): Promise<void> {
+    const { taskId, changes } = e.detail as {
+      taskId:  string;
+      changes: Partial<Task>;
+    };
+
+    // Localizar columna origen desde el caché
+    let sourceColumnId: string | null = null;
+    for (const [colId, tasks] of this._tasksByColumn) {
+      if (tasks.some(t => t.id === taskId)) { sourceColumnId = colId; break; }
+    }
+    if (!sourceColumnId) return;
+
+    // Guard: validar que el statusId destino existe (previene race condition — Fix #1)
+    if (changes.statusId && !this._columns.some(c => c.id === changes.statusId)) {
+      console.warn('[dojo-kanban-board] Intento de mover tarea a columna inexistente:', changes.statusId);
+      return;
+    }
+
+    try {
+      const updated = await updateTask(taskId, changes);
+      const targetColumnId = updated.statusId;
+
+      if (changes.statusId && changes.statusId !== sourceColumnId) {
+        // ── Cambio de columna (movimiento) ────────────────────────────────
+        const sourceTasks = (this._tasksByColumn.get(sourceColumnId) ?? []).filter(t => t.id !== taskId);
+        const targetTasks = this._tasksByColumn.get(targetColumnId) ?? [];
+        this._tasksByColumn.set(sourceColumnId, sourceTasks.map((t, i) => ({ ...t, order: i })));
+        this._tasksByColumn.set(targetColumnId, [...targetTasks, updated]);
+        this._refreshColumnCards(sourceColumnId);
+        this._refreshColumnCards(targetColumnId);
+      } else {
+        // ── Actualización en la misma columna ─────────────────────────────
+        const tasks = this._tasksByColumn.get(sourceColumnId) ?? [];
+        this._tasksByColumn.set(
+          sourceColumnId,
+          tasks.map(t => t.id === taskId ? updated : t),
+        );
+        // Refresco de tarjeta: solo re-renderizar si cambió título o prioridad
+        if (changes.title !== undefined || changes.priority !== undefined) {
+          const colEl = this._shadow.querySelector(
+            `dojo-kanban-column[column-id="${CSS.escape(sourceColumnId)}"]`
+          );
+          if (colEl) {
+            const cardEl = colEl.querySelector(`dojo-task-card[task-id="${CSS.escape(taskId)}"]`);
+            if (cardEl) {
+              if (changes.title    !== undefined) cardEl.setAttribute('task-title',    updated.title);
+              if (changes.priority !== undefined) cardEl.setAttribute('task-priority', updated.priority);
+            }
+          }
+        }
+      }
+      this._updateColumnCounts();
+    } catch (err) {
+      console.error('[dojo-kanban-board] Error al actualizar tarea:', err);
     }
   }
 }
