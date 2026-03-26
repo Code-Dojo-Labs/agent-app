@@ -50,10 +50,37 @@ export class DojoTaskDetail extends HTMLElement {
   private _columns: Column[] = [];
   private _allLabels: Label[] = [];
   private _labelsPickerOpen = false;
+  /** Preserva el overflow del body antes de abrir el panel (se restaura al cerrar). Fix #5 */
+  private _prevOverflow: string = '';
 
   /** Referencia estable para poder eliminar el listener de teclado. */
   private _onDocKeydown = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' && this._isOpen()) this.close();
+    if (!this._isOpen()) return;
+    if (e.key === 'Escape') {
+      this.close();
+      return;
+    }
+    // Focus trap: mantener Tab dentro del panel (Fix #7)
+    if (e.key === 'Tab') {
+      const panel = this._shadow.querySelector<HTMLElement>('.panel');
+      if (!panel) return;
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter(el => !el.hidden && el.offsetParent !== null);
+      if (focusable.length < 2) return;
+      const first  = focusable[0];
+      const last   = focusable[focusable.length - 1];
+      const active = this._shadow.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
   };
 
   constructor() {
@@ -67,7 +94,7 @@ export class DojoTaskDetail extends HTMLElement {
 
   disconnectedCallback(): void {
     document.removeEventListener('keydown', this._onDocKeydown);
-    document.body.style.overflow = '';
+    document.body.style.overflow = this._prevOverflow;
   }
 
   // ── API pública ───────────────────────────────────────────────────────────
@@ -93,6 +120,7 @@ export class DojoTaskDetail extends HTMLElement {
 
   private _openPanel(): void {
     this.setAttribute('open', '');
+    this._prevOverflow = document.body.style.overflow;  // Fix #5
     document.body.style.overflow = 'hidden';
     // Guarda de duplicados — igual que en dojo-task-dialog
     document.removeEventListener('keydown', this._onDocKeydown);
@@ -105,7 +133,7 @@ export class DojoTaskDetail extends HTMLElement {
 
   private _closePanel(): void {
     this.removeAttribute('open');
-    document.body.style.overflow = '';
+    document.body.style.overflow = this._prevOverflow;  // Fix #5
     document.removeEventListener('keydown', this._onDocKeydown);
   }
 
@@ -244,6 +272,10 @@ export class DojoTaskDetail extends HTMLElement {
         border-color: var(--dojo-primary, #1D4ED8);
         background: var(--dojo-bg);
       }
+      .title-input:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
 
       /* ── Selects ── */
       .field-select {
@@ -263,6 +295,10 @@ export class DojoTaskDetail extends HTMLElement {
         outline: none;
         border-color: var(--dojo-primary, #1D4ED8);
         box-shadow: 0 0 0 2px color-mix(in srgb, var(--dojo-primary, #1D4ED8) 20%, transparent);
+      }
+      .field-select:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
       }
 
       /* ── Fila de dos campos ── */
@@ -313,6 +349,10 @@ export class DojoTaskDetail extends HTMLElement {
       .desc-textarea:focus {
         outline: none;
         border-color: var(--dojo-primary, #1D4ED8);
+      }
+      .desc-textarea:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
       }
       .desc-preview {
         min-height: 140px;
@@ -696,8 +736,32 @@ export class DojoTaskDetail extends HTMLElement {
       }
     };
 
-    editTab.addEventListener('click',    switchToEdit);
-    previewTab.addEventListener('click', switchToPreview);
+    const tabEls     = [editTab, previewTab];
+    const tabActions  = [switchToEdit, switchToPreview];
+
+    // Roving tabindex — solo el tab activo es alcanzable con Tab (WCAG 2.1 AA Fix #2)
+    editTab.setAttribute('tabindex', '0');
+    previewTab.setAttribute('tabindex', '-1');
+
+    const switchTab = (index: number): void => {
+      if (index < 0 || index >= tabEls.length) return;
+      tabEls.forEach((t, idx) => t.setAttribute('tabindex', idx === index ? '0' : '-1'));
+      tabEls[index].focus();
+      tabActions[index]();
+    };
+
+    tabEls.forEach((tab, i) => {
+      tab.addEventListener('click', () => {
+        tabEls.forEach((t, idx) => t.setAttribute('tabindex', idx === i ? '0' : '-1'));
+        tabActions[i]();
+      });
+      tab.addEventListener('keydown', (ev: KeyboardEvent) => {
+        if (ev.key === 'ArrowLeft')  { ev.preventDefault(); switchTab(i - 1); }
+        if (ev.key === 'ArrowRight') { ev.preventDefault(); switchTab(i + 1); }
+        if (ev.key === 'Home')       { ev.preventDefault(); switchTab(0); }
+        if (ev.key === 'End')        { ev.preventDefault(); switchTab(tabEls.length - 1); }
+      });
+    });
 
     section.appendChild(sectionLbl);
     section.appendChild(tabs);
@@ -725,6 +789,27 @@ export class DojoTaskDetail extends HTMLElement {
     picker.setAttribute('aria-multiselectable', 'true');
     picker.setAttribute('aria-label', 'Selector de etiquetas disponibles');
 
+    // Navegación por teclado dentro del picker (Fix #4: ArrowDown/ArrowUp + Escape)
+    picker.addEventListener('keydown', (ev: KeyboardEvent) => {
+      const checkboxes = Array.from(picker.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+      if (!checkboxes.length) return;
+      const current = checkboxes.indexOf(this._shadow.activeElement as HTMLInputElement);
+      if (ev.key === 'ArrowDown') {
+        ev.preventDefault();
+        const next = current >= 0 ? (current + 1) % checkboxes.length : 0;
+        checkboxes[next].focus();
+      } else if (ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        const prev = current >= 0 ? (current - 1 + checkboxes.length) % checkboxes.length : checkboxes.length - 1;
+        checkboxes[prev].focus();
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        this._labelsPickerOpen = false;
+        picker.classList.remove('open');
+        chips.querySelector<HTMLElement>('.add-label-btn')?.focus();
+      }
+    });
+
     const renderChips = (): void => {
       chips.innerHTML = '';
       const currentIds = this._task?.labelIds ?? [];
@@ -734,7 +819,13 @@ export class DojoTaskDetail extends HTMLElement {
         if (!label) return;
 
         let textColor = '#ffffff';
-        try { textColor = pickTextColor(label.color); } catch { /* color inválido — usar blanco */ }
+        // Fix #6: validar formato hex antes de llamar a pickTextColor
+        const HEX_COLOR_RE = /^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/;
+        if (HEX_COLOR_RE.test(label.color)) {
+          try { textColor = pickTextColor(label.color); } catch { /* sin cambios */ }
+        } else {
+          console.warn('[dojo-task-detail] Color de etiqueta inválido (se usa blanco):', label.color);
+        }
 
         const chip    = document.createElement('span');
         chip.className  = 'label-chip';
@@ -770,6 +861,12 @@ export class DojoTaskDetail extends HTMLElement {
         this._labelsPickerOpen = !this._labelsPickerOpen;
         picker.classList.toggle('open', this._labelsPickerOpen);
         addBtn.setAttribute('aria-expanded', String(this._labelsPickerOpen));
+        // Fix #4: mover foco al primer checkbox al abrir
+        if (this._labelsPickerOpen) {
+          requestAnimationFrame(() => {
+            picker.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus();
+          });
+        }
       });
       chips.appendChild(addBtn);
     };

@@ -688,6 +688,12 @@ export class DojoKanbanBoard extends HTMLElement {
     }
     if (!sourceColumnId) return;
 
+    // Guard: validar que el statusId destino existe (previene race condition — Fix #1)
+    if (changes.statusId && !this._columns.some(c => c.id === changes.statusId)) {
+      console.warn('[dojo-kanban-board] Intento de mover tarea a columna inexistente:', changes.statusId);
+      return;
+    }
+
     try {
       const updated = await updateTask(taskId, changes);
       const targetColumnId = updated.statusId;
