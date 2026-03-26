@@ -29,6 +29,7 @@
 import type { Task, Column, Label, Priority } from '../../../types/models.js';
 import { parseMarkdown } from '../../../utils/markdown.js';
 import { pickTextColor } from '../../../utils/contrast.js';
+import { createLabel } from '../../../db/label.repository.js';
 
 // ── Constantes ─────────────────────────────────────────────────────────────
 
@@ -491,6 +492,125 @@ export class DojoTaskDetail extends HTMLElement {
         flex-shrink: 0;
       }
 
+      /* ── Etiquetas — búsqueda y creación (US-09) ── */
+      .labels-search {
+        display: block;
+        width: 100%;
+        padding: 0.4375rem 0.75rem;
+        border: none;
+        border-bottom: 1px solid var(--dojo-border);
+        background: transparent;
+        font-size: 0.8125rem;
+        color: var(--dojo-text-primary);
+        box-sizing: border-box;
+        font-family: inherit;
+        outline: none;
+      }
+      .labels-search:focus {
+        border-bottom-color: var(--dojo-primary, #1D4ED8);
+        background: var(--dojo-bg);
+      }
+      .label-create-option {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.4375rem 0.75rem;
+        cursor: pointer;
+        font-size: 0.8125rem;
+        color: var(--dojo-primary, #1D4ED8);
+        font-weight: 500;
+        border-top: 1px solid var(--dojo-border);
+      }
+      .label-create-option:hover { background: var(--dojo-bg); }
+      .label-create-option:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: -2px;
+      }
+      .label-create-form {
+        padding: 0.625rem 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        border-top: 1px solid var(--dojo-border);
+      }
+      .label-create-form-title {
+        font-size: 0.6875rem;
+        font-weight: 700;
+        color: var(--dojo-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .label-color-palette {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3125rem;
+      }
+      .color-swatch {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+        padding: 0;
+        outline: none;
+        transition: border-color 0.12s, transform 0.12s;
+      }
+      .color-swatch.selected,
+      .color-swatch:focus-visible {
+        border-color: var(--dojo-text-primary, #111);
+        transform: scale(1.2);
+      }
+      .label-custom-color-row {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.8125rem;
+        color: var(--dojo-text-secondary);
+      }
+      .label-color-input {
+        width: 36px;
+        height: 22px;
+        border: 1px solid var(--dojo-border);
+        border-radius: 3px;
+        padding: 0 2px;
+        cursor: pointer;
+        background: transparent;
+      }
+      .label-error {
+        font-size: 0.75rem;
+        color: #EF4444;
+      }
+      .label-create-actions {
+        display: flex;
+        gap: 0.375rem;
+        justify-content: flex-end;
+      }
+      .label-btn {
+        padding: 0.25rem 0.625rem;
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.75rem;
+        cursor: pointer;
+        font-family: inherit;
+        border: 1px solid var(--dojo-border);
+        background: transparent;
+        color: var(--dojo-text-secondary);
+        transition: background 0.15s;
+      }
+      .label-btn:hover { background: var(--dojo-bg); color: var(--dojo-text-primary); }
+      .label-btn-primary {
+        background: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary, #1D4ED8);
+        color: #fff;
+        font-weight: 600;
+      }
+      .label-btn-primary:hover { opacity: 0.88; }
+      .label-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+      .label-btn:focus-visible,
+      .label-btn-primary:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
+
       /* ── Footer de peligro (US-06) ── */
       .panel-footer {
         flex-shrink: 0;
@@ -842,6 +962,17 @@ export class DojoTaskDetail extends HTMLElement {
   }
 
   private _buildLabelsField(task: Task): HTMLElement {
+    const PRESET_COLORS = [
+      '#EF4444', '#F97316', '#F59E0B', '#EAB308',
+      '#22C55E', '#10B981', '#3B82F6', '#6366F1',
+      '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16',
+    ];
+    const PRESET_COLOR_NAMES = [
+      'Rojo', 'Naranja', 'Ámbar', 'Amarillo',
+      'Verde', 'Esmeralda', 'Azul', 'Índigo',
+      'Violeta', 'Rosa', 'Cian', 'Lima',
+    ];
+
     const section = document.createElement('div');
     section.className = 'section';
 
@@ -858,27 +989,49 @@ export class DojoTaskDetail extends HTMLElement {
     picker.id = 'labels-picker-dropdown';
     picker.setAttribute('aria-label', 'Selector de etiquetas disponibles');
 
-    // Navegación por teclado dentro del picker (Fix #4: ArrowDown/ArrowUp + Escape)
+    // ── Estado de cierre del picker ───────────────────────────────────────
+    let searchTerm     = '';
+    let showCreateForm = false;
+    let pendingColor   = PRESET_COLORS[0];
+
+    // Navegación por teclado dentro del picker
     picker.addEventListener('keydown', (ev: KeyboardEvent) => {
-      const checkboxes = Array.from(picker.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
-      if (!checkboxes.length) return;
-      const current = checkboxes.indexOf(this._shadow.activeElement as HTMLInputElement);
-      if (ev.key === 'ArrowDown') {
+      if (ev.key === 'Escape') {
         ev.preventDefault();
-        const next = current >= 0 ? (current + 1) % checkboxes.length : 0;
-        checkboxes[next].focus();
-      } else if (ev.key === 'ArrowUp') {
-        ev.preventDefault();
-        const prev = current >= 0 ? (current - 1 + checkboxes.length) % checkboxes.length : checkboxes.length - 1;
-        checkboxes[prev].focus();
-      } else if (ev.key === 'Escape') {
-        ev.preventDefault();
-        this._labelsPickerOpen = false;
-        picker.classList.remove('open');
-        chips.querySelector<HTMLElement>('.add-label-btn')?.focus();
+        if (showCreateForm) {
+          showCreateForm = false;
+          renderPicker();
+          requestAnimationFrame(() =>
+            picker.querySelector<HTMLInputElement>('.labels-search')?.focus()
+          );
+        } else {
+          this._labelsPickerOpen = false;
+          picker.classList.remove('open');
+          chips.querySelector<HTMLElement>('.add-label-btn')?.focus();
+        }
+        return;
+      }
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        const focusable = Array.from(
+          picker.querySelectorAll<HTMLElement>(
+            'input[type="checkbox"], .label-create-option, .color-swatch, .label-btn, .label-btn-primary, input[type="color"]'
+          )
+        );
+        if (focusable.length < 2) return;
+        const current = focusable.indexOf(this._shadow.activeElement as HTMLElement);
+        if (ev.key === 'ArrowDown') {
+          ev.preventDefault();
+          const next = current >= 0 ? (current + 1) % focusable.length : 0;
+          focusable[next].focus();
+        } else {
+          ev.preventDefault();
+          const prev = current >= 0 ? (current - 1 + focusable.length) % focusable.length : focusable.length - 1;
+          focusable[prev].focus();
+        }
       }
     });
 
+    // ── Render chips ───────────────────────────────────────────────────────
     const renderChips = (): void => {
       chips.innerHTML = '';
       const currentIds = this._task?.labelIds ?? [];
@@ -888,7 +1041,6 @@ export class DojoTaskDetail extends HTMLElement {
         if (!label) return;
 
         let textColor = '#ffffff';
-        // Fix #6: validar formato hex antes de llamar a pickTextColor
         const HEX_COLOR_RE = /^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/;
         if (HEX_COLOR_RE.test(label.color)) {
           try { textColor = pickTextColor(label.color); } catch { /* sin cambios */ }
@@ -896,10 +1048,10 @@ export class DojoTaskDetail extends HTMLElement {
           console.warn('[dojo-task-detail] Color de etiqueta inválido (se usa blanco):', label.color);
         }
 
-        const chip    = document.createElement('span');
-        chip.className  = 'label-chip';
+        const chip = document.createElement('span');
+        chip.className = 'label-chip';
         chip.style.backgroundColor = label.color;
-        chip.style.color              = textColor;
+        chip.style.color = textColor;
 
         const chipText = document.createElement('span');
         chipText.textContent = label.name;
@@ -920,7 +1072,6 @@ export class DojoTaskDetail extends HTMLElement {
         chips.appendChild(chip);
       });
 
-      // Botón abrir/cerrar picker
       const addBtn = document.createElement('button');
       addBtn.className = 'add-label-btn';
       addBtn.textContent = '＋ Etiqueta';
@@ -930,58 +1081,255 @@ export class DojoTaskDetail extends HTMLElement {
         this._labelsPickerOpen = !this._labelsPickerOpen;
         picker.classList.toggle('open', this._labelsPickerOpen);
         addBtn.setAttribute('aria-expanded', String(this._labelsPickerOpen));
-        // Fix #4: mover foco al primer checkbox al abrir
         if (this._labelsPickerOpen) {
-          requestAnimationFrame(() => {
-            picker.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus();
-          });
+          requestAnimationFrame(() =>
+            picker.querySelector<HTMLInputElement>('.labels-search')?.focus()
+          );
         }
       });
       chips.appendChild(addBtn);
     };
 
+    // ── Formulario inline de creación (US-09) ─────────────────────────────
+    const buildCreateForm = (name: string): HTMLElement => {
+      const form = document.createElement('div');
+      form.className = 'label-create-form';
+      form.setAttribute('role', 'group');
+      form.setAttribute('aria-label', `Crear etiqueta "${name}"`);
+
+      const formTitle = document.createElement('span');
+      formTitle.className = 'label-create-form-title';
+      formTitle.textContent = `Color para "${name}"`;
+      form.appendChild(formTitle);
+
+      const palette = document.createElement('div');
+      palette.className = 'label-color-palette';
+      PRESET_COLORS.forEach(c => {
+        const swatch = document.createElement('button');
+        swatch.type = 'button';
+        swatch.className = 'color-swatch' + (pendingColor === c ? ' selected' : '');
+        swatch.style.backgroundColor = c;
+        const colorName = PRESET_COLOR_NAMES[PRESET_COLORS.indexOf(c)] ?? c;
+        swatch.setAttribute('aria-label', `Color ${colorName}`);
+        swatch.setAttribute('aria-pressed', String(pendingColor === c));
+        swatch.title = colorName;
+        swatch.dataset['color'] = c;
+        swatch.addEventListener('click', () => {
+          pendingColor = c;
+          palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
+            const active = s.dataset['color'] === c;
+            s.classList.toggle('selected', active);
+            s.setAttribute('aria-pressed', String(active));
+          });
+          const ci = form.querySelector<HTMLInputElement>('.label-color-input');
+          if (ci) ci.value = c;
+        });
+        palette.appendChild(swatch);
+      });
+      form.appendChild(palette);
+
+      const customRow = document.createElement('div');
+      customRow.className = 'label-custom-color-row';
+      const customLbl = document.createElement('span');
+      customLbl.textContent = 'Personalizado:';
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.className = 'label-color-input';
+      colorInput.value = pendingColor;
+      colorInput.setAttribute('aria-label', 'Color personalizado para la etiqueta');
+      colorInput.addEventListener('input', () => {
+        pendingColor = colorInput.value;
+        palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
+          const active = s.dataset['color'] === pendingColor;
+          s.classList.toggle('selected', active);
+          s.setAttribute('aria-pressed', String(active));
+        });
+      });
+      customRow.appendChild(customLbl);
+      customRow.appendChild(colorInput);
+      form.appendChild(customRow);
+
+      const errorEl = document.createElement('span');
+      errorEl.className = 'label-error';
+      errorEl.setAttribute('role', 'alert');
+      errorEl.setAttribute('aria-live', 'polite');
+      errorEl.style.display = 'none';
+      form.appendChild(errorEl);
+
+      const actions = document.createElement('div');
+      actions.className = 'label-create-actions';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'label-btn';
+      cancelBtn.textContent = 'Cancelar';
+      cancelBtn.addEventListener('click', () => {
+        showCreateForm = false;
+        pendingColor = PRESET_COLORS[0];
+        renderPicker();
+        requestAnimationFrame(() =>
+          picker.querySelector<HTMLInputElement>('.labels-search')?.focus()
+        );
+      });
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'label-btn label-btn-primary';
+      confirmBtn.textContent = 'Crear';
+      confirmBtn.setAttribute('aria-label', `Confirmar creación de etiqueta "${name}"`);
+      confirmBtn.addEventListener('click', async () => {
+        if (!pendingColor) {
+          errorEl.textContent = 'Debes seleccionar un color.';
+          errorEl.style.display = '';
+          return;
+        }
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = '…';
+        try {
+          const newLabel = await createLabel({ name, color: pendingColor });
+          this._allLabels = [...this._allLabels, newLabel].sort((a, b) =>
+            a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+          );
+          const currentIds = this._task?.labelIds ?? [];
+          this._save({ labelIds: [...currentIds, newLabel.id] });
+          searchTerm     = '';
+          showCreateForm = false;
+          pendingColor   = PRESET_COLORS[0];
+          renderChips();
+          renderPicker();
+          this._labelsPickerOpen = false;
+          picker.classList.remove('open');
+          chips.querySelector<HTMLElement>('.add-label-btn')?.focus();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Error al crear la etiqueta';
+          errorEl.textContent = msg;
+          errorEl.style.display = '';
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Crear';
+        }
+      });
+
+      actions.appendChild(cancelBtn);
+      actions.appendChild(confirmBtn);
+      form.appendChild(actions);
+      return form;
+    };
+
+    // ── Render picker con búsqueda (US-09) ────────────────────────────────
     const renderPicker = (): void => {
       picker.innerHTML = '';
-      if (this._allLabels.length === 0) {
-        const empty = document.createElement('p');
-        empty.style.cssText = 'padding:.5rem .75rem;font-size:.8125rem;color:var(--dojo-text-secondary)';
-        empty.textContent = 'No hay etiquetas disponibles.';
-        picker.appendChild(empty);
-        return;
-      }
-      this._allLabels.forEach(label => {
-        const currentIds = this._task?.labelIds ?? [];
-        const isSelected = currentIds.includes(label.id);
 
-        const optionEl = document.createElement('label');
-        optionEl.className = 'label-option';
-
-        const cb = document.createElement('input');
-        cb.type    = 'checkbox';
-        cb.checked = isSelected;
-        cb.setAttribute('aria-label', label.name);
-        cb.addEventListener('change', () => {
-          const ids    = this._task?.labelIds ?? [];
-          const newIds = cb.checked
-            ? [...ids, label.id]
-            : ids.filter(id => id !== label.id);
-          this._save({ labelIds: newIds });
-          renderChips();
+      // Campo de búsqueda — siempre visible
+      const searchInput = document.createElement('input');
+      searchInput.type = 'text';
+      searchInput.className = 'labels-search';
+      searchInput.placeholder = 'Buscar o crear etiqueta…';
+      searchInput.maxLength = 30;
+      searchInput.value = searchTerm;
+      searchInput.setAttribute('aria-label', 'Buscar etiqueta');
+      searchInput.setAttribute('autocomplete', 'off');
+      searchInput.addEventListener('input', () => {
+        const newVal = searchInput.value;
+        if (newVal === searchTerm) return;
+        searchTerm = newVal;
+        const trimmedNew = newVal.trim();
+        if (showCreateForm) {
+          const hasExact = this._allLabels.some(
+            l => l.name.toLowerCase() === trimmedNew.toLowerCase()
+          );
+          if (!trimmedNew || hasExact) showCreateForm = false;
+        }
+        renderPicker();
+        requestAnimationFrame(() => {
+          const s = picker.querySelector<HTMLInputElement>('.labels-search');
+          if (s) { s.focus(); const len = s.value.length; s.setSelectionRange(len, len); }
         });
-
-        const dot = document.createElement('span');
-        dot.className           = 'label-dot';
-        dot.style.backgroundColor = label.color;
-        dot.setAttribute('aria-hidden', 'true');
-
-        const namePart = document.createElement('span');
-        namePart.textContent = label.name;
-
-        optionEl.appendChild(cb);
-        optionEl.appendChild(dot);
-        optionEl.appendChild(namePart);
-        picker.appendChild(optionEl);
       });
+      picker.appendChild(searchInput);
+
+      const trimmed = searchTerm.trim();
+      const filtered = trimmed
+        ? this._allLabels.filter(l => l.name.toLowerCase().includes(trimmed.toLowerCase()))
+        : this._allLabels;
+
+      // Lista de etiquetas (filtradas o completa)
+      if (filtered.length === 0 && !trimmed) {
+        const empty = document.createElement('p');
+        empty.style.cssText = 'padding:.375rem .75rem;font-size:.8125rem;color:var(--dojo-text-secondary);margin:0';
+        empty.textContent = 'No hay etiquetas. Escribe un nombre para crear una.';
+        picker.appendChild(empty);
+      } else {
+        filtered.forEach(label => {
+          const currentIds = this._task?.labelIds ?? [];
+          const isSelected = currentIds.includes(label.id);
+
+          const optionEl = document.createElement('label');
+          optionEl.className = 'label-option';
+
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = isSelected;
+          cb.setAttribute('aria-label', label.name);
+          cb.addEventListener('change', () => {
+            const ids = this._task?.labelIds ?? [];
+            const newIds = cb.checked
+              ? [...ids, label.id]
+              : ids.filter(id => id !== label.id);
+            this._save({ labelIds: newIds });
+            renderChips();
+          });
+
+          const dot = document.createElement('span');
+          dot.className = 'label-dot';
+          dot.style.backgroundColor = label.color;
+          dot.setAttribute('aria-hidden', 'true');
+
+          const namePart = document.createElement('span');
+          namePart.textContent = label.name;
+
+          optionEl.appendChild(cb);
+          optionEl.appendChild(dot);
+          optionEl.appendChild(namePart);
+          picker.appendChild(optionEl);
+        });
+      }
+
+      // Opción / formulario de creación cuando no hay coincidencia exacta
+      if (trimmed) {
+        const hasExact = this._allLabels.some(
+          l => l.name.toLowerCase() === trimmed.toLowerCase()
+        );
+        if (!hasExact) {
+          if (showCreateForm) {
+            picker.appendChild(buildCreateForm(trimmed));
+          } else {
+            const createOpt = document.createElement('div');
+            createOpt.className = 'label-create-option';
+            createOpt.setAttribute('role', 'button');
+            createOpt.setAttribute('tabindex', '0');
+            const icon = document.createElement('span');
+            icon.setAttribute('aria-hidden', 'true');
+            icon.textContent = '＋';
+            const labelEl = document.createElement('span');
+            labelEl.textContent = `Crear etiqueta "${trimmed}"`;
+            createOpt.appendChild(icon);
+            createOpt.appendChild(labelEl);
+            const activate = (): void => {
+              showCreateForm = true;
+              pendingColor   = PRESET_COLORS[0];
+              renderPicker();
+              requestAnimationFrame(() =>
+                picker.querySelector<HTMLInputElement>('.labels-search')?.focus()
+              );
+            };
+            createOpt.addEventListener('click', activate);
+            createOpt.addEventListener('keydown', (ev: KeyboardEvent) => {
+              if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); activate(); }
+            });
+            picker.appendChild(createOpt);
+          }
+        }
+      }
     };
 
     renderChips();
