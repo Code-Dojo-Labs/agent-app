@@ -611,6 +611,17 @@ export class DojoTaskDetail extends HTMLElement {
         outline-offset: 2px;
       }
 
+      /* Aviso cuando la etiqueta ya existe con distinta capitaliz. (US-10) */
+      .label-info-notice {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.75rem;
+        color: var(--dojo-primary, #1D4ED8);
+        background: color-mix(in srgb, var(--dojo-primary, #1D4ED8) 8%, transparent);
+        border-top: 1px solid var(--dojo-border);
+        line-height: 1.4;
+        margin: 0;
+      }
+
       /* ── Footer de peligro (US-06) ── */
       .panel-footer {
         flex-shrink: 0;
@@ -1192,6 +1203,11 @@ export class DojoTaskDetail extends HTMLElement {
           );
           const currentIds = this._task?.labelIds ?? [];
           this._save({ labelIds: [...currentIds, newLabel.id] });
+          // Notificar al tablero para actualizar su caché de etiquetas (US-10)
+          this.dispatchEvent(new CustomEvent('dojo:label-created', {
+            bubbles: true, composed: true,
+            detail: { label: newLabel },
+          }));
           searchTerm     = '';
           showCreateForm = false;
           pendingColor   = PRESET_COLORS[0];
@@ -1327,6 +1343,15 @@ export class DojoTaskDetail extends HTMLElement {
               if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); activate(); }
             });
             picker.appendChild(createOpt);
+          }
+        } else {
+          // La etiqueta ya existe con el mismo nombre (puede que diferente capitaliz.) — US-10 S2
+          const matchedLabel = this._allLabels.find(l => l.name.toLowerCase() === trimmed.toLowerCase())!;
+          if (matchedLabel.name !== trimmed) {
+            const notice = document.createElement('p');
+            notice.className = 'label-info-notice';
+            notice.textContent = `ℹ️\u00a0«${matchedLabel.name}» ya existe — selecciónala en la lista.`;
+            picker.appendChild(notice);
           }
         }
       }

@@ -23,6 +23,8 @@
    - [Paso 9 — Implementación de la Eliminación de Tareas (US-06 / Issue #7)](#paso-9--implementación-de-la-eliminación-de-tareas-us-06--issue-7)
    - [Paso 10 — Implementación de Descripción Markdown con bloques de código (US-07 / Issue #8)](#paso-10--implementación-de-descripción-markdown-con-bloques-de-código-us-07--issue-8)
    - [Paso 11 — Implementación de Prioridad de Tarea (US-08 / Issue #9)](#paso-11--implementación-de-prioridad-de-tarea-us-08--issue-9)
+   - [Paso 12 — Implementación de Crear Etiqueta (US-09 / Issue #10)](#paso-12--implementación-de-crear-etiqueta-us-09--issue-10)
+   - [Paso 13 — Implementación de Reutilización de Etiquetas (US-10 / Issue #11)](#paso-13--implementación-de-reutilización-de-etiquetas-us-10--issue-11)
 
 ---
 
@@ -1022,4 +1024,204 @@ Implementa la visualización de prioridad con iconos standardizados (⬇️/➡�
 | 2. Ícono y texto en la tarjeta (⬇️/➡️/⬆️/🔥) | ✅ este PR |
 | 3. Cambiar prioridad desde panel de detalle | ✅ `dojo-task-detail` (selector + auto-save pre-existente, iconos fijados aquí) |
 | 4. Filtrar por una o más prioridades | ✅ este PR (`_buildFilterBar` + `_filterTasks`) |
+
+---
+
+### Paso 12 — Implementación de Crear Etiqueta (US-09 / Issue #10)
+
+**Fecha:** 2026-03-26  
+**Agente ejecutor:** `builder`  
+**Issue asociado:** [#10 — US-09 Crear etiqueta](https://github.com/Code-Dojo-Labs/agent-app/issues/10)  
+**PR:** 🔄 En revisión — [#27](https://github.com/Code-Dojo-Labs/agent-app/pull/27)  
+**Branch:** `feat/10-crear-etiqueta`
+
+#### Descripción
+
+El agente Builder implementó el flujo completo de **búsqueda en tiempo real y creación inline de etiquetas** directamente desde el panel de detalle de tarea (`dojo-task-detail`). La infraestructura subyacente (modelo `Label`, repositorio `label.repository.ts`, Object Store en IndexedDB) ya existía; este paso añade la capa de interfaz de usuario.
+
+#### Archivo modificado
+
+| Archivo | Cambios |
+|---|---|
+| `src/components/organisms/dojo-task-detail/dojo-task-detail.ts` | Import de `createLabel`; ~90 líneas de CSS nuevas; `_buildLabelsField` refactorizado (400 → 460 líneas netas) |
+
+#### Lógica de implementación
+
+**Estado de cierre del picker** (variables de closure locales en `_buildLabelsField`):
+
+| Variable | Tipo | Propósito |
+|---|---|---|
+| `searchTerm` | `string` | Término actual del campo de búsqueda |
+| `showCreateForm` | `boolean` | Indica si el formulario inline de creación está visible |
+| `pendingColor` | `string` | Color seleccionado para la nueva etiqueta |
+
+**Flujo de creación:**
+
+```
+Usuario escribe en el campo de búsqueda
+        │
+        ▼
+_allLabels filtrado en tiempo real (includes, case-insensitive)
+        │
+   ┌────┴────┐
+   │ Hay     │ No hay coincidencia exacta
+   │ match   │        │
+   │ exacto  │        ▼
+   │         │  Muestra "Crear etiqueta '[nombre]'"
+   └────┬────┘        │
+        │             ▼ (click)
+        │        showCreateForm = true → renderPicker()
+        │             │
+        │             ▼
+        │    Formulario inline:
+        │    - 12 colores predefinidos (swatches)
+        │    - <input type="color"> personalizado
+        │    - Botones Cancelar / Crear
+        │             │
+        │             ▼ (click Crear)
+        │    createLabel({ name, color }) → IndexedDB
+        │    auto-assign: _save({ labelIds: [..., newLabel.id] })
+        │    _allLabels actualizado en memoria
+        │    renderChips() + renderPicker() + cerrar picker
+        │
+        ▼
+   Chip de la etiqueta aparece inmediatamente en el panel
+```
+
+#### Paleta de colores predefinidos (12 colores)
+
+| Índice | Hex | Color |
+|---|---|---|
+| 0 | `#EF4444` | Rojo |
+| 1 | `#F97316` | Naranja |
+| 2 | `#F59E0B` | Ámbar |
+| 3 | `#EAB308` | Amarillo |
+| 4 | `#22C55E` | Verde |
+| 5 | `#10B981` | Esmeralda |
+| 6 | `#3B82F6` | Azul |
+| 7 | `#6366F1` | Índigo |
+| 8 | `#8B5CF6` | Violeta |
+| 9 | `#EC4899` | Rosa |
+| 10 | `#06B6D4` | Cian |
+| 11 | `#84CC16` | Lima |
+
+#### Selectores CSS añadidos
+
+| Selector | Propósito |
+|---|---|
+| `.labels-search` | Campo de búsqueda en el picker |
+| `.label-create-option` | Opción "Crear etiqueta '[nombre]'" |
+| `.label-create-form` | Contenedor del formulario inline |
+| `.label-create-form-title` | Título del formulario ("Color para…") |
+| `.label-color-palette` | Contenedor de swatches de color |
+| `.color-swatch` | Botón circular de color predefinido |
+| `.label-custom-color-row` | Fila con `<input type="color">` |
+| `.label-color-input` | Input de color personalizado |
+| `.label-error` | Mensaje de error con `role="alert"` |
+| `.label-create-actions` | Fila de acciones (Cancelar / Crear) |
+| `.label-btn` | Botón genérico (Cancelar) |
+| `.label-btn-primary` | Botón primario (Crear) |
+
+#### Criterios US-09 cubiertos
+
+| Scenario Gherkin | Estado |
+|---|---|
+| 1. Crear etiqueta desde selector de etiquetas de una tarea | ✅ Flujo completo implementado |
+| 2. Nombre de etiqueta obligatorio | ✅ Validación a nivel UI y repositorio |
+| 3. Nombre de etiqueta con máximo 30 caracteres | ✅ `maxLength=30` en `searchInput` |
+| 4. Color de etiqueta obligatorio | ✅ Pre-selección de color por defecto; error si `!pendingColor` |
+| 5. Búsqueda en tiempo real entre etiquetas existentes | ✅ Filtrado `includes()` case-insensitive en `renderPicker()` |
+
+#### Decisión de diseño: Import directo de `createLabel` en `dojo-task-detail`
+
+Se evaluaron dos opciones para la creación de etiquetas:
+
+| Opción | Descripción | Decisión |
+|---|---|---|
+| **A: Import directo** | `dojo-task-detail` importa `createLabel` y lo llama directamente | ✅ Elegida |
+| B: Event-driven | `dojo-task-detail` despacha `dojo:label-create`; `dojo-kanban-board` lo maneja | Descartada |
+
+**Justificación:** La creación de etiquetas es parte inherente del flujo de edición de tareas, que ya reside en `dojo-task-detail`. Añadir un event round-trip añadiría complejidad sin beneficio de desacoplamiento real, dado que la etiqueta creada se persiste en IndexedDB (accesible globalmente). La próxima vez que `_onTaskOpen` en el board llame a `getAllLabels()`, la nueva etiqueta estará disponible automáticamente.
+
+---
+
+### Paso 13 — Implementación de Reutilización de Etiquetas (US-10 / Issue #11)
+
+**Fecha:** 2026-03-26  
+**Agente ejecutor:** `builder`  
+**Issue asociado:** [#11 — US-10 Reutilización de etiquetas](https://github.com/Code-Dojo-Labs/agent-app/issues/11)  
+**Branch:** `feat/11-reutilizacion-etiquetas` (basada en `feat/10-crear-etiqueta`)
+
+#### Descripción
+
+Este paso añade la **visualización de chips de etiquetas en las tarjetas del tablero Kanban** y la **detección de duplicados por diferencia de capitalización** en el selector de etiquetas. El objetivo es que el usuario vea, de un vistazo en el tablero, qué etiquetas tiene cada tarea, sin necesidad de abrir el panel de detalle.
+
+#### Archivos modificados
+
+| Archivo | Cambios |
+|---|---|
+| `src/components/atoms/dojo-task-card/dojo-task-card.ts` | Imports `Label` + `pickTextColor`; campo `_labels`; getter/setter `taskLabels`; CSS `.chip-row` / `.task-label-chip`; render de chips entre título y footer |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | `Label` en type imports; campo `_labels`; carga paralela en `_loadBoard`; setter `taskLabels` en `_renderTaskCards`; helpers `_getTaskLabels` y `_handleLabelCreated`; listener `dojo:label-created`; propagación de cambios en `_handleTaskFieldUpdated` |
+| `src/components/organisms/dojo-task-detail/dojo-task-detail.ts` | Despacha `dojo:label-created` tras crear etiqueta; aviso de duplicado por diferente capitalización; CSS `.label-info-notice` |
+
+#### Arquitectura de comunicación (US-10)
+
+```
+[dojo-task-detail] ── dojo:label-created (bubbles+composed) ──▶ [dojo-kanban-board]
+                                                                         │
+                                                               _handleLabelCreated()
+                                                               actualiza _labels[]
+                                                               (caché en memoria)
+
+[dojo-kanban-board]
+  _loadBoard()   ── Promise.all([getAllColumns(), getAllLabels()]) ──▶ IndexedDB
+  _renderTaskCards() ── .taskLabels = _getTaskLabels(task) ──▶ [dojo-task-card]
+  _handleTaskFieldUpdated() ── si changes.labelIds ──▶ actualiza card.taskLabels
+```
+
+#### Propiedad `taskLabels` en `dojo-task-card`
+
+La tarjeta recibe un array de objetos `Label` mediante la propiedad JS (no atributo HTML, ya que los atributos son siempre strings). El setter llama a `_render()` si el elemento está conectado, lo que garantiza re-render reactivo ante cualquier cambio de etiquetas desde el tablero.
+
+```typescript
+set taskLabels(labels: Label[]) {
+  this._labels = [...labels];
+  if (this.isConnected) this._render();
+}
+```
+
+#### Seguridad del color en chips
+
+Antes de aplicar `backgroundColor`, el chip valida el color contra la expresión regular `/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/`. Si no pasa la validación (p.ej., valor corrupto en BD), usa `var(--dojo-border)` como fallback. El contraste de texto se delega a `pickTextColor()` de `utils/contrast.ts`, con `try/catch` para aislar posibles errores en valores edge.
+
+#### Selectores CSS añadidos en `dojo-task-card`
+
+| Selector | Propósito |
+|---|---|
+| `.chip-row` | Fila flex envolvente de chips de etiquetas |
+| `.task-label-chip` | Chip individual: color de fondo dinámico, texto truncado a 80 px |
+
+#### Selectores CSS añadidos en `dojo-task-detail`
+
+| Selector | Propósito |
+|---|---|
+| `.label-info-notice` | Aviso informativo cuando el nombre tecleado coincide (sin distinguir mayúsculas) con una etiqueta existente |
+
+#### Criterios US-10 cubiertos
+
+| Scenario | Estado |
+|---|---|
+| S1 — Asignar etiqueta existente a una tarea (picker con scroll) | ✅ Heredado de US-09; picker funciona con lista completa |
+| S2 — Prevención de duplicados por capitalización diferente | ✅ `else` branch en `renderPicker()` muestra `.label-info-notice` |
+| S3 — Ver etiquetas asignadas en las tarjetas del tablero | ✅ Chips `.task-label-chip` renderizados en `dojo-task-card` |
+| S4 — Etiqueta nueva visible en el tablero sin recargar | ✅ `dojo:label-created` actualiza `_labels[]` en el board; setter `taskLabels` re-renderiza la tarjeta activa |
+
+#### Decisión de diseño: Propiedad JS vs. atributo HTML para `taskLabels`
+
+| Opción | Descripción | Decisión |
+|---|---|---|
+| **A: Propiedad JS** | `card.taskLabels = Label[]` — permite pasar objetos complejos | ✅ Elegida |
+| B: Atributo JSON serializado | `card.setAttribute('task-labels', JSON.stringify(...))` — más frágil y detectable en DevTools como ruido | Descartado |
+
+**Justificación:** Los Web Components permiten comunicar estado complejo a través de propiedades JS, reservando los atributos HTML para datos primitivos (IDs, flags semánticos). Serializar/deserializar JSON en atributos añade garbage colection overhead y expone datos internos como texto en el DOM inspeccionable.
 

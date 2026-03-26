@@ -28,7 +28,7 @@
  * --dojo-shadow, --dojo-radius, --dojo-primary
  */
 
-import type { Column, Task, Priority } from '../../../types/models.js';
+import type { Column, Task, Label, Priority } from '../../../types/models.js';
 import { getAllColumns, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
 import { getTasksByStatus, createTask, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
 import { getAllLabels } from '../../../db/label.repository.js';
@@ -47,6 +47,11 @@ interface ActiveFilter {
   labelIds?: string[];
 }
 
+/** Contrato de la propiedad taskLabels expuesta por dojo-task-card (US-10). */
+interface TaskCardElement extends HTMLElement {
+  taskLabels: Label[];
+}
+
 // ── Clase ──────────────────────────────────────────────────────────────────
 
 export class DojoKanbanBoard extends HTMLElement {
@@ -58,6 +63,8 @@ export class DojoKanbanBoard extends HTMLElement {
   private _tasksByColumn: Map<string, Task[]> = new Map();
   /** Lista ordenada de columnas actualmente cargadas */
   private _columns: Column[] = [];
+  /** Lista completa de etiquetas (US-10) */
+  private _labels: Label[] = [];
 
   constructor() {
     super();
@@ -268,6 +275,8 @@ export class DojoKanbanBoard extends HTMLElement {
     this._shadow.appendChild(deleteDialog);
     this._shadow.addEventListener('dojo:task-delete-request',  (e) => this._onTaskDeleteRequest(e as CustomEvent));
     this._shadow.addEventListener('dojo:task-delete-confirm',  (e) => this._handleTaskDeleteConfirm(e as CustomEvent));
+    // US-10: sincronizar etiquetas nuevas creadas desde el panel de detalle
+    this._shadow.addEventListener('dojo:label-created',        (e) => this._handleLabelCreated(e as CustomEvent));
   }
 
   // ── Barra de filtros (US-08) ─────────────────────────────────────────────
@@ -411,7 +420,11 @@ export class DojoKanbanBoard extends HTMLElement {
     this._tasksByColumn.clear();
 
     try {
-      const columns = await getAllColumns();
+      const [columns, labels] = await Promise.all([
+        getAllColumns(),
+        getAllLabels(),
+      ]);
+      this._labels = labels;
 
       // Cargar tareas de todas las columnas en paralelo
       const taskResults = await Promise.all(
@@ -482,6 +495,7 @@ export class DojoKanbanBoard extends HTMLElement {
       card.setAttribute('task-id',       task.id);
       card.setAttribute('task-title',    task.title);
       card.setAttribute('task-priority', task.priority);
+      (card as TaskCardElement).taskLabels = this._getTaskLabels(task);
       colEl.appendChild(card);
     }
   }
@@ -506,6 +520,23 @@ export class DojoKanbanBoard extends HTMLElement {
     const total = tasks.length;
     const visible = this._filterTasks(tasks).length;
     return { visible, total };
+  }
+
+  /** Resuelve los objetos Label para una tarea a partir del caché local (US-10). */
+  private _getTaskLabels(task: Task): Label[] {
+    return (task.labelIds ?? [])
+      .map(id => this._labels.find(l => l.id === id))
+      .filter((l): l is Label => l !== undefined);
+  }
+
+  /** Añade una etiqueta recién creada al caché local para que los chips se muestren sin recargar (US-10). */
+  private _handleLabelCreated(e: CustomEvent): void {
+    const { label } = e.detail as { label: Label };
+    if (!this._labels.find(l => l.id === label.id)) {
+      this._labels = [...this._labels, label].sort((a, b) =>
+        a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+      );
+    }
   }
 
   private _filterTasks(tasks: Task[]): Task[] {
@@ -866,7 +897,10 @@ export class DojoKanbanBoard extends HTMLElement {
         // En cualquier otro caso actualizamos solo los atributos para evitar re-render completo.
         if (changes.priority !== undefined && this._activeFilter.priorities?.length) {
           this._refreshColumnCards(sourceColumnId);
-        } else if (changes.title !== undefined || changes.priority !== undefined) {
+        } else if (changes.labelIds !== undefined && this._activeFilter.labelIds?.length) {
+          // Etiquetas cambiaron y hay filtro activo — puede que la tarjeta deba desaparecer
+          this._refreshColumnCards(sourceColumnId);
+        } else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined) {
           const colEl = this._shadow.querySelector(
             `dojo-kanban-column[column-id="${CSS.escape(sourceColumnId)}"]`
           );
@@ -875,6 +909,7 @@ export class DojoKanbanBoard extends HTMLElement {
             if (cardEl) {
               if (changes.title    !== undefined) cardEl.setAttribute('task-title',    updated.title);
               if (changes.priority !== undefined) cardEl.setAttribute('task-priority', updated.priority);
+              if (changes.labelIds !== undefined) (cardEl as TaskCardElement).taskLabels = this._getTaskLabels(updated);
             }
           }
         }
