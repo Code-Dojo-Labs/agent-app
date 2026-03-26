@@ -85,6 +85,28 @@ export class DojoKanbanBoard extends HTMLElement {
     this._updateColumnCounts();
   }
 
+  /**
+   * Actualiza una etiqueta en el caché local y refresca los chips de todas las
+   * tarjetas visibles que la tienen asignada. Llamado por dojo-app tras recibir
+   * el evento `dojo:label-updated` desde dojo-label-manager (US-11).
+   */
+  refreshLabel(updatedLabel: Label): void {
+    this._labels = this._labels.map(l => l.id === updatedLabel.id ? updatedLabel : l);
+    for (const [columnId, tasks] of this._tasksByColumn) {
+      for (const task of tasks) {
+        if ((task.labelIds ?? []).includes(updatedLabel.id)) {
+          const colEl = this._shadow.querySelector(
+            `dojo-kanban-column[column-id="${CSS.escape(columnId)}"]`
+          );
+          if (colEl) {
+            const cardEl = colEl.querySelector(`dojo-task-card[task-id="${CSS.escape(task.id)}"]`);
+            if (cardEl) (cardEl as any).taskLabels = this._getTaskLabels(task);
+          }
+        }
+      }
+    }
+  }
+
   // ── Render inicial (estructura vacía con loading) ─────────────────────────
 
   private _render(): void {

@@ -25,6 +25,7 @@
    - [Paso 11 — Implementación de Prioridad de Tarea (US-08 / Issue #9)](#paso-11--implementación-de-prioridad-de-tarea-us-08--issue-9)
    - [Paso 12 — Implementación de Crear Etiqueta (US-09 / Issue #10)](#paso-12--implementación-de-crear-etiqueta-us-09--issue-10)
    - [Paso 13 — Implementación de Reutilización de Etiquetas (US-10 / Issue #11)](#paso-13--implementación-de-reutilización-de-etiquetas-us-10--issue-11)
+   - [Paso 14 — Implementación de Editar Etiqueta (US-11 / Issue #12)](#paso-14--implementación-de-editar-etiqueta-us-11--issue-12)
 
 ---
 
@@ -1224,4 +1225,98 @@ Antes de aplicar `backgroundColor`, el chip valida el color contra la expresión
 | B: Atributo JSON serializado | `card.setAttribute('task-labels', JSON.stringify(...))` — más frágil y detectable en DevTools como ruido | Descartado |
 
 **Justificación:** Los Web Components permiten comunicar estado complejo a través de propiedades JS, reservando los atributos HTML para datos primitivos (IDs, flags semánticos). Serializar/deserializar JSON en atributos añade garbage colection overhead y expone datos internos como texto en el DOM inspeccionable.
+
+---
+
+### Paso 14 — Implementación de Editar Etiqueta (US-11 / Issue #12)
+
+**Fecha:** 2026-03-26  
+**Agente ejecutor:** `builder`  
+**Issue asociado:** [#12 — US-11 Editar etiqueta](https://github.com/Code-Dojo-Labs/agent-app/issues/12)  
+**Branch:** `feat/12-editar-etiqueta` (basada en `feat/11-reutilizacion-etiquetas`)
+
+#### Descripción
+
+Este paso implementa el **panel de administración de etiquetas** accesible desde el header de la aplicación. El usuario puede editar el nombre o el color de cualquier etiqueta, y los cambios se propagan automáticamente a todos los chips visibles en el tablero, sin necesidad de recargar.
+
+#### Archivos nuevos
+
+| Archivo | Descripción |
+|---|---|
+| `src/components/organisms/dojo-label-manager/dojo-label-manager.ts` | Nuevo organismo: panel lateral slide-in con listado y formulario de edición inline por etiqueta |
+
+#### Archivos modificados
+
+| Archivo | Cambios |
+|---|---|
+| `src/components/organisms/dojo-app/dojo-app.ts` | Botón "Gestionar etiquetas" en header; monta `<dojo-label-manager>`; listener `dojo:label-updated` que llama a `board.refreshLabel()` |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | Nuevo método público `refreshLabel(label)` que actualiza `_labels[]` y refresca los chips de las tarjetas afectadas |
+
+#### Arquitectura de comunicación (US-11)
+
+```
+Usuario hace clic en "Gestionar etiquetas" (header)
+            │
+            ▼
+  dojo-app llama a labelMgr.show()
+            │
+            ▼
+  dojo-label-manager carga getAllLabels() → muestra lista
+            │
+  Usuario hace clic en ✏️ → formulario inline por etiqueta
+            │
+  Usuario guarda → updateLabel(id, { name, color })
+            │
+            ▼
+  dojo:label-updated (bubbles+composed) sube hasta dojo-app Shadow Root
+            │
+            ▼
+  dojo-app listener → board.refreshLabel(label)
+            │
+            ▼
+  dojo-kanban-board._labels[] actualizado
+  Para cada tarea con ese labelId → card.taskLabels = _getTaskLabels(task)
+            │
+            ▼
+  dojo-task-card setter → _render() → chips actualizados sin recargar bd
+```
+
+#### `dojo-label-manager` — API pública
+
+| Método  | Descripción |
+|---|---|
+| `show()` | Carga todas las etiquetas y muestra el panel con animación slide-in |
+| `hide()` | Cierra el panel; también responde a clic en backdrop y tecla Escape |
+
+#### Selectores CSS de `dojo-label-manager`
+
+| Selector | Propósito |
+|---|---|
+| `.backdrop` | Capa oscura semitransparente; click cierra el panel |
+| `.panel` | Drawer lateral derecho, width `min(360px, 100vw)`, slide-in |
+| `.panel-header` | Título + botón de cierre (✕) |
+| `.panel-content` | Área desplazable con la lista |
+| `.label-list` | `<ul role="list">` de todas las etiquetas |
+| `.label-row` | Fila: dot color + nombre + botón editar |
+| `.edit-form` | Formulario inline de edición (nombre + paleta + acciones) |
+| `.color-swatch` | Swatch de la paleta (mismo estilo que en `dojo-task-detail`) |
+| `.edit-name-input` | Campo de texto para el nombre (max 30 chars) |
+
+#### Criterios US-11 cubiertos
+
+| Scenario Gherkin | Estado |
+|---|---|
+| 1. Acceder al panel de administración desde el header | ✅ Botón "Gestionar etiquetas" en `.app-header` |
+| 2. Editar el nombre de una etiqueta | ✅ `updateLabel()` + detección de duplicados por repositorio |
+| 3. Editar el color de una etiqueta | ✅ Paleta de 12 colores + color personalizado (`<input type="color">`) |
+| 4. Propagación automática a tarjetas visibles | ✅ `board.refreshLabel()` itera `_tasksByColumn` y actualiza `.taskLabels` |
+
+#### Decisión de diseño: Panel en `dojo-app` vs. dentro de `dojo-kanban-board`
+
+| Opción | Descripción | Decisión |
+|---|---|---|
+| **A: Panel en `dojo-app`** | El botón y el panel de gestión viven en el nivel de la app raíz | ✅ Elegida |
+| B: Panel dentro del board | El botón estaría en la barra de filtros, el panel en el shadow del board | Descartada |
+
+**Justificación:** El issue especifica "botón en el header de la aplicación". El header está en `dojo-app`. Para evitar que el organismo board asuma responsabilidades de gestión global, el panel de etiquetas se monta en el shadow de `dojo-app`, que actúa como coordinador de nivel de aplicación.
 
