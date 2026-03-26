@@ -13,6 +13,9 @@
  */
 
 import '../dojo-kanban-board/dojo-kanban-board.js';
+import '../dojo-label-manager/dojo-label-manager.js';
+
+import type { Label } from '../../../types/models.js';
 
 export class DojoApp extends HTMLElement {
   static readonly TAG = 'dojo-app';
@@ -72,6 +75,33 @@ export class DojoApp extends HTMLElement {
         margin-left: auto;
       }
 
+      /* Botón Gestionar etiquetas */
+      .manage-labels-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.3125rem 0.75rem;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius, 6px);
+        background: transparent;
+        color: var(--dojo-text-secondary);
+        font-size: 0.8125rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        margin-left: auto;
+        white-space: nowrap;
+      }
+      .manage-labels-btn:hover {
+        background: var(--dojo-bg);
+        color: var(--dojo-text-primary);
+        border-color: var(--dojo-primary, #1D4ED8);
+      }
+      .manage-labels-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
+
       /* ── Área del tablero (ocupa el espacio restante) ─────────────── */
       .board-area {
         flex: 1;
@@ -102,12 +132,27 @@ export class DojoApp extends HTMLElement {
     subtitle.className = 'app-subtitle';
     subtitle.textContent = 'Zero Dependencies';
 
+    const manageLabelBtn = document.createElement('button');
+    manageLabelBtn.className = 'manage-labels-btn';
+    manageLabelBtn.type = 'button';
+    manageLabelBtn.setAttribute('aria-label', 'Gestionar etiquetas');
+    const btnIcon = document.createElement('span');
+    btnIcon.setAttribute('aria-hidden', 'true');
+    btnIcon.textContent = '🏷️';
+    const btnText = document.createElement('span');
+    btnText.textContent = 'Gestionar etiquetas';
+    manageLabelBtn.appendChild(btnIcon);
+    manageLabelBtn.appendChild(btnText);
+    manageLabelBtn.addEventListener('click', () => {
+      (labelMgr as any).show();
+    });
+
     appHeader.appendChild(logo);
     appHeader.appendChild(title);
-    appHeader.appendChild(subtitle);
+    appHeader.appendChild(manageLabelBtn);
     this._shadow.appendChild(appHeader);
 
-    // ── Área del tablero ────────────────────────────────────────────────────
+    // ── Área del tablero ────────────────────────────────────────────────────────────────────
     const boardArea = document.createElement('main');
     boardArea.className = 'board-area';
     boardArea.setAttribute('role', 'main');
@@ -115,6 +160,16 @@ export class DojoApp extends HTMLElement {
     const board = document.createElement('dojo-kanban-board');
     boardArea.appendChild(board);
     this._shadow.appendChild(boardArea);
+
+    // ── Panel de gestión de etiquetas (US-11) ───────────────────────────────────────
+    const labelMgr = document.createElement('dojo-label-manager');
+    this._shadow.appendChild(labelMgr);
+
+    // Cuando se actualiza una etiqueta, propagar al tablero para refrescar los chips
+    this._shadow.addEventListener('dojo:label-updated', (e: Event) => {
+      const { label } = (e as CustomEvent).detail as { label: Label };
+      (board as any).refreshLabel?.(label);
+    });
   }
 }
 
