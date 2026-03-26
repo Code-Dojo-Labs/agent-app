@@ -99,6 +99,11 @@ export class DojoTaskDetail extends HTMLElement {
 
   // ── API pública ───────────────────────────────────────────────────────────
 
+  /** Id de la tarea actualmente en edición (null si el panel está cerrado). */
+  get currentTaskId(): string | null {
+    return this._task?.id ?? null;
+  }
+
   openTask(task: Task, columns: Column[], labels: Label[]): void {
     this._task           = { ...task };
     this._columns        = columns;

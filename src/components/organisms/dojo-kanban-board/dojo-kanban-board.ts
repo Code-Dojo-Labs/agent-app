@@ -746,8 +746,12 @@ export class DojoKanbanBoard extends HTMLElement {
 
   private _onTaskDeleteRequest(e: CustomEvent): void {
     const { taskId, taskTitle } = e.detail as { taskId: string; taskTitle: string };
+    // Guardar referencia al elemento disparador para devolver el foco al cerrar (Fix #3)
+    const trigger = e.composedPath()
+      .find((el): el is HTMLElement => el instanceof HTMLElement && typeof (el as HTMLElement).focus === 'function'
+      ) ?? null;
     const dialog = this._getDeleteDialog() as any;
-    if (dialog?.show) dialog.show(taskId, taskTitle);
+    if (dialog?.show) dialog.show(taskId, taskTitle, trigger);
   }
 
   private async _handleTaskDeleteConfirm(e: CustomEvent): Promise<void> {
@@ -767,9 +771,9 @@ export class DojoKanbanBoard extends HTMLElement {
       const remaining = (this._tasksByColumn.get(columnId) ?? []).filter(t => t.id !== taskId);
       this._tasksByColumn.set(columnId, remaining.map((t, i) => ({ ...t, order: i })));
 
-      // Cerrar panel de detalle si estaba mostrando esta tarea
+      // Cerrar panel de detalle solo si estaba mostrando la tarea eliminada (Fix #1)
       const detail = this._getTaskDetail() as any;
-      if (detail?.close) detail.close();
+      if (detail?.currentTaskId === taskId && detail?.close) detail.close();
 
       // Refrescar columna + conteos
       this._refreshColumnCards(columnId);

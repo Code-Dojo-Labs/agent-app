@@ -27,6 +27,8 @@ export class DojoDeleteConfirmDialog extends HTMLElement {
 
   private _shadow: ShadowRoot;
   private _taskId: string = '';
+  /** Elemento que abrió el diálogo — el foco regresa aquí al cerrar (WCAG 2.1 SC 2.4.3). */
+  private _triggerEl: HTMLElement | null = null;
 
   /** Referencia estable para poder eliminar el listener de teclado. */
   private _onDocKeydown = (e: KeyboardEvent): void => {
@@ -68,10 +70,14 @@ export class DojoDeleteConfirmDialog extends HTMLElement {
 
   // ── API pública ───────────────────────────────────────────────────────────
 
-  show(taskId: string, taskTitle: string): void {
-    this._taskId = taskId;
+  show(taskId: string, taskTitle: string, triggerEl?: HTMLElement): void {
+    this._taskId    = taskId;
+    this._triggerEl = triggerEl ?? null;
     const titleEl = this._shadow.querySelector<HTMLElement>('.dialog-task-title');
     if (titleEl) titleEl.textContent = `"${taskTitle}"`;
+    // Marcar como visible para lectores de pantalla (Fix #2)
+    const dialog = this._shadow.querySelector<HTMLElement>('.dialog');
+    dialog?.setAttribute('aria-hidden', 'false');
     this.setAttribute('open', '');
     document.removeEventListener('keydown', this._onDocKeydown);
     document.addEventListener('keydown', this._onDocKeydown);
@@ -84,6 +90,13 @@ export class DojoDeleteConfirmDialog extends HTMLElement {
   hide(): void {
     this.removeAttribute('open');
     document.removeEventListener('keydown', this._onDocKeydown);
+    // Ocultar del árbol AT mientras está cerrado (Fix #2)
+    const dialog = this._shadow.querySelector<HTMLElement>('.dialog');
+    dialog?.setAttribute('aria-hidden', 'true');
+    // Devolver foco al disparador (Fix #3 — WCAG 2.1 SC 2.4.3)
+    const trigger = this._triggerEl;
+    this._triggerEl = null;
+    requestAnimationFrame(() => trigger?.focus());
   }
 
   // ── Estado ────────────────────────────────────────────────────────────────
@@ -231,6 +244,8 @@ export class DojoDeleteConfirmDialog extends HTMLElement {
     dialog.setAttribute('aria-modal', 'true');
     dialog.setAttribute('aria-labelledby', 'delete-dialog-title');
     dialog.setAttribute('aria-describedby', 'delete-dialog-desc');
+    // Oculto del árbol AT hasta que se abra con show() (Fix #2)
+    dialog.setAttribute('aria-hidden', 'true');
 
     const icon = document.createElement('div');
     icon.className = 'dialog-icon';
