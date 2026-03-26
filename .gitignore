@@ -3,3 +3,4 @@ dist/
 
 # Preferencias personales del IDE — no deben imponerse a otros colaboradores
 .vscode/settings.json
+agents/rules.md
