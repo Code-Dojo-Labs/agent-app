@@ -967,6 +967,11 @@ export class DojoTaskDetail extends HTMLElement {
       '#22C55E', '#10B981', '#3B82F6', '#6366F1',
       '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16',
     ];
+    const PRESET_COLOR_NAMES = [
+      'Rojo', 'Naranja', 'Ámbar', 'Amarillo',
+      'Verde', 'Esmeralda', 'Azul', 'Índigo',
+      'Violeta', 'Rosa', 'Cian', 'Lima',
+    ];
 
     const section = document.createElement('div');
     section.className = 'section';
@@ -1104,12 +1109,15 @@ export class DojoTaskDetail extends HTMLElement {
         swatch.type = 'button';
         swatch.className = 'color-swatch' + (pendingColor === c ? ' selected' : '');
         swatch.style.backgroundColor = c;
-        swatch.setAttribute('aria-label', `Color ${c}`);
+        const colorName = PRESET_COLOR_NAMES[PRESET_COLORS.indexOf(c)] ?? c;
+        swatch.setAttribute('aria-label', `Color ${colorName}`);
         swatch.setAttribute('aria-pressed', String(pendingColor === c));
+        swatch.title = colorName;
+        swatch.dataset['color'] = c;
         swatch.addEventListener('click', () => {
           pendingColor = c;
           palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
-            const active = s.getAttribute('aria-label') === `Color ${c}`;
+            const active = s.dataset['color'] === c;
             s.classList.toggle('selected', active);
             s.setAttribute('aria-pressed', String(active));
           });
@@ -1132,7 +1140,7 @@ export class DojoTaskDetail extends HTMLElement {
       colorInput.addEventListener('input', () => {
         pendingColor = colorInput.value;
         palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
-          const active = s.getAttribute('aria-label') === `Color ${pendingColor}`;
+          const active = s.dataset['color'] === pendingColor;
           s.classList.toggle('selected', active);
           s.setAttribute('aria-pressed', String(active));
         });
