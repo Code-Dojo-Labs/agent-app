@@ -29,13 +29,14 @@
  */
 
 import type { Label } from '../../../types/models.js';
+import { getDueStatus, formatRelativeDate, type DueStatus } from '../../../utils/date.js';
 // US-13: texto de chips siempre #FFFFFF (todos los colores de paleta cumplen ≥ 4.5:1 con blanco)
 
 export class DojoTaskCard extends HTMLElement {
   static readonly TAG = 'dojo-task-card';
 
   static get observedAttributes(): string[] {
-    return ['task-id', 'task-title', 'task-priority', 'task-created-at'];
+    return ['task-id', 'task-title', 'task-priority', 'task-created-at', 'task-due-date'];
   }
 
   private _shadow: ShadowRoot;
@@ -85,6 +86,7 @@ export class DojoTaskCard extends HTMLElement {
   get taskTitle(): string { return this.getAttribute('task-title') ?? ''; }
   get priority(): string  { return this.getAttribute('task-priority') ?? 'medium'; }
   get createdAt(): string { return this.getAttribute('task-created-at') ?? ''; }
+  get dueDate(): string   { return this.getAttribute('task-due-date') ?? ''; }
 
   // ── Drag handlers ─────────────────────────────────────────────────────────
 
@@ -127,9 +129,19 @@ export class DojoTaskCard extends HTMLElement {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  /** Mapeo estado → clase CSS para borde de alerta de vencimiento (US-17). */
+  private static readonly DUE_STATUS_CLASS: Record<DueStatus, string> = {
+    overdue:    'due-overdue',
+    'due-soon': 'due-soon',
+    normal:     '',
+    none:       '',
+  };
+
   private _render(): void {
     const p       = this.priority as keyof typeof DojoTaskCard.PRIORITY_CONFIG;
     const pConfig = DojoTaskCard.PRIORITY_CONFIG[p] ?? DojoTaskCard.PRIORITY_CONFIG.medium;
+    const dueStatus = getDueStatus(this.dueDate || null);
+    const dueCls    = DojoTaskCard.DUE_STATUS_CLASS[dueStatus];
 
     this._shadow.innerHTML = '';
 
@@ -288,6 +300,35 @@ export class DojoTaskCard extends HTMLElement {
         flex-shrink: 0;
       }
 
+      /* ── Alertas de vencimiento (US-17) ── */
+      :host(.due-overdue) {
+        border-color: var(--dojo-due-overdue, #EF4444);
+        border-width: 2px;
+      }
+      :host(.due-soon) {
+        border-color: var(--dojo-due-soon, #F59E0B);
+        border-width: 2px;
+      }
+      .due-date-label {
+        font-size: 0.625rem;
+        white-space: nowrap;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+      }
+      .due-date-label.due-overdue {
+        color: var(--dojo-due-overdue, #EF4444);
+        font-weight: 600;
+      }
+      .due-date-label.due-soon {
+        color: var(--dojo-due-soon, #F59E0B);
+        font-weight: 600;
+      }
+      .due-date-label.due-normal {
+        color: var(--dojo-text-muted, var(--dojo-text-secondary));
+      }
+
       /* Chips de etiquetas (US-10) */
       .chip-row {
         display: flex;
@@ -311,6 +352,10 @@ export class DojoTaskCard extends HTMLElement {
       }
     `;
     this._shadow.appendChild(style);
+
+    // ── Clase de alerta de vencimiento en el host (US-17) ─────────────────
+    this.classList.remove('due-overdue', 'due-soon');
+    if (dueCls) this.classList.add(dueCls);
 
     // ── Acciones rápidas en hover (US-06, US-16) ──────────────────────────
     const cardActions = document.createElement('div');
@@ -399,6 +444,19 @@ export class DojoTaskCard extends HTMLElement {
       dateEl.setAttribute('aria-label', `Creado el ${dateStr}`);
       dateEl.textContent = dateStr;
       footer.appendChild(dateEl);
+    }
+
+    // ── Fecha de vencimiento relativa (US-17) ─────────────────────────────
+    const dueRelative = formatRelativeDate(this.dueDate || null);
+    if (dueRelative) {
+      const dueEl = document.createElement('span');
+      const statusCls = dueStatus === 'overdue' ? 'due-overdue'
+                      : dueStatus === 'due-soon' ? 'due-soon'
+                      : 'due-normal';
+      dueEl.className = `due-date-label ${statusCls}`;
+      dueEl.setAttribute('aria-label', `Vence ${dueRelative}`);
+      dueEl.textContent = `📅 ${dueRelative}`;
+      footer.appendChild(dueEl);
     }
 
     this._shadow.appendChild(footer);

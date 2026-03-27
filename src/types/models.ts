@@ -29,6 +29,8 @@ export interface Task {
   createdAt: string;
   /** Fecha de última modificación en formato ISO 8601. */
   updatedAt: string;
+  /** Fecha de vencimiento en formato ISO 8601. Null/undefined = sin vencimiento (US-17). */
+  dueDate?: string | null;
   /** Posición dentro de la columna (para ordenamiento manual). */
   order: number;
 }

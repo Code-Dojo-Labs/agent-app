@@ -363,6 +363,23 @@ export class DojoTaskDialog extends HTMLElement {
     priField.appendChild(priSelect);
     dialog.appendChild(priField);
 
+    // ── Campo: Fecha de vencimiento (opcional, US-17) ─────────────────────
+    const dueField = document.createElement('div');
+    dueField.className = 'field';
+
+    const dueLabel = document.createElement('label');
+    dueLabel.setAttribute('for', 'task-due-date-input');
+    dueLabel.textContent = 'Fecha de vencimiento (opcional)';
+
+    const dueInput = document.createElement('input');
+    dueInput.id   = 'task-due-date-input';
+    dueInput.type = 'date';
+    dueInput.setAttribute('aria-label', 'Fecha de vencimiento');
+
+    dueField.appendChild(dueLabel);
+    dueField.appendChild(dueInput);
+    dialog.appendChild(dueField);
+
     // ── Acciones ───────────────────────────────────────────────────────────
     const actions = document.createElement('div');
     actions.className = 'actions';
@@ -394,6 +411,7 @@ export class DojoTaskDialog extends HTMLElement {
           title,
           description: descInput.value.trim(),
           priority:    priSelect.value as Priority,
+          dueDate:     dueInput.value ? new Date(dueInput.value + 'T23:59:59').toISOString() : null,
         },
       }));
       this._close();

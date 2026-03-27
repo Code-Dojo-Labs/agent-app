@@ -800,6 +800,7 @@ export class DojoKanbanBoard extends HTMLElement {
       card.setAttribute('task-title',      task.title);
       card.setAttribute('task-priority',   task.priority);
       card.setAttribute('task-created-at', task.createdAt);
+      if (task.dueDate) card.setAttribute('task-due-date', task.dueDate);
       (card as TaskCardElement).taskLabels = this._getTaskLabels(task);
       colEl.appendChild(card);
     }
@@ -1116,11 +1117,12 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private async _handleCreateTask(e: CustomEvent): Promise<void> {
-    const { statusId, title, description, priority } = e.detail as {
+    const { statusId, title, description, priority, dueDate } = e.detail as {
       statusId:    string;
       title:       string;
       description: string;
       priority:    string;
+      dueDate?:    string | null;
     };
     // Validar que la columna exista (puede haberse eliminado mientras el diálogo estaba abierto)
     if (!this._columns.some(c => c.id === statusId)) {
@@ -1136,6 +1138,7 @@ export class DojoKanbanBoard extends HTMLElement {
         priority:  priority as Task['priority'],
         labelIds:  [],
         order:     tasks.length,
+        dueDate:   dueDate ?? null,
       });
       this._tasksByColumn.set(statusId, [...tasks, newTask]);
       this._refreshColumnCards(statusId);
@@ -1212,7 +1215,7 @@ export class DojoKanbanBoard extends HTMLElement {
         } else if (changes.labelIds !== undefined && this._activeFilter.labelIds?.length) {
           // Etiquetas cambiaron y hay filtro activo — puede que la tarjeta deba desaparecer
           this._refreshColumnCards(sourceColumnId);
-        } else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined) {
+        } else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined || changes.dueDate !== undefined) {
           const colEl = this._shadow.querySelector(
             `dojo-kanban-column[column-id="${CSS.escape(sourceColumnId)}"]`
           );
@@ -1222,6 +1225,13 @@ export class DojoKanbanBoard extends HTMLElement {
               if (changes.title    !== undefined) cardEl.setAttribute('task-title',    updated.title);
               if (changes.priority !== undefined) cardEl.setAttribute('task-priority', updated.priority);
               if (changes.labelIds !== undefined) (cardEl as TaskCardElement).taskLabels = this._getTaskLabels(updated);
+              if (changes.dueDate !== undefined) {
+                if (updated.dueDate) {
+                  cardEl.setAttribute('task-due-date', updated.dueDate);
+                } else {
+                  cardEl.removeAttribute('task-due-date');
+                }
+              }
             }
           }
         }
