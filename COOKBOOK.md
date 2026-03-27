@@ -1325,7 +1325,6 @@ Usuario hace clic en "Gestionar etiquetas" (header)
 
 ---
 
-<<<<<<< HEAD
 ### Paso 15 — Implementación de Eliminar Etiqueta (US-12 / Issue #13)
 
 **Pull Request:** [#30 — [US-12] Eliminar etiqueta con limpieza atómica en IndexedDB](https://github.com/Code-Dojo-Labs/agent-app/pull/30)  
@@ -1717,3 +1716,106 @@ private _filterTasks(tasks: Task[]): Task[] {
 - Espaciado consistente con el resto del toolbar sin CSS adicional para la sección.
 - `display: contents` es standard (amplio soporte de navegadores modernos).
 - La alternativa (`display: flex` sobre el wrapper) crearía un flex-in-flex con gap diferente, requiriendo CSS adicional para alineación.
+
+---
+
+### Paso 19 — Tarjeta de tarea en el tablero (US-16 / Issue #17)
+
+#### Objetivo
+
+Cumplir todos los criterios de aceptación de US-16: chips de etiquetas en la parte superior de la tarjeta, fecha de creación en formato corto, acciones rápidas (drag + delete) solo en hover, y formato de fecha legible en el panel de detalle.
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `src/components/atoms/dojo-task-card/dojo-task-card.ts` | Chips reubicados, footer con fecha, acciones agrupadas en `.card-actions`, atributo `task-created-at` |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | `_renderTaskCards()` pasa `task.createdAt` como `task-created-at` |
+| `src/components/organisms/dojo-task-detail/dojo-task-detail.ts` | `_formatDate()` reescrito con formato determinista |
+
+#### Detalle de la implementación
+
+**Reorden de contenido en la tarjeta:**
+
+El orden visual pasa de: `[delete] → [title] → [chips] → [footer]` a:
+
+```
+[card-actions: drag + delete] ← overlay, visible solo en hover
+[chip-row: etiqueta1, etiqueta2...]  ← solo si hay etiquetas
+[title: max 2 líneas + ellipsis]
+[footer: ⬆️ Alta  |  25 mar 2026]
+```
+
+**`task-created-at` observado:**
+
+```typescript
+static get observedAttributes(): string[] {
+  return ['task-id', 'task-title', 'task-priority', 'task-created-at'];
+}
+get createdAt(): string { return this.getAttribute('task-created-at') ?? ''; }
+```
+
+Pasado por el kanban board en `_renderTaskCards()`: `card.setAttribute('task-created-at', task.createdAt)`.
+
+**`_formatCardDate()` — formato determinista:**
+
+```typescript
+private static readonly MONTHS_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+private static _formatCardDate(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()} ${DojoTaskCard.MONTHS_ES[d.getMonth()]} ${d.getFullYear()}`;
+}
+```
+
+Produce exactamente `"25 mar 2026"` sin depender del locale del SO.
+
+**`.card-actions` en hover:**
+
+```css
+.card-actions { position: absolute; top: 0.375rem; right: 0.375rem;
+  display: flex; align-items: center; gap: 0.125rem; opacity: 0; }
+:host(:hover) .card-actions, :host(:focus-within) .card-actions { opacity: 1; }
+```
+
+**`_formatDate()` en detalle — "25 mar 2026, 10:43":**
+
+Reemplaza `toLocaleString('es-MX')` (producía "10:43 a. m.") por formato manual:
+
+```typescript
+const hh = String(d.getHours()).padStart(2, '0');
+const mm = String(d.getMinutes()).padStart(2, '0');
+return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${hh}:${mm}`;
+```
+
+#### Criterios US-16 cubiertos
+
+| Scenario Gherkin | Estado |
+|---|---|
+| 1. Chips en parte superior (fondo color, texto blanco) | ✅ chip-row antes del título |
+| 2. Título máx. 2 líneas con ellipsis | ✅ `-webkit-line-clamp: 2` |
+| 3. Prioridad en parte inferior izquierda | ✅ `.footer-priority` |
+| 4. Fecha "25 mar 2026" en parte inferior derecha | ✅ `_formatCardDate()` + `.date-label` |
+| 5. Sin chips cuando no hay etiquetas | ✅ `if (this._labels.length > 0)` |
+| 6. Acciones en hover: drag + delete | ✅ `.card-actions` con opacity 0→1 |
+| 7. Clic en tarjeta abre detalle | ✅ `dojo:task-open` (existente) |
+| 8. Fecha en detalle "25 mar 2026, 10:43" | ✅ `_formatDate()` reescrito |
+
+#### ADR-23 — Formato de fecha determinista vs. `toLocaleString()`
+
+**Contexto:** US-16 especifica formatos exactos. `toLocaleString('es-MX')` produce variaciones entre OS/navegador ("a. m." vs "am", "." al final del mes en algunos navegadores).
+
+**Decisión:** Array `MONTHS_ES` estático + concatenación manual garantiza el formato exacto en todos los entornos.
+
+**Consecuencias:**
+- Comportamiento idéntico en Chrome, Firefox, Safari y cualquier locale del OS.
+- No hay internacionalización (aceptable para esta app monolingüe).
+
+#### ADR-24 — Agrupación de acciones en `.card-actions`
+
+**Contexto:** US-06 añadió `quick-delete-btn` absoluto independiente. US-16 requiere también un drag handle. Mantener dos elementos absolutos independientes complica el posicionamiento.
+
+**Decisión:** Un único `.card-actions` div agrupa ambas acciones. La transición `opacity: 0 → 1` se aplica una sola vez al contenedor.
+
+**Consecuencias:**
+- Una regla CSS gestiona la visibilidad de todas las acciones actuales y futuras.
+- El evento `dojo:task-delete-request` sigue siendo idéntico (sin breaking changes en la API pública).

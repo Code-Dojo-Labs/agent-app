@@ -1459,10 +1459,15 @@ export class DojoTaskDetail extends HTMLElement {
 
   private _formatDate(iso: string): string {
     try {
-      return new Date(iso).toLocaleString('es-MX', {
-        day: 'numeric', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit',
-      });
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      const day   = d.getDate();
+      const month = months[d.getMonth()];
+      const year  = d.getFullYear();
+      const hh    = String(d.getHours()).padStart(2, '0');
+      const mm    = String(d.getMinutes()).padStart(2, '0');
+      return `${day} ${month} ${year}, ${hh}:${mm}`;
     } catch {
       return iso;
     }
