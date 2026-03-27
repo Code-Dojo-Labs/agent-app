@@ -45,6 +45,7 @@ import '../../organisms/dojo-delete-confirm-dialog/dojo-delete-confirm-dialog.js
 interface ActiveFilter {
   priorities?: Priority[];
   labelIds?: string[];
+  searchText?: string;
 }
 
 /** Contrato de la propiedad taskLabels expuesta por dojo-task-card (US-10). */
@@ -65,6 +66,16 @@ export class DojoKanbanBoard extends HTMLElement {
   private _columns: Column[] = [];
   /** Lista completa de etiquetas (US-10) */
   private _labels: Label[] = [];
+  // Referencias UI del toolbar de filtros (US-15)
+  private _filterBarContent: HTMLElement | null = null;
+  private _filterClearAllBtn: HTMLButtonElement | null = null;
+  private _filterLabelSection: HTMLElement | null = null;
+  private _filterLabelChipsContainer: HTMLElement | null = null;
+  private _filterToggleBtn: HTMLButtonElement | null = null;
+  private _filterSearchInput: HTMLInputElement | null = null;
+  private _selectedLabelIds: Set<string> = new Set();
+  private _selectedPriorities: Set<Priority> = new Set();
+  private _filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     super();
@@ -134,6 +145,19 @@ export class DojoKanbanBoard extends HTMLElement {
         }
       }
     }
+    // Limpiar estado del filtro para la etiqueta eliminada (US-15)
+    this._selectedLabelIds.delete(deletedLabelId);
+    if (this._activeFilter.labelIds) {
+      const newLabelIds = this._activeFilter.labelIds.filter(id => id !== deletedLabelId);
+      if (newLabelIds.length !== this._activeFilter.labelIds.length) {
+        this._activeFilter = {
+          ...this._activeFilter,
+          labelIds: newLabelIds.length > 0 ? newLabelIds : undefined,
+        };
+      }
+    }
+    this._rebuildLabelFilterChips();
+    this._updateClearAllVisibility();
   }
 
   // ── Render inicial (estructura vacía con loading) ─────────────────────────
@@ -283,12 +307,81 @@ export class DojoKanbanBoard extends HTMLElement {
         cursor: pointer;
         font-family: inherit;
         text-decoration: underline;
+        white-space: nowrap;
       }
       .filter-clear:hover { color: var(--dojo-text-primary); }
+
+      /* ── Toggle de filtros (US-15) ── */
+      .filter-toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.625rem;
+        background: transparent;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.8125rem;
+        color: var(--dojo-text-secondary);
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.14s, color 0.14s, border-color 0.14s;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+      .filter-toggle-btn:hover {
+        background: var(--dojo-bg);
+        color: var(--dojo-text-primary);
+      }
+      .filter-toggle-btn.has-active {
+        color: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary, #1D4ED8);
+      }
+      .filter-toggle-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
+      /* ── Contenido colapsable ── */
+      .filter-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        flex: 1;
+      }
+      .filter-content.collapsed { display: none; }
+      /* ── Input de búsqueda ── */
+      .filter-search {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8125rem;
+        font-family: inherit;
+        color: var(--dojo-text-primary);
+        background: var(--dojo-bg);
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        min-width: 160px;
+        outline: none;
+        transition: border-color 0.14s;
+      }
+      .filter-search:focus { border-color: var(--dojo-primary, #1D4ED8); }
+      .filter-search::placeholder { color: var(--dojo-text-secondary); }
+      /* ── Separador vertical ── */
+      .filter-sep {
+        width: 1px;
+        height: 1rem;
+        background: var(--dojo-border);
+        flex-shrink: 0;
+      }
+      /* ── Grupo de chips de etiquetas ── */
+      .filter-chips-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.375rem;
+      }
     `;
     this._shadow.appendChild(style);
 
-    // Barra de filtros de prioridad (US-08)
+    // Toolbar de filtros (US-08, US-15)
     this._shadow.appendChild(this._buildFilterBar());
 
     // Área principal — empieza en estado loading
@@ -325,7 +418,7 @@ export class DojoKanbanBoard extends HTMLElement {
     this._shadow.addEventListener('dojo:label-created',        (e) => this._handleLabelCreated(e as CustomEvent));
   }
 
-  // ── Barra de filtros (US-08) ─────────────────────────────────────────────
+  // ── Toolbar de filtros (US-08, US-15) ───────────────────────────────────
 
   private _buildFilterBar(): HTMLElement {
     const FILTER_PRIORITIES: { value: Priority; icon: string; label: string }[] = [
@@ -335,24 +428,47 @@ export class DojoKanbanBoard extends HTMLElement {
       { value: 'urgent', icon: '🔥', label: 'Urgente' },
     ];
 
+    // ── Contenedor externo ────────────────────────────────────────────────
     const bar = document.createElement('div');
     bar.className = 'filter-bar';
-    bar.setAttribute('role', 'group');
-    bar.setAttribute('aria-label', 'Filtrar por prioridad');
+    bar.setAttribute('role', 'toolbar');
+    bar.setAttribute('aria-label', 'Filtros del tablero');
 
-    const lbl = document.createElement('span');
-    lbl.className = 'filter-label';
-    lbl.textContent = 'Prioridad:';
-    bar.appendChild(lbl);
+    // ── Botón toggle (siempre visible) ────────────────────────────────────
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'filter-toggle-btn';
+    toggleBtn.type = 'button';
+    toggleBtn.setAttribute('aria-expanded', 'true');
+    toggleBtn.textContent = 'Filtros';
+    this._filterToggleBtn = toggleBtn;
+    bar.appendChild(toggleBtn);
 
-    const selectedPriorities = new Set<Priority>();
+    // ── Contenido colapsable ──────────────────────────────────────────────
+    const content = document.createElement('div');
+    content.className = 'filter-content';
+    this._filterBarContent = content;
+    bar.appendChild(content);
 
-    const clearBtn = document.createElement('button');
-    clearBtn.className = 'filter-clear';
-    clearBtn.type = 'button';
-    clearBtn.textContent = '✕ Limpiar';
-    clearBtn.setAttribute('aria-label', 'Limpiar filtros de prioridad');
-    clearBtn.style.display = 'none';
+    // ── Input de búsqueda ─────────────────────────────────────────────────
+    const searchInput = document.createElement('input');
+    searchInput.type = 'search';
+    searchInput.className = 'filter-search';
+    searchInput.placeholder = 'Buscar...';
+    searchInput.setAttribute('aria-label', 'Buscar tareas por título o descripción');
+    this._filterSearchInput = searchInput;
+    content.appendChild(searchInput);
+
+    // ── Separador ─────────────────────────────────────────────────────────
+    const sep1 = document.createElement('div');
+    sep1.className = 'filter-sep';
+    sep1.setAttribute('aria-hidden', 'true');
+    content.appendChild(sep1);
+
+    // ── Chips de prioridad ────────────────────────────────────────────────
+    const priorityLabel = document.createElement('span');
+    priorityLabel.className = 'filter-label';
+    priorityLabel.textContent = 'Prioridad:';
+    content.appendChild(priorityLabel);
 
     for (const p of FILTER_PRIORITIES) {
       const btn = document.createElement('button');
@@ -362,37 +478,178 @@ export class DojoKanbanBoard extends HTMLElement {
       btn.setAttribute('data-priority', p.value);
       btn.textContent = `${p.icon} ${p.label}`;
       btn.addEventListener('click', () => {
-        const isActive = selectedPriorities.has(p.value);
+        const isActive = this._selectedPriorities.has(p.value);
         if (isActive) {
-          selectedPriorities.delete(p.value);
+          this._selectedPriorities.delete(p.value);
           btn.classList.remove('active');
           btn.setAttribute('aria-pressed', 'false');
         } else {
-          selectedPriorities.add(p.value);
+          this._selectedPriorities.add(p.value);
           btn.classList.add('active');
           btn.setAttribute('aria-pressed', 'true');
         }
-        clearBtn.style.display = selectedPriorities.size > 0 ? '' : 'none';
-        const newPriorities = selectedPriorities.size > 0
-          ? (Array.from(selectedPriorities) as Priority[])
+        const newPriorities = this._selectedPriorities.size > 0
+          ? (Array.from(this._selectedPriorities) as Priority[])
           : undefined;
         this.activeFilter = { ...this._activeFilter, priorities: newPriorities };
+        this._updateClearAllVisibility();
       });
-      bar.appendChild(btn);
+      content.appendChild(btn);
     }
 
-    clearBtn.addEventListener('click', () => {
-      selectedPriorities.clear();
-      bar.querySelectorAll<HTMLButtonElement>('.filter-chip').forEach(b => {
+    // ── Sección de etiquetas (se rellena tras cargar las etiquetas) ────────
+    const labelSection = document.createElement('div');
+    labelSection.style.display = 'none';
+    this._filterLabelSection = labelSection;
+
+    const sep2 = document.createElement('div');
+    sep2.className = 'filter-sep';
+    sep2.setAttribute('aria-hidden', 'true');
+    labelSection.appendChild(sep2);
+
+    const labelsLabelEl = document.createElement('span');
+    labelsLabelEl.className = 'filter-label';
+    labelsLabelEl.textContent = 'Etiquetas:';
+    labelSection.appendChild(labelsLabelEl);
+
+    const labelChipsContainer = document.createElement('div');
+    labelChipsContainer.className = 'filter-chips-group';
+    this._filterLabelChipsContainer = labelChipsContainer;
+    labelSection.appendChild(labelChipsContainer);
+
+    content.appendChild(labelSection);
+
+    // ── Botón "Limpiar filtros" ───────────────────────────────────────────
+    const clearAllBtn = document.createElement('button');
+    clearAllBtn.className = 'filter-clear';
+    clearAllBtn.type = 'button';
+    clearAllBtn.textContent = '✕ Limpiar filtros';
+    clearAllBtn.setAttribute('aria-label', 'Limpiar todos los filtros activos');
+    clearAllBtn.style.display = 'none';
+    this._filterClearAllBtn = clearAllBtn;
+    clearAllBtn.addEventListener('click', () => this._clearAllFilters());
+    content.appendChild(clearAllBtn);
+
+    // ── Comportamiento toggle ─────────────────────────────────────────────
+    toggleBtn.addEventListener('click', () => {
+      const isCollapsed = content.classList.contains('collapsed');
+      content.classList.toggle('collapsed');
+      toggleBtn.setAttribute('aria-expanded', String(isCollapsed));
+      this._updateClearAllVisibility();
+    });
+
+    // ── Búsqueda con debounce 300ms ───────────────────────────────────────
+    searchInput.addEventListener('input', () => {
+      if (this._filterDebounceTimer !== null) clearTimeout(this._filterDebounceTimer);
+      this._filterDebounceTimer = setTimeout(() => {
+        this._filterDebounceTimer = null;
+        const text = searchInput.value.trim();
+        this.activeFilter = { ...this._activeFilter, searchText: text || undefined };
+        this._updateClearAllVisibility();
+      }, 300);
+    });
+
+    return bar;
+  }
+
+  /** Reconstruye los chips de etiquetas del toolbar. Se llama tras cargar/cambiar etiquetas. */
+  private _rebuildLabelFilterChips(): void {
+    if (!this._filterLabelSection || !this._filterLabelChipsContainer) return;
+
+    // Limpiar IDs seleccionados de etiquetas que ya no existen
+    const existingIds = new Set(this._labels.map(l => l.id));
+    for (const id of [...this._selectedLabelIds]) {
+      if (!existingIds.has(id)) this._selectedLabelIds.delete(id);
+    }
+    // Sincronizar activeFilter.labelIds con etiquetas que siguen existiendo
+    if (this._activeFilter.labelIds) {
+      const cleaned = this._activeFilter.labelIds.filter(id => existingIds.has(id));
+      if (cleaned.length !== this._activeFilter.labelIds.length) {
+        this._activeFilter = {
+          ...this._activeFilter,
+          labelIds: cleaned.length > 0 ? cleaned : undefined,
+        };
+      }
+    }
+
+    this._filterLabelChipsContainer.innerHTML = '';
+
+    if (this._labels.length === 0) {
+      this._filterLabelSection.style.display = 'none';
+      this._updateClearAllVisibility();
+      return;
+    }
+
+    this._filterLabelSection.style.display = 'contents';
+
+    for (const lbl of this._labels) {
+      const btn = document.createElement('button');
+      btn.className = 'filter-chip';
+      btn.type = 'button';
+      btn.setAttribute('data-label-id', lbl.id);
+      const isActive = this._selectedLabelIds.has(lbl.id);
+      btn.setAttribute('aria-pressed', String(isActive));
+      btn.textContent = lbl.name;
+      if (isActive) btn.classList.add('active');
+
+      btn.addEventListener('click', () => {
+        const active = this._selectedLabelIds.has(lbl.id);
+        if (active) {
+          this._selectedLabelIds.delete(lbl.id);
+          btn.classList.remove('active');
+          btn.setAttribute('aria-pressed', 'false');
+        } else {
+          this._selectedLabelIds.add(lbl.id);
+          btn.classList.add('active');
+          btn.setAttribute('aria-pressed', 'true');
+        }
+        const newLabelIds = this._selectedLabelIds.size > 0
+          ? Array.from(this._selectedLabelIds)
+          : undefined;
+        this.activeFilter = { ...this._activeFilter, labelIds: newLabelIds };
+        this._updateClearAllVisibility();
+      });
+
+      this._filterLabelChipsContainer.appendChild(btn);
+    }
+
+    this._updateClearAllVisibility();
+  }
+
+  /** Muestra/oculta el botón "Limpiar filtros" y actualiza el estado visual del toggle. */
+  private _updateClearAllVisibility(): void {
+    if (!this._filterClearAllBtn || !this._filterToggleBtn) return;
+    const hasActive =
+      (this._activeFilter.priorities?.length ?? 0) > 0 ||
+      (this._activeFilter.labelIds?.length ?? 0) > 0 ||
+      !!(this._activeFilter.searchText);
+    this._filterClearAllBtn.style.display = hasActive ? '' : 'none';
+    this._filterToggleBtn.classList.toggle('has-active', hasActive);
+  }
+
+  /** Resetea todos los filtros activos y actualiza la UI del toolbar. */
+  private _clearAllFilters(): void {
+    this._selectedPriorities.clear();
+    this._selectedLabelIds.clear();
+
+    if (this._filterDebounceTimer !== null) {
+      clearTimeout(this._filterDebounceTimer);
+      this._filterDebounceTimer = null;
+    }
+    if (this._filterSearchInput) this._filterSearchInput.value = '';
+    if (this._filterBarContent) {
+      this._filterBarContent.querySelectorAll<HTMLButtonElement>('[data-priority]').forEach(b => {
         b.classList.remove('active');
         b.setAttribute('aria-pressed', 'false');
       });
-      clearBtn.style.display = 'none';
-      this.activeFilter = { ...this._activeFilter, priorities: undefined };
-    });
-    bar.appendChild(clearBtn);
+      this._filterBarContent.querySelectorAll<HTMLButtonElement>('[data-label-id]').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
+    }
 
-    return bar;
+    this.activeFilter = {};
+    this._updateClearAllVisibility();
   }
 
   // ── Estados visuales ─────────────────────────────────────────────────────
@@ -471,6 +728,7 @@ export class DojoKanbanBoard extends HTMLElement {
         getAllLabels(),
       ]);
       this._labels = labels;
+      this._rebuildLabelFilterChips(); // Poblar chips de etiquetas en el toolbar (US-15)
 
       // Cargar tareas de todas las columnas en paralelo
       const taskResults = await Promise.all(
@@ -582,17 +840,24 @@ export class DojoKanbanBoard extends HTMLElement {
       this._labels = [...this._labels, label].sort((a, b) =>
         a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
       );
+      this._rebuildLabelFilterChips();
     }
   }
 
   private _filterTasks(tasks: Task[]): Task[] {
-    const { priorities, labelIds } = this._activeFilter;
+    const { priorities, labelIds, searchText } = this._activeFilter;
+    const lowerSearch = searchText ? searchText.toLowerCase() : null;
     return tasks.filter(task => {
       if (priorities && priorities.length > 0 && !priorities.includes(task.priority)) return false;
       if (labelIds && labelIds.length > 0) {
         const taskLabelIds = task.labelIds ?? [];
         const hasLabel = labelIds.some(id => taskLabelIds.includes(id));
         if (!hasLabel) return false;
+      }
+      if (lowerSearch) {
+        const titleMatch = task.title.toLowerCase().includes(lowerSearch);
+        const descMatch  = (task.description ?? '').toLowerCase().includes(lowerSearch);
+        if (!titleMatch && !descMatch) return false;
       }
       return true;
     });
