@@ -75,3 +75,15 @@ export interface Label {
    */
   color: string;
 }
+
+/** Etiquetas por defecto que se insertan al inicializar la base de datos. */
+export const DEFAULT_LABELS: Omit<Label, 'id'>[] = [
+  { name: 'Bug',             color: '#B91C1C' },
+  { name: 'Feature',         color: '#1D4ED8' },
+  { name: 'Mejora',          color: '#15803D' },
+  { name: 'Documentación',   color: '#6D28D9' },
+  { name: 'Diseño',          color: '#BE185D' },
+  { name: 'Investigación',   color: '#B45309' },
+  { name: 'Testing',         color: '#0E7490' },
+  { name: 'Infraestructura', color: '#374151' },
+];

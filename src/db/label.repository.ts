@@ -8,6 +8,7 @@
 
 import { idbRequest, idbTransaction, getStore, openDatabase } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
+import { DEFAULT_LABELS } from '../types/models.js';
 import type { Label, Task } from '../types/models.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
@@ -113,5 +114,20 @@ export async function deleteLabel(id: string): Promise<void> {
     }
   }
 
+  await idbTransaction(tx);
+}
+
+/**
+ * Inserta las etiquetas por defecto si el Object Store está vacío.
+ * Se llama una sola vez durante la inicialización de la aplicación.
+ */
+export async function seedDefaultLabels(): Promise<void> {
+  const existing = await getAllLabels();
+  if (existing.length > 0) return;
+
+  const { store, tx } = await getStore('labels', 'readwrite');
+  for (const lbl of DEFAULT_LABELS) {
+    store.add({ ...lbl, id: generateUUID() });
+  }
   await idbTransaction(tx);
 }
