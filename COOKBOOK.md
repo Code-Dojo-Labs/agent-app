@@ -29,6 +29,9 @@
    - [Paso 15 — Implementación de Eliminar Etiqueta (US-12 / Issue #13)](#paso-15--implementación-de-eliminar-etiqueta-us-12--issue-13)
    - [Paso 16 — Implementación de Colores WCAG y Validación de Contraste (US-13 / Issue #14)](#paso-16--implementación-de-colores-wcag-y-validación-de-contraste-us-13--issue-14)
    - [Paso 17 — Persistencia de datos con IndexedDB (US-14 / Issue #15)](#paso-17--persistencia-de-datos-con-indexeddb-us-14--issue-15)
+   - [Paso 18 — Búsqueda y filtrado de tareas (US-15 / Issue #16)](#paso-18--búsqueda-y-filtrado-de-tareas-us-15--issue-16)
+   - [Paso 19 — Tarjeta de tarea en el tablero (US-16 / Issue #17)](#paso-19--tarjeta-de-tarea-en-el-tablero-us-16--issue-17)
+   - [Paso 20 — Modo oscuro automático (US-18 / Issue #36)](#paso-20--modo-oscuro-automático-us-18--issue-36)
 
 ---
 
@@ -1819,3 +1822,114 @@ return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${hh}:${mm}`;
 **Consecuencias:**
 - Una regla CSS gestiona la visibilidad de todas las acciones actuales y futuras.
 - El evento `dojo:task-delete-request` sigue siendo idéntico (sin breaking changes en la API pública).
+
+---
+
+### Paso 20 — Modo oscuro automático (US-18 / Issue #36)
+
+**Issue:** #36 — US-18: Modo oscuro automático  
+**Rama:** `feat/36-modo-oscuro-automatico`  
+**PR:** #52  
+**Prioridad:** Alta
+
+#### Problema
+
+Los usuarios necesitan que la aplicación se adapte al modo oscuro del sistema operativo y puedan sobreescribir la preferencia manualmente (Claro / Oscuro / Sistema), con persistencia entre sesiones.
+
+#### Solución implementada
+
+Se adoptó una estrategia en la que **JavaScript controla el atributo `data-theme` de `<html>`**, eliminando la dependencia en `@media (prefers-color-scheme: dark)` dentro del CSS (se usaba previamente de forma duplicada).
+
+##### Arquitectura
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                  FLUJO DEL TEMA                              │
+│                                                              │
+│  1. Anti-FOUC script (inline en <head>)                      │
+│     └→ Lee localStorage("theme-preference")                  │
+│     └→ Establece data-theme="light"|"dark" en <html>        │
+│                                                              │
+│  2. main.ts → initTheme()                                    │
+│     └→ Confirma data-theme                                   │
+│     └→ Si pref="system", registra matchMedia listener        │
+│                                                              │
+│  3. <dojo-theme-toggle> (header)                             │
+│     └→ Muestra opciones: ☀️ Claro / 🌙 Oscuro / 💻 Sistema  │
+│     └→ Al seleccionar: setThemePreference(pref)              │
+│         └→ Persiste en localStorage                          │
+│         └→ Aplica data-theme                                 │
+│         └→ Gestiona listeners de matchMedia                  │
+│                                                              │
+│  CSS [data-theme="dark"] { ... }  ← tokens oscuros          │
+│  :root { ... }                    ← tokens claros (default) │
+└──────────────────────────────────────────────────────────────┘
+```
+
+##### Archivos creados o modificados
+
+| Archivo | Tipo | Descripción |
+|---------|------|-------------|
+| `src/utils/theme.ts` | Nuevo | Utilidad de gestión: `getThemePreference()`, `setThemePreference()`, `resolveEffectiveTheme()`, `initTheme()`. Escucha cambios dinámicos de `matchMedia` cuando el modo es "Sistema". |
+| `src/components/atoms/dojo-theme-toggle/dojo-theme-toggle.ts` | Nuevo | Web Component átomo: control segmentado con tres botones. Usa `aria-pressed` para accesibilidad. Emite `dojo:theme-changed`. |
+| `public/index.html` | Modificado | Eliminado `data-theme="light"` hardcoded. Reemplazados `@media` duplicados por `[data-theme="dark"]` unificado. Añadido script anti-FOUC inline. Añadidos tokens de sombra oscuros. |
+| `src/main.ts` | Modificado | Importa e invoca `initTheme()` como paso 1 del bootstrap. |
+| `src/components/organisms/dojo-app/dojo-app.ts` | Modificado | Importa `dojo-theme-toggle` y lo monta en el header. |
+
+##### Decisión clave: Eliminar `@media (prefers-color-scheme: dark)` del CSS
+
+La implementación anterior duplicaba cada token en dos selectores:
+
+```css
+/* ANTES — redundante y con problemas de especificidad al forzar "light" */
+@media (prefers-color-scheme: dark) { :root { --dojo-bg: #0F172A; } }
+[data-theme="dark"]                 {        --dojo-bg: #0F172A; }
+```
+
+Al usuario seleccionar "Claro" con el SO en modo oscuro, la media query seguía activa y sus tokens tenían la misma especificidad que `:root`, lo que causaba conflictos. La solución: dejar que JavaScript sea la única fuente de verdad para `data-theme`.
+
+```css
+/* DESPUÉS — una sola fuente de verdad */
+:root            { --dojo-bg: #F1F5F9; }  /* light (default) */
+[data-theme="dark"] { --dojo-bg: #0F172A; }  /* dark */
+```
+
+##### Script anti-FOUC
+
+Para evitar el destello de tema incorrecto antes de que carguen los módulos ES, se incluyó un script `<script>` síncrono en `<head>` que lee `localStorage` y aplica `data-theme` inmediatamente:
+
+```javascript
+(function() {
+  var pref = localStorage.getItem('theme-preference');
+  if (!pref || ['light','dark','system'].indexOf(pref) === -1) pref = 'system';
+  var theme = pref;
+  if (pref === 'system') {
+    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+```
+
+#### Criterios US-18 cubiertos
+
+| Scenario Gherkin | Estado |
+|---|---|
+| Detección automática de preferencia del sistema | ✅ `resolveEffectiveTheme('system')` usa `matchMedia` |
+| Detección automática de modo claro del sistema | ✅ Default `:root` light + sistema light = `data-theme="light"` |
+| Sobreescribir la preferencia a modo oscuro | ✅ `setThemePreference('dark')` → `data-theme="dark"` |
+| Sobreescribir la preferencia a modo claro | ✅ `setThemePreference('light')` → `data-theme="light"` |
+| Restablecer a preferencia del sistema | ✅ `setThemePreference('system')` + listener `matchMedia` |
+| Persistencia de la preferencia entre sesiones | ✅ `localStorage.setItem('theme-preference', ...)` |
+| Cambio dinámico de preferencia del sistema | ✅ `_addMediaListener()` con `matchMedia.addEventListener('change')` |
+
+#### ADR-25 — JS como única fuente de verdad para el tema
+
+**Contexto:** El CSS original usaba `@media (prefers-color-scheme: dark)` junto con `[data-theme="dark"]`, duplicando tokens. Esto causaba conflictos de especificidad al forzar modo claro desde JS cuando el SO estaba en modo oscuro.
+
+**Decisión:** Eliminar todas las media queries de tema del CSS. JavaScript detecta la preferencia del SO vía `window.matchMedia()` y establece `data-theme` en el elemento `<html>`. Un script inline en `<head>` previene el FOUC.
+
+**Consecuencias:**
+- Una sola fuente de verdad: el atributo `data-theme`.
+- Sin conflictos de especificidad CSS.
+- Funcionalidad de override manual sin necesidad de `[data-theme="light"]` adicional.
+- Requiere JavaScript habilitado (aceptable para esta SPA).
