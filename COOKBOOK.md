@@ -28,6 +28,7 @@
    - [Paso 14 — Implementación de Editar Etiqueta (US-11 / Issue #12)](#paso-14--implementación-de-editar-etiqueta-us-11--issue-12)
    - [Paso 15 — Implementación de Eliminar Etiqueta (US-12 / Issue #13)](#paso-15--implementación-de-eliminar-etiqueta-us-12--issue-13)
    - [Paso 16 — Implementación de Colores WCAG y Validación de Contraste (US-13 / Issue #14)](#paso-16--implementación-de-colores-wcag-y-validación-de-contraste-us-13--issue-14)
+   - [Paso 17 — Persistencia de datos con IndexedDB (US-14 / Issue #15)](#paso-17--persistencia-de-datos-con-indexeddb-us-14--issue-15)
 
 ---
 
@@ -1324,6 +1325,7 @@ Usuario hace clic en "Gestionar etiquetas" (header)
 
 ---
 
+<<<<<<< HEAD
 ### Paso 15 — Implementación de Eliminar Etiqueta (US-12 / Issue #13)
 
 **Pull Request:** [#30 — [US-12] Eliminar etiqueta con limpieza atómica en IndexedDB](https://github.com/Code-Dojo-Labs/agent-app/pull/30)  
@@ -1533,3 +1535,87 @@ meetsWcagAA('#FFFFFF', color)?
 | 3. Color personalizado con contraste insuficiente → advertencia + sugerencia | ✅ |
 | 4. Texto siempre blanco en chips | ✅ `#FFFFFF` fijo en `dojo-task-card` |
 | 5. Sin dependencias externas de gestión de colores | ✅ Solo `contrast.ts` nativo |
+
+---
+
+### Paso 17 — Persistencia de datos con IndexedDB (US-14 / Issue #15)
+
+#### Objetivo
+
+Cumplir todos los criterios de aceptación de US-14: datos almacenados automáticamente en IndexedDB, inicialización con 6 columnas por defecto, capa de acceso a datos desacoplada y manejo explícito de la indisponibilidad de IndexedDB (modo privado restringido).
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `src/db/database.ts` | Verificación explícita de disponibilidad de `indexedDB` antes de intentar abrirla |
+| `src/main.ts` | Mensaje de error mejorado: propaga el mensaje específico de `database.ts` cuando IndexedDB no está disponible |
+
+#### Archivos ya correctos en `init` (sin cambios)
+
+| Archivo | Cumplimiento |
+|---|---|
+| `src/db/database.ts` | DB_NAME=`kanban-app-db`, DB_VERSION=1, 3 stores, índices `by-status`/`by-priority` ✅ |
+| `src/db/column.repository.ts` | `seedDefaultColumns()` inserta 6 columnas si el store está vacío ✅ |
+| `src/types/models.ts` | `DEFAULT_COLUMNS` con las 6 columnas exactas del criterio ✅ |
+| `src/main.ts` | Llama `openDatabase()` → `seedDefaultColumns()` en el bootstrap ✅ |
+| `src/db/*.repository.ts` | Capa CRUD desacoplada de la UI ✅ |
+
+#### Detalle de la implementación
+
+**`src/db/database.ts` — verificación de disponibilidad:**
+
+```typescript
+if (!('indexedDB' in globalThis) || !globalThis.indexedDB) {
+  return Promise.reject(
+    new Error('IndexedDB no está disponible en este contexto. Por favor, sal del modo privado o usa otro navegador.')
+  );
+}
+```
+
+Esto permite que el `catch` del bootstrap en `main.ts` reciba un error con mensaje descriptivo en lugar de un `TypeError` genérico de acceso a `undefined`.
+
+**`src/main.ts` — propagación del mensaje:**
+
+```typescript
+msg.textContent = error instanceof Error && error.message.includes('IndexedDB')
+  ? error.message
+  : 'No se pudo conectar al almacenamiento local. Comprueba que no estás en modo privado o usa otro navegador.';
+```
+
+El mensaje específico de IndexedDB se muestra directamente; cualquier otro error de bootstrap usa el mensaje genérico.
+
+#### Criterios US-14 cubiertos
+
+| Scenario Gherkin | Estado |
+|---|---|
+| 1. Datos almacenados automáticamente al operar | ✅ Todas las operaciones CRUD persisten en IndexedDB via repositorios |
+| 2. Inicialización con 6 columnas por defecto | ✅ `seedDefaultColumns()` en `column.repository.ts`, llamada desde `main.ts` |
+| 3. Capa de acceso a datos desacoplada | ✅ `src/db/` con repositorios independientes; UI no accede a IndexedDB directamente |
+| 4. IndexedDB no disponible (modo privado) | ✅ Check explícito + mensaje con recomendación de salir del modo privado o usar otro navegador |
+| 5. Nombre y versión correctos | ✅ `kanban-app-db`, versión 1, 3 stores: tasks/columns/labels |
+| 6. Índices de consulta correctos | ✅ `by-status` sobre `statusId`, `by-priority` sobre `priority` |
+
+---
+
+#### ADR-19 — Verificación de disponibilidad de IndexedDB en `openDatabase()`
+
+**Contexto:** En algunos entornos restringidos (Safari en modo privado, Firefox con `dom.indexedDB.enabled=false`), `globalThis.indexedDB` es `null` o `undefined`. Llamar `.open()` directamente lanzaría un `TypeError` genérico poco informativo.
+
+**Decisión:** Añadir un guard explícito en `openDatabase()` que rechaza la promesa con un mensaje accionable antes de intentar la apertura.
+
+**Consecuencias:**
+- El `catch` del bootstrap puede propagar el mensaje específico al usuario sin lógica adicional de detección.
+- El código de error queda únicamente en la capa de datos (`database.ts`), respetando SRP.
+- No supone overhead en el path feliz (la condición se evalúa solo si IndexedDB no está disponible).
+
+#### ADR-20 — Propagación selectiva del mensaje de error en `main.ts`
+
+**Contexto:** El bootstrap captura cualquier error de inicialización. Antes, siempre mostraba un mensaje fijo que no distinguía si el error era de IndexedDB o de otro tipo.
+
+**Decisión:** Usar `error.message.includes('IndexedDB')` como heurística de discriminación. Si el error viene del guard de `database.ts`, el mensaje ya es descriptivo y se muestra directamente. Cualquier otro error usa el mensaje genérico de fallback.
+
+**Consecuencias:**
+- Cumple la aceptación de US-14: el usuario ve explícitamente "sal del modo privado o usa otro navegador".
+- La heurística de string es frágil respecto a renombrados, pero aceptable en una app sin internacionalización y con un único punto de lanzamiento del error.
+- Alternativa descartada: código de error tipado (`class IndexedDBUnavailableError extends Error`). Correcta en una base de código grande; excesiva aquí dado que solo hay un único arrojador del error.
