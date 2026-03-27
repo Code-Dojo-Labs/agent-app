@@ -1447,20 +1447,36 @@ export class DojoTaskDetail extends HTMLElement {
     input.className = 'field-select';
     input.type      = 'date';
     input.setAttribute('aria-label', 'Fecha de vencimiento');
-    // Convertir ISO a formato YYYY-MM-DD para el input
+    // Convertir ISO a formato YYYY-MM-DD para el input usando hora local
     if (task.dueDate) {
       try {
         const d = new Date(task.dueDate);
         if (!isNaN(d.getTime())) {
-          input.value = d.toISOString().slice(0, 10);
+          const year  = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day   = String(d.getDate()).padStart(2, '0');
+          input.value = `${year}-${month}-${day}`;
         }
       } catch { /* ignorar fecha inválida */ }
     }
 
     input.addEventListener('change', () => {
-      const isoValue = input.value
-        ? new Date(input.value + 'T23:59:59').toISOString()
-        : null;
+      let isoValue: string | null = null;
+      if (input.value) {
+        const parts = input.value.split('-');
+        if (parts.length === 3) {
+          const [yearStr, monthStr, dayStr] = parts;
+          const year  = Number(yearStr);
+          const month = Number(monthStr);
+          const day   = Number(dayStr);
+          if (!Number.isNaN(year) && !Number.isNaN(month) && !Number.isNaN(day)) {
+            const d = new Date(year, month - 1, day, 23, 59, 59, 999);
+            if (!isNaN(d.getTime())) {
+              isoValue = d.toISOString();
+            }
+          }
+        }
+      }
       this._save({ dueDate: isoValue });
     });
 

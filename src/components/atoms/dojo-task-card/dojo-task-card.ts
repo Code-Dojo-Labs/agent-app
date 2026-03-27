@@ -454,7 +454,10 @@ export class DojoTaskCard extends HTMLElement {
                       : dueStatus === 'due-soon' ? 'due-soon'
                       : 'due-normal';
       dueEl.className = `due-date-label ${statusCls}`;
-      dueEl.setAttribute('aria-label', `Vence ${dueRelative}`);
+      const ariaLabel = dueStatus === 'overdue'
+        ? `Venció ${dueRelative}`
+        : `Vence ${dueRelative}`;
+      dueEl.setAttribute('aria-label', ariaLabel);
       dueEl.textContent = `📅 ${dueRelative}`;
       footer.appendChild(dueEl);
     }

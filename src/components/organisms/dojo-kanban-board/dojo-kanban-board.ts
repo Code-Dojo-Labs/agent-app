@@ -42,10 +42,13 @@ import '../../organisms/dojo-delete-confirm-dialog/dojo-delete-confirm-dialog.js
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
 
+type SortMode = 'order' | 'due-date';
+
 interface ActiveFilter {
   priorities?: Priority[];
   labelIds?: string[];
   searchText?: string;
+  sortBy?: SortMode;
 }
 
 /** Contrato de la propiedad taskLabels expuesta por dojo-task-card (US-10). */
@@ -458,6 +461,30 @@ export class DojoKanbanBoard extends HTMLElement {
     this._filterSearchInput = searchInput;
     content.appendChild(searchInput);
 
+    // ── Selector de ordenamiento (US-17) ──────────────────────────────────
+    const sortLabel = document.createElement('label');
+    sortLabel.className = 'filter-label';
+    sortLabel.textContent = 'Orden:';
+    sortLabel.setAttribute('for', 'sort-select');
+    content.appendChild(sortLabel);
+
+    const sortSelect = document.createElement('select');
+    sortSelect.id = 'sort-select';
+    sortSelect.className = 'filter-search';
+    sortSelect.setAttribute('aria-label', 'Ordenar tareas');
+    const optOrder = document.createElement('option');
+    optOrder.value = 'order';
+    optOrder.textContent = 'Manual';
+    const optDue = document.createElement('option');
+    optDue.value = 'due-date';
+    optDue.textContent = 'Fecha de vencimiento';
+    sortSelect.appendChild(optOrder);
+    sortSelect.appendChild(optDue);
+    sortSelect.addEventListener('change', () => {
+      this.activeFilter = { ...this._activeFilter, sortBy: sortSelect.value as SortMode };
+    });
+    content.appendChild(sortSelect);
+
     // ── Separador ─────────────────────────────────────────────────────────
     const sep1 = document.createElement('div');
     sep1.className = 'filter-sep';
@@ -792,7 +819,15 @@ export class DojoKanbanBoard extends HTMLElement {
    * Las tarjetas se proyectan en el default slot del componente.
    */
   private _renderTaskCards(colEl: Element, tasks: Task[]): void {
-    const sorted   = [...tasks].sort((a, b) => a.order - b.order);
+    const sortMode = this._activeFilter.sortBy ?? 'order';
+    const sorted = [...tasks].sort((a, b) => {
+      if (sortMode === 'due-date') {
+        const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        if (aDate !== bDate) return aDate - bDate;
+      }
+      return a.order - b.order;
+    });
     const filtered = this._filterTasks(sorted);
     for (const task of filtered) {
       const card = document.createElement('dojo-task-card');
