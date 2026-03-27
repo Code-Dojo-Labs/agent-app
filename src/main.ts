@@ -4,8 +4,9 @@
  * Responsabilidades:
  *   1. Inicializar la base de datos IndexedDB.
  *   2. Insertar columnas por defecto si es la primera ejecución.
- *   3. Registrar todos los Web Components (Custom Elements).
- *   4. Montar el componente raíz <dojo-app> en el DOM.
+ *   3. Insertar etiquetas por defecto si es la primera ejecución.
+ *   4. Registrar todos los Web Components (Custom Elements).
+ *   5. Montar el componente raíz <dojo-app> en el DOM.
  *
  * Este archivo es el único módulo referenciado desde public/index.html:
  *   <script type="module" src="./main.js"></script>
@@ -13,6 +14,7 @@
 
 import { openDatabase } from './db/database.js';
 import { seedDefaultColumns } from './db/column.repository.js';
+import { seedDefaultLabels } from './db/label.repository.js';
 
 // ── Inicialización ─────────────────────────────────────────────────────────
 
@@ -24,10 +26,13 @@ async function bootstrap(): Promise<void> {
     // 2. Seed de columnas por defecto (solo si el store está vacío)
     await seedDefaultColumns();
 
-    // 3. Registrar Web Components — US-01 Visualización del tablero Kanban
+    // 3. Seed de etiquetas por defecto (solo si el store está vacío)
+    await seedDefaultLabels();
+
+    // 4. Registrar Web Components — US-01 Visualización del tablero Kanban
     await import('./components/organisms/dojo-app/dojo-app.js');
 
-    // 4. Montar la app (el elemento <dojo-app> ya está en el HTML)
+    // 5. Montar la app (el elemento <dojo-app> ya está en el HTML)
     console.info('[Dojo Kanban] App inicializada correctamente.');
   } catch (error) {
     console.error('[Dojo Kanban] Error durante la inicialización:', error);
