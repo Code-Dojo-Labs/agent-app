@@ -731,6 +731,7 @@ export class DojoTaskDetail extends HTMLElement {
 
     body.appendChild(this._buildTitleField(task));
     body.appendChild(this._buildStatusPriorityRow(task));
+    body.appendChild(this._buildDueDateField(task));
     body.appendChild(this._buildDescriptionField(task));
     body.appendChild(this._buildLabelsField(task));
     body.appendChild(this._buildMetadata(task));
@@ -1423,6 +1424,77 @@ export class DojoTaskDetail extends HTMLElement {
     section.appendChild(sectionLbl);
     section.appendChild(chips);
     section.appendChild(picker);
+    return section;
+  }
+
+  /** Campo de fecha de vencimiento con auto-save (US-17). */
+  private _buildDueDateField(task: Task): HTMLElement {
+    const section = document.createElement('div');
+    section.className = 'section';
+
+    const lbl = document.createElement('label');
+    lbl.className = 'section-lbl';
+    lbl.setAttribute('for', 'detail-due-date');
+    lbl.textContent = 'Fecha de vencimiento';
+
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    row.style.gap = '0.5rem';
+
+    const input = document.createElement('input');
+    input.id        = 'detail-due-date';
+    input.className = 'field-select';
+    input.type      = 'date';
+    input.setAttribute('aria-label', 'Fecha de vencimiento');
+    // Convertir ISO a formato YYYY-MM-DD para el input usando hora local
+    if (task.dueDate) {
+      try {
+        const d = new Date(task.dueDate);
+        if (!isNaN(d.getTime())) {
+          const year  = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day   = String(d.getDate()).padStart(2, '0');
+          input.value = `${year}-${month}-${day}`;
+        }
+      } catch { /* ignorar fecha inválida */ }
+    }
+
+    input.addEventListener('change', () => {
+      let isoValue: string | null = null;
+      if (input.value) {
+        const parts = input.value.split('-');
+        if (parts.length === 3) {
+          const [yearStr, monthStr, dayStr] = parts;
+          const year  = Number(yearStr);
+          const month = Number(monthStr);
+          const day   = Number(dayStr);
+          if (!Number.isNaN(year) && !Number.isNaN(month) && !Number.isNaN(day)) {
+            const d = new Date(year, month - 1, day, 23, 59, 59, 999);
+            if (!isNaN(d.getTime())) {
+              isoValue = d.toISOString();
+            }
+          }
+        }
+      }
+      this._save({ dueDate: isoValue });
+    });
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'close-btn';
+    clearBtn.setAttribute('aria-label', 'Eliminar fecha de vencimiento');
+    clearBtn.textContent = '✕';
+    clearBtn.style.flexShrink = '0';
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+      this._save({ dueDate: null });
+    });
+
+    row.appendChild(input);
+    row.appendChild(clearBtn);
+    section.appendChild(lbl);
+    section.appendChild(row);
     return section;
   }
 

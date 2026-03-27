@@ -42,10 +42,13 @@ import '../../organisms/dojo-delete-confirm-dialog/dojo-delete-confirm-dialog.js
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
 
+type SortMode = 'order' | 'due-date';
+
 interface ActiveFilter {
   priorities?: Priority[];
   labelIds?: string[];
   searchText?: string;
+  sortBy?: SortMode;
 }
 
 /** Contrato de la propiedad taskLabels expuesta por dojo-task-card (US-10). */
@@ -458,6 +461,30 @@ export class DojoKanbanBoard extends HTMLElement {
     this._filterSearchInput = searchInput;
     content.appendChild(searchInput);
 
+    // ── Selector de ordenamiento (US-17) ──────────────────────────────────
+    const sortLabel = document.createElement('label');
+    sortLabel.className = 'filter-label';
+    sortLabel.textContent = 'Orden:';
+    sortLabel.setAttribute('for', 'sort-select');
+    content.appendChild(sortLabel);
+
+    const sortSelect = document.createElement('select');
+    sortSelect.id = 'sort-select';
+    sortSelect.className = 'filter-search';
+    sortSelect.setAttribute('aria-label', 'Ordenar tareas');
+    const optOrder = document.createElement('option');
+    optOrder.value = 'order';
+    optOrder.textContent = 'Manual';
+    const optDue = document.createElement('option');
+    optDue.value = 'due-date';
+    optDue.textContent = 'Fecha de vencimiento';
+    sortSelect.appendChild(optOrder);
+    sortSelect.appendChild(optDue);
+    sortSelect.addEventListener('change', () => {
+      this.activeFilter = { ...this._activeFilter, sortBy: sortSelect.value as SortMode };
+    });
+    content.appendChild(sortSelect);
+
     // ── Separador ─────────────────────────────────────────────────────────
     const sep1 = document.createElement('div');
     sep1.className = 'filter-sep';
@@ -792,7 +819,15 @@ export class DojoKanbanBoard extends HTMLElement {
    * Las tarjetas se proyectan en el default slot del componente.
    */
   private _renderTaskCards(colEl: Element, tasks: Task[]): void {
-    const sorted   = [...tasks].sort((a, b) => a.order - b.order);
+    const sortMode = this._activeFilter.sortBy ?? 'order';
+    const sorted = [...tasks].sort((a, b) => {
+      if (sortMode === 'due-date') {
+        const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        if (aDate !== bDate) return aDate - bDate;
+      }
+      return a.order - b.order;
+    });
     const filtered = this._filterTasks(sorted);
     for (const task of filtered) {
       const card = document.createElement('dojo-task-card');
@@ -800,6 +835,7 @@ export class DojoKanbanBoard extends HTMLElement {
       card.setAttribute('task-title',      task.title);
       card.setAttribute('task-priority',   task.priority);
       card.setAttribute('task-created-at', task.createdAt);
+      if (task.dueDate) card.setAttribute('task-due-date', task.dueDate);
       (card as TaskCardElement).taskLabels = this._getTaskLabels(task);
       colEl.appendChild(card);
     }
@@ -1116,11 +1152,12 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private async _handleCreateTask(e: CustomEvent): Promise<void> {
-    const { statusId, title, description, priority } = e.detail as {
+    const { statusId, title, description, priority, dueDate } = e.detail as {
       statusId:    string;
       title:       string;
       description: string;
       priority:    string;
+      dueDate?:    string | null;
     };
     // Validar que la columna exista (puede haberse eliminado mientras el diálogo estaba abierto)
     if (!this._columns.some(c => c.id === statusId)) {
@@ -1136,6 +1173,7 @@ export class DojoKanbanBoard extends HTMLElement {
         priority:  priority as Task['priority'],
         labelIds:  [],
         order:     tasks.length,
+        dueDate:   dueDate ?? null,
       });
       this._tasksByColumn.set(statusId, [...tasks, newTask]);
       this._refreshColumnCards(statusId);
@@ -1212,7 +1250,7 @@ export class DojoKanbanBoard extends HTMLElement {
         } else if (changes.labelIds !== undefined && this._activeFilter.labelIds?.length) {
           // Etiquetas cambiaron y hay filtro activo — puede que la tarjeta deba desaparecer
           this._refreshColumnCards(sourceColumnId);
-        } else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined) {
+        } else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined || changes.dueDate !== undefined) {
           const colEl = this._shadow.querySelector(
             `dojo-kanban-column[column-id="${CSS.escape(sourceColumnId)}"]`
           );
@@ -1222,6 +1260,13 @@ export class DojoKanbanBoard extends HTMLElement {
               if (changes.title    !== undefined) cardEl.setAttribute('task-title',    updated.title);
               if (changes.priority !== undefined) cardEl.setAttribute('task-priority', updated.priority);
               if (changes.labelIds !== undefined) (cardEl as TaskCardElement).taskLabels = this._getTaskLabels(updated);
+              if (changes.dueDate !== undefined) {
+                if (updated.dueDate) {
+                  cardEl.setAttribute('task-due-date', updated.dueDate);
+                } else {
+                  cardEl.removeAttribute('task-due-date');
+                }
+              }
             }
           }
         }
