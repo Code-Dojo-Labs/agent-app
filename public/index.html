@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" data-theme="light">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -45,29 +45,38 @@
       }
 
       /* ── Tokens globales — modo oscuro ────────────────────────────── */
-      /* Los valores se definen en un único lugar por token para facilitar futuros cambios.
-         @media cubre el modo automático del SO; [data-theme] permite override manual. */
-      @media (prefers-color-scheme: dark) { :root { --dojo-bg: #0F172A; } }
-      [data-theme="dark"]                 {        --dojo-bg: #0F172A; }
-
-      @media (prefers-color-scheme: dark) { :root { --dojo-surface: #1E293B; } }
-      [data-theme="dark"]                 {        --dojo-surface: #1E293B; }
-
-      @media (prefers-color-scheme: dark) { :root { --dojo-surface-hover: #273349; } }
-      [data-theme="dark"]                 {        --dojo-surface-hover: #273349; }
-
-      @media (prefers-color-scheme: dark) { :root { --dojo-border: #334155; } }
-      [data-theme="dark"]                 {        --dojo-border: #334155; }
-
-      @media (prefers-color-scheme: dark) { :root { --dojo-text-primary: #F1F5F9; } }
-      [data-theme="dark"]                 {        --dojo-text-primary: #F1F5F9; }
-
-      @media (prefers-color-scheme: dark) { :root { --dojo-text-secondary: #94A3B8; } }
-      [data-theme="dark"]                 {        --dojo-text-secondary: #94A3B8; }
-
-      @media (prefers-color-scheme: dark) { :root { --dojo-text-muted: #475569; } }
-      [data-theme="dark"]                 {        --dojo-text-muted: #475569; }
+      /* El tema se gestiona íntegramente mediante el atributo data-theme.
+         JS (theme.ts) establece data-theme="light"|"dark" según la preferencia
+         del usuario o la detección automática del SO. */
+      [data-theme="dark"] {
+        --dojo-bg:             #0F172A;
+        --dojo-surface:        #1E293B;
+        --dojo-surface-hover:  #273349;
+        --dojo-border:         #334155;
+        --dojo-text-primary:   #F1F5F9;
+        --dojo-text-secondary: #94A3B8;
+        --dojo-text-muted:     #475569;
+        --dojo-shadow:         0 1px 3px rgba(0,0,0,.24), 0 1px 2px rgba(0,0,0,.18);
+        --dojo-shadow-md:      0 4px 6px rgba(0,0,0,.20), 0 2px 4px rgba(0,0,0,.16);
+      }
     </style>
+
+    <!--
+      Script anti-FOUC: aplica el tema correcto ANTES de que el body se renderice.
+      Evita el "flash" de fondo blanco cuando el usuario tiene modo oscuro.
+    -->
+    <script>
+      (function() {
+        var VALID = ['light', 'dark', 'system'];
+        var pref = localStorage.getItem('theme-preference');
+        if (!pref || VALID.indexOf(pref) === -1) pref = 'system';
+        var theme = pref;
+        if (pref === 'system') {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
   </head>
   <body>
     <!-- El componente raíz de la aplicación se registra en main.ts -->
