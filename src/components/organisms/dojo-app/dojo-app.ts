@@ -14,6 +14,7 @@
 
 import '../dojo-kanban-board/dojo-kanban-board.js';
 import '../dojo-label-manager/dojo-label-manager.js';
+import '../../atoms/dojo-theme-toggle/dojo-theme-toggle.js';
 
 import type { Label } from '../../../types/models.js';
 
@@ -73,6 +74,11 @@ export class DojoApp extends HTMLElement {
         font-size: 0.75rem;
         color: var(--dojo-text-secondary);
         margin-left: auto;
+      }
+
+      /* Selector de tema */
+      dojo-theme-toggle {
+        flex-shrink: 0;
       }
 
       /* Botón Gestionar etiquetas */
@@ -147,9 +153,12 @@ export class DojoApp extends HTMLElement {
       (labelMgr as any).show();
     });
 
+    const themeToggle = document.createElement('dojo-theme-toggle');
+
     appHeader.appendChild(logo);
     appHeader.appendChild(title);
     appHeader.appendChild(manageLabelBtn);
+    appHeader.appendChild(themeToggle);
     this._shadow.appendChild(appHeader);
 
     // ── Área del tablero ────────────────────────────────────────────────────────────────────

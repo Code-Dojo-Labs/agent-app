@@ -15,24 +15,28 @@
 import { openDatabase } from './db/database.js';
 import { seedDefaultColumns } from './db/column.repository.js';
 import { seedDefaultLabels } from './db/label.repository.js';
+import { initTheme } from './utils/theme.js';
 
 // ── Inicialización ─────────────────────────────────────────────────────────
 
 async function bootstrap(): Promise<void> {
   try {
-    // 1. Abrir (o crear) la base de datos
+    // 1. Inicializar el tema (light/dark/system)
+    initTheme();
+
+    // 2. Abrir (o crear) la base de datos
     await openDatabase();
 
-    // 2. Seed de columnas por defecto (solo si el store está vacío)
+    // 3. Seed de columnas por defecto (solo si el store está vacío)
     await seedDefaultColumns();
 
-    // 3. Seed de etiquetas por defecto (solo si el store está vacío)
+    // 4. Seed de etiquetas por defecto (solo si el store está vacío)
     await seedDefaultLabels();
 
-    // 4. Registrar Web Components — US-01 Visualización del tablero Kanban
+    // 5. Registrar Web Components — US-01 Visualización del tablero Kanban
     await import('./components/organisms/dojo-app/dojo-app.js');
 
-    // 5. Montar la app (el elemento <dojo-app> ya está en el HTML)
+    // 6. Montar la app (el elemento <dojo-app> ya está en el HTML)
     console.info('[Dojo Kanban] App inicializada correctamente.');
   } catch (error) {
     console.error('[Dojo Kanban] Error durante la inicialización:', error);
