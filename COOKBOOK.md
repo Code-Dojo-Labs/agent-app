@@ -1619,3 +1619,101 @@ El mensaje específico de IndexedDB se muestra directamente; cualquier otro erro
 - Cumple la aceptación de US-14: el usuario ve explícitamente "sal del modo privado o usa otro navegador".
 - La heurística de string es frágil respecto a renombrados, pero aceptable en una app sin internacionalización y con un único punto de lanzamiento del error.
 - Alternativa descartada: código de error tipado (`class IndexedDBUnavailableError extends Error`). Correcta en una base de código grande; excesiva aquí dado que solo hay un único arrojador del error.
+
+---
+
+### Paso 18 — Búsqueda y filtrado de tareas (US-15 / Issue #16)
+
+#### Objetivo
+
+Cumplir todos los criterios de aceptación de US-15: búsqueda por texto en tiempo real con debounce, filtros por prioridad y etiqueta combinables, botón "Limpiar filtros" contextual, y toolbar colapsable.
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | Reescritura de `_buildFilterBar()`, nuevos helpers, `ActiveFilter` extendida, `_filterTasks()` con texto |
+
+#### Detalle de la implementación
+
+**`ActiveFilter` — campo añadido:**
+
+```typescript
+interface ActiveFilter {
+  priorities?: Priority[];
+  labelIds?: string[];
+  searchText?: string;  // ← nuevo
+}
+```
+
+**Toolbar colapsable:**
+El botón "Filtros" (siempre visible) controla un `<div class="filter-content">` que se colapsa con `.collapsed { display: none }`. Los filtros aplicados persisten al colapsar porque viven en `this._activeFilter`. El botón adopta la clase `has-active` para indicar que hay filtros activos aunque el panel esté cerrado.
+
+**Búsqueda con debounce 300ms:**
+El `<input type="search" class="filter-search">` dispara `input` y aplica el filtro solo 300 ms después del último evento (via `setTimeout` cancelable). Filtra `task.title` y `task.description` con `toLowerCase().includes()`.
+
+**Chips de etiquetas dinámicos:**
+`_rebuildLabelFilterChips()` construye chips para cada etiqueta de `this._labels`. Se invoca:
+- Tras `_loadBoard()` (etiquetas cargadas de IndexedDB)
+- Tras `_handleLabelCreated()` (nueva etiqueta creada desde detalle)
+- Tras `removeLabel()` (etiqueta eliminada desde gestión de etiquetas)
+
+Al reconstruir, limpia IDs de `_selectedLabelIds` de etiquetas ya eliminadas para evitar estado stale.
+
+**`_filterTasks()` — lógica AND completa:**
+
+```typescript
+private _filterTasks(tasks: Task[]): Task[] {
+  const { priorities, labelIds, searchText } = this._activeFilter;
+  const lowerSearch = searchText ? searchText.toLowerCase() : null;
+  return tasks.filter(task => {
+    if (priorities?.length && !priorities.includes(task.priority)) return false;
+    if (labelIds?.length) {
+      const hasLabel = labelIds.some(id => (task.labelIds ?? []).includes(id));
+      if (!hasLabel) return false;
+    }
+    if (lowerSearch) {
+      const titleMatch = task.title.toLowerCase().includes(lowerSearch);
+      const descMatch  = (task.description ?? '').toLowerCase().includes(lowerSearch);
+      if (!titleMatch && !descMatch) return false;
+    }
+    return true;
+  });
+}
+```
+
+**`_clearAllFilters()`:** Resetea `_selectedPriorities`, `_selectedLabelIds`, el input de búsqueda, los cambios visuales de todos los chips y llama `this.activeFilter = {}`.
+
+#### Criterios US-15 cubiertos
+
+| Scenario Gherkin | Estado |
+|---|---|
+| 1. Búsqueda de texto en tiempo real (300ms debounce) | ✅ input con setTimeout cancelable, filtra título + descripción |
+| 2. Filtrar por prioridad | ✅ Chips existentes de US-08 integrados en toolbar colapsable |
+| 3. Filtrar por etiqueta | ✅ Chips dinámicos cargados desde `this._labels` |
+| 4. Combinar múltiples filtros | ✅ Lógica AND en `_filterTasks()` |
+| 5. Limpiar todos los filtros | ✅ Botón "✕ Limpiar filtros" visible solo con filtros activos |
+| 6. Conteo X / Y actualizado con filtros | ✅ `_getColumnCounts()` usa `_filterTasks()` que ya incluye todos los filtros |
+| 7. Toolbar colapsable | ✅ Toggle collapse/expand; filtros persisten al colapsar |
+
+#### ADR-21 — Estado de filtros en campos de clase vs. closures locales
+
+**Contexto:** El toolbar anterior (US-08) usaba `selectedPriorities` como variable local de la closure de `_buildFilterBar()`. Con US-15 se añaden dos filtros más (texto y etiquetas) y se necesita una función `_clearAllFilters()` que resetee los tres al mismo tiempo.
+
+**Decisión:** Migrar el estado de los filtros (`_selectedPriorities`, `_selectedLabelIds`) a campos privados de la clase. `_filterSearchInput` también se almacena como referencia de clase para permitir el reset desde `_clearAllFilters()`.
+
+**Consecuencias:**
+- `_clearAllFilters()` puede acceder a cualquier filtro sin depender de la closure original.
+- `_rebuildLabelFilterChips()` puede marcar chips como activos al reconstruirlos (por ejemplo, tras crear una etiqueta mientras hay chips de etiqueta seleccionados).
+- Ligero aumento en la superficie del estado de la clase (9 campos nuevos), justificado por la funcionalidad multi-filtro.
+
+#### ADR-22 — `display: contents` para la sección de chips de etiquetas
+
+**Contexto:** La sección de etiquetas (separador + label + chips) debe fluir como items inline del flexbox padre `.filter-content` y además debe ser ocultable (`display: none`) cuando no hay etiquetas.
+
+**Decisión:** El contenedor `labelSection` usa `style.display = 'contents'` cuando tiene etiquetas y `style.display = 'none'` cuando no. Con `display: contents`, sus hijos directos (sep, label, chips-group) se convierten en flex-items del padre, heredando el `gap: 0.5rem` de `.filter-content`.
+
+**Consecuencias:**
+- Espaciado consistente con el resto del toolbar sin CSS adicional para la sección.
+- `display: contents` es standard (amplio soporte de navegadores modernos).
+- La alternativa (`display: flex` sobre el wrapper) crearía un flex-in-flex con gap diferente, requiriendo CSS adicional para alineación.
