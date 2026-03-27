@@ -796,9 +796,10 @@ export class DojoKanbanBoard extends HTMLElement {
     const filtered = this._filterTasks(sorted);
     for (const task of filtered) {
       const card = document.createElement('dojo-task-card');
-      card.setAttribute('task-id',       task.id);
-      card.setAttribute('task-title',    task.title);
-      card.setAttribute('task-priority', task.priority);
+      card.setAttribute('task-id',         task.id);
+      card.setAttribute('task-title',      task.title);
+      card.setAttribute('task-priority',   task.priority);
+      card.setAttribute('task-created-at', task.createdAt);
       (card as TaskCardElement).taskLabels = this._getTaskLabels(task);
       colEl.appendChild(card);
     }
