@@ -121,6 +121,110 @@ interface Board {
 
 ---
 
+## MS-07: Etiquetas durante la creación de tareas
+
+**Problema que resuelve**: Actualmente solo se pueden asignar etiquetas después de crear la tarea, desde el panel de detalle. Esto obliga a un flujo de dos pasos innecesario.
+
+**Propuesta**:
+- Añadir un selector de etiquetas al diálogo de creación de tarea (`dojo-task-dialog`).
+- Desde el mismo selector, permitir crear etiquetas nuevas inline (igual que en el panel de detalle).
+- Ampliar el tamaño del diálogo (`max-width: 560px`) y del textarea de descripción (`rows: 5`, `min-height: 120px`) para mejorar la experiencia de redacción.
+- El evento `dojo:dialog-create-task` debe incluir `labelIds: string[]` en su detalle.
+
+**Impacto en componentes**: `dojo-task-dialog`, `dojo-kanban-board` (handler de creación).
+
+---
+
+## MS-08: Etiquetas por defecto genéricas
+
+**Problema que resuelve**: Un tablero nuevo no tiene etiquetas, lo que obliga al usuario a crear las más básicas manualmente antes de poder clasificar tareas.
+
+**Propuesta**:
+- Insertar un conjunto de etiquetas genéricas durante la inicialización de la base de datos (similar a `seedDefaultColumns`).
+- Añadir una función `seedDefaultLabels()` en `label.repository.ts` que se ejecute en el bootstrap.
+- Etiquetas sugeridas:
+
+| Nombre       | Color     | Uso típico                    |
+|--------------|-----------|-------------------------------|
+| Bug          | `#B91C1C` | Errores y defectos            |
+| Feature      | `#1D4ED8` | Nuevas funcionalidades        |
+| Mejora        | `#15803D` | Mejoras a funcionalidad existente |
+| Documentación | `#6D28D9` | Tareas de documentación       |
+| Diseño       | `#BE185D` | Trabajo de UI/UX              |
+| Investigación | `#B45309` | Spikes y análisis técnico     |
+| Testing      | `#0E7490` | Pruebas y QA                  |
+| Infraestructura | `#374151` | DevOps, CI/CD, configuración |
+
+**Impacto en el modelo de datos**: Añadir `DEFAULT_LABELS` en `models.ts`.
+
+---
+
+## MS-09: Vista previa Markdown al consultar tareas
+
+**Problema que resuelve**: Al abrir el panel de detalle de una tarea, la descripción se muestra por defecto en modo edición (textarea). El usuario tiene que cambiar manualmente a "Vista previa" para ver el Markdown renderizado, lo cual no es intuitivo.
+
+**Propuesta**:
+- Cambiar el comportamiento por defecto del panel de detalle: al abrir una tarea, mostrar la descripción en **modo vista previa** (Markdown renderizado).
+- El usuario puede cambiar a modo edición haciendo clic en el tab "Editar".
+- Si la descripción está vacía, mostrar directamente el modo edición con un placeholder.
+
+**Impacto en componentes**: `dojo-task-detail` (método `_buildDescriptionField`).
+
+---
+
+## MS-10: Agrupación de tareas por proyectos
+
+**Problema que resuelve**: Cuando hay muchas tareas en un mismo tablero, no existe forma de organizarlas por contexto o proyecto. Todas las tareas comparten el mismo espacio sin distinción.
+
+**Propuesta**:
+- Añadir una entidad `Project` que actúe como agrupador lógico de tareas.
+- Cada tarea se vincula a un proyecto mediante `projectId`.
+- Cada proyecto tiene un `prefix` corto (ej. "WEB", "API", "DOC") que se usa para generar un identificador legible en cada tarea (ej. "WEB-001", "WEB-002").
+- El contador secuencial (`nextTaskNumber`) se almacena en el proyecto y se incrementa atómicamente al crear una tarea.
+- El tablero permite filtrar por proyecto y muestra el identificador del proyecto en cada tarjeta.
+- Se incluye un "Proyecto por defecto" (`General`) para tareas sin contexto específico.
+
+**Nuevo modelo de datos**:
+```ts
+interface Project {
+  id: string;
+  name: string;
+  prefix: string;        // Máx. 5 caracteres, único, uppercase
+  description: string;
+  nextTaskNumber: number; // Autoincremento para IDs legibles
+  createdAt: string;
+}
+
+// En Task, añadir:
+projectId: string;       // FK → Project.id
+taskNumber: string;      // Ej. "WEB-001" — generado automáticamente
+```
+
+**Impacto en IndexedDB**: Nuevo object store `projects` con índice `by-prefix` (unique). Migración `v1 → v2`. Nuevo índice `by-project` en el store `tasks`.
+
+---
+
+## MS-11: Wiki / Guía de usuario del proyecto
+
+**Problema que resuelve**: La aplicación puede no ser intuitiva para usuarios nuevos. No existe documentación de uso que explique las funcionalidades y flujos principales.
+
+**Propuesta**:
+- Crear una wiki en Markdown dentro del repositorio (`docs/wiki/`) con las siguientes secciones:
+  1. **Inicio rápido** — Primeros pasos tras abrir la app.
+  2. **Gestión de columnas** — Crear, renombrar, eliminar y reordenar columnas.
+  3. **Gestión de tareas** — Crear, editar, eliminar, mover y filtrar tareas.
+  4. **Etiquetas** — Crear, asignar, editar y eliminar etiquetas.
+  5. **Drag & Drop** — Cómo mover tareas entre columnas y reordenar.
+  6. **Filtros y búsqueda** — Uso de la barra de filtros.
+  7. **Atajos de teclado** — Teclas disponibles (Escape, Tab, Enter, etc.).
+  8. **Proyectos** — Cómo agrupar tareas por proyecto (cuando MS-10 se implemente).
+- Incluir capturas de pantalla o diagramas cuando sea relevante.
+- Enlazar la wiki desde el header de la aplicación con un botón "❓ Ayuda" / "📖 Guía".
+
+**Formato**: Archivos `.md` en `docs/wiki/`, enlazados desde un `docs/wiki/index.md`.
+
+---
+
 ## MS-07: Búsqueda global con atajos de teclado
 
 **Problema que resuelve**: En tableros con muchas tareas, la navegación puede volverse lenta.
