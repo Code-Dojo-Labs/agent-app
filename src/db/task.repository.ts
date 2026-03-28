@@ -121,6 +121,16 @@ export async function reorderTasks(statusId: string, orderedIds: string[]): Prom
 }
 
 /**
+ * Devuelve los IDs de todas las tareas de un tablero (US-22).
+ */
+export async function getTaskIdsByBoard(boardId: string): Promise<string[]> {
+  const { store } = await getStore('tasks');
+  const index     = store.index('by-board');
+  const tasks     = await idbRequest<Task[]>(index.getAll(boardId));
+  return tasks.map(t => t.id);
+}
+
+/**
  * Elimina todas las tareas de un tablero (US-22).
  */
 export async function deleteTasksByBoard(boardId: string): Promise<void> {

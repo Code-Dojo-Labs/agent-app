@@ -17,7 +17,8 @@
 
 import { getAllBoards, createBoard, updateBoard, deleteBoard } from '../../../db/board.repository.js';
 import { seedDefaultColumns, deleteColumnsByBoard } from '../../../db/column.repository.js';
-import { deleteTasksByBoard } from '../../../db/task.repository.js';
+import { deleteTasksByBoard, getTaskIdsByBoard } from '../../../db/task.repository.js';
+import { deleteActivitiesByTaskId } from '../../../db/activity.repository.js';
 import type { Board } from '../../../types/models.js';
 
 export class DojoBoardSelector extends HTMLElement {
@@ -645,19 +646,52 @@ export class DojoBoardSelector extends HTMLElement {
   private _showDeleteDialogUI(): void {
     this._shadow.querySelector('.delete-backdrop')?.classList.add('visible');
     this._shadow.querySelector('.delete-dialog')?.classList.add('visible');
+    document.addEventListener('keydown', this._onDeleteKeydown);
+    requestAnimationFrame(() => {
+      this._shadow.querySelector<HTMLButtonElement>('.delete-cancel-btn')?.focus();
+    });
   }
 
   private _hideDeleteDialog(): void {
     this._shadow.querySelector('.delete-backdrop')?.classList.remove('visible');
     this._shadow.querySelector('.delete-dialog')?.classList.remove('visible');
+    document.removeEventListener('keydown', this._onDeleteKeydown);
     this._pendingDeleteId = null;
   }
+
+  /** Focus trap + Escape para el diálogo de eliminación (WCAG 2.1 SC 2.1.2). */
+  private _onDeleteKeydown = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      this._hideDeleteDialog();
+      return;
+    }
+    if (e.key === 'Tab') {
+      const focusable = Array.from(
+        this._shadow.querySelectorAll<HTMLElement>('.delete-dialog button:not([style*="display: none"])')
+      ).filter(el => el.offsetParent !== null);
+      if (focusable.length < 2) return;
+      const first  = focusable[0];
+      const last   = focusable[focusable.length - 1];
+      const active = this._shadow.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  };
 
   private async _confirmDelete(): Promise<void> {
     const boardId = this._pendingDeleteId;
     if (!boardId) return;
 
     try {
+      // Limpiar actividad asociada a las tareas del tablero (evita datos huérfanos)
+      const taskIds = await getTaskIdsByBoard(boardId);
+      await Promise.all(taskIds.map(id => deleteActivitiesByTaskId(id)));
       await deleteTasksByBoard(boardId);
       await deleteColumnsByBoard(boardId);
       await deleteBoard(boardId);
