@@ -2,7 +2,7 @@
  * dojo-task-dialog — Organismo
  *
  * Diálogo modal para crear tareas en el tablero Kanban.
- * Implementa los criterios de aceptación de US-04.
+ * Implementa los criterios de aceptación de US-04 y US-23.
  *
  * ## API Pública
  * | Método                          | Descripción                              |
@@ -10,9 +10,9 @@
  * | openCreate(columnId, colName)   | Abre el formulario de creación de tarea  |
  *
  * ## Eventos despachados
- * | Nombre                    | Detalle                                       | Descripción           |
- * |---------------------------|-----------------------------------------------|-----------------------|
- * | dojo:dialog-create-task   | { statusId, title, description, priority }    | Usuario confirmó crear|
+ * | Nombre                    | Detalle                                                 | Descripción           |
+ * |---------------------------|---------------------------------------------------------|-----------------------|
+ * | dojo:dialog-create-task   | { statusId, title, description, priority, labelIds }    | Usuario confirmó crear|
  *
  * ## Validaciones (US-04)
  * - Título obligatorio (no vacío)
@@ -24,7 +24,9 @@
  * --dojo-danger, --dojo-radius, --dojo-radius-sm, --dojo-shadow
  */
 
-import type { Priority } from '../../../types/models.js';
+import type { Priority, Label } from '../../../types/models.js';
+import { getAllLabels, createLabel } from '../../../db/label.repository.js';
+import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 
 const PRIORITIES: { value: Priority; label: string }[] = [
   { value: 'low',    label: '⬇️ Baja'    },
@@ -39,6 +41,10 @@ export class DojoTaskDialog extends HTMLElement {
   private _shadow: ShadowRoot;
   private _columnId  = '';
   private _columnName = '';
+
+  // US-23: estado de etiquetas
+  private _allLabels: Label[] = [];
+  private _selectedLabelIds: Set<string> = new Set();
 
   // Referencia estable para poder eliminar el listener de teclado
   private _onDocKeydown = (e: KeyboardEvent): void => {
@@ -63,8 +69,15 @@ export class DojoTaskDialog extends HTMLElement {
   openCreate(columnId: string, columnName: string): void {
     this._columnId   = columnId;
     this._columnName = columnName;
-    this._buildForm();
-    this._open();
+    this._selectedLabelIds = new Set();
+    // Cargar etiquetas (US-23) y luego construir el formulario
+    getAllLabels()
+      .then(labels => { this._allLabels = labels; })
+      .catch(() => { this._allLabels = []; })
+      .finally(() => {
+        this._buildForm();
+        this._open();
+      });
   }
 
   // ── Estado del diálogo ────────────────────────────────────────────────────
@@ -115,7 +128,7 @@ export class DojoTaskDialog extends HTMLElement {
         border-radius: var(--dojo-radius);
         box-shadow: var(--dojo-shadow);
         width: 100%;
-        max-width: 460px;
+        max-width: 560px;
         padding: 1.5rem;
         display: flex;
         flex-direction: column;
@@ -189,7 +202,7 @@ export class DojoTaskDialog extends HTMLElement {
 
       .field textarea {
         resize: vertical;
-        min-height: 80px;
+        min-height: 120px;
         line-height: 1.5;
       }
 
@@ -229,6 +242,236 @@ export class DojoTaskDialog extends HTMLElement {
       .btn-primary {
         background: var(--dojo-primary, #1D4ED8);
         color: #fff;
+      }
+
+      /* ── Etiquetas — US-23 ── */
+      .labels-field { display: flex; flex-direction: column; gap: 0.375rem; }
+      .labels-field label {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--dojo-text-secondary);
+      }
+      .labels-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+        min-height: 28px;
+        align-items: center;
+      }
+      .label-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 99px;
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+      .label-chip-remove {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+        font-size: 0.875rem;
+        opacity: 0.65;
+        transition: opacity 0.1s;
+        color: inherit;
+      }
+      .label-chip-remove:hover { opacity: 1; }
+      .label-chip-remove:focus-visible {
+        outline: 1px solid currentColor;
+        border-radius: 2px;
+      }
+      .add-label-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.2rem 0.6rem;
+        border: 1px dashed var(--dojo-border);
+        border-radius: 99px;
+        font-size: 0.75rem;
+        color: var(--dojo-text-secondary);
+        background: transparent;
+        cursor: pointer;
+        transition: border-color 0.15s, color 0.15s;
+        font-family: inherit;
+      }
+      .add-label-btn:hover {
+        border-color: var(--dojo-primary, #1D4ED8);
+        color: var(--dojo-primary, #1D4ED8);
+      }
+      .add-label-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
+      .labels-picker {
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        background: var(--dojo-surface);
+        box-shadow: var(--dojo-shadow);
+        max-height: 180px;
+        overflow-y: auto;
+        display: none;
+        margin-top: 0.25rem;
+      }
+      .labels-picker.open { display: block; }
+      .label-option {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4375rem 0.75rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: background 0.1s;
+      }
+      .label-option:hover { background: var(--dojo-bg); }
+      .label-option input[type="checkbox"] {
+        accent-color: var(--dojo-primary, #1D4ED8);
+        flex-shrink: 0;
+      }
+      .label-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .labels-search {
+        display: block;
+        width: 100%;
+        padding: 0.4375rem 0.75rem;
+        border: none;
+        border-bottom: 1px solid var(--dojo-border);
+        background: transparent;
+        font-size: 0.8125rem;
+        color: var(--dojo-text-primary);
+        box-sizing: border-box;
+        font-family: inherit;
+        outline: none;
+      }
+      .labels-search:focus {
+        border-bottom-color: var(--dojo-primary, #1D4ED8);
+        background: var(--dojo-bg);
+      }
+      .label-create-option {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.4375rem 0.75rem;
+        cursor: pointer;
+        font-size: 0.8125rem;
+        color: var(--dojo-primary, #1D4ED8);
+        font-weight: 500;
+        border-top: 1px solid var(--dojo-border);
+      }
+      .label-create-option:hover { background: var(--dojo-bg); }
+      .label-create-option:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: -2px;
+      }
+      .label-create-form {
+        padding: 0.625rem 0.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        border-top: 1px solid var(--dojo-border);
+      }
+      .label-create-form-title {
+        font-size: 0.6875rem;
+        font-weight: 700;
+        color: var(--dojo-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .label-color-palette {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3125rem;
+      }
+      .color-swatch {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+        padding: 0;
+        outline: none;
+        transition: border-color 0.12s, transform 0.12s;
+      }
+      .color-swatch.selected,
+      .color-swatch:focus-visible {
+        border-color: var(--dojo-text-primary, #111);
+        transform: scale(1.2);
+      }
+      .label-custom-color-row {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.8125rem;
+        color: var(--dojo-text-secondary);
+      }
+      .label-color-input {
+        width: 36px;
+        height: 22px;
+        border: 1px solid var(--dojo-border);
+        border-radius: 3px;
+        padding: 0 2px;
+        cursor: pointer;
+        background: transparent;
+      }
+      .label-error {
+        font-size: 0.75rem;
+        color: #EF4444;
+      }
+      .label-contrast-warning {
+        font-size: 0.75rem;
+        color: #92400E;
+        background: #FEF3C7;
+        border: 1px solid #F59E0B;
+        border-radius: var(--dojo-radius-sm, 4px);
+        padding: 0.3rem 0.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+      .label-create-actions {
+        display: flex;
+        gap: 0.375rem;
+        justify-content: flex-end;
+      }
+      .label-btn {
+        padding: 0.25rem 0.625rem;
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.75rem;
+        cursor: pointer;
+        font-family: inherit;
+        border: 1px solid var(--dojo-border);
+        background: transparent;
+        color: var(--dojo-text-secondary);
+        transition: background 0.15s;
+      }
+      .label-btn:hover { background: var(--dojo-bg); color: var(--dojo-text-primary); }
+      .label-btn-primary {
+        background: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary, #1D4ED8);
+        color: #fff;
+        font-weight: 600;
+      }
+      .label-btn-primary:hover { opacity: 0.88; }
+      .label-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+      .label-btn:focus-visible,
+      .label-btn-primary:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
+      .label-info-notice {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.75rem;
+        color: var(--dojo-primary, #1D4ED8);
+        background: color-mix(in srgb, var(--dojo-primary, #1D4ED8) 8%, transparent);
+        border-top: 1px solid var(--dojo-border);
+        line-height: 1.4;
+        margin: 0;
       }
     `;
     this._shadow.appendChild(style);
@@ -332,7 +575,7 @@ export class DojoTaskDialog extends HTMLElement {
     const descInput = document.createElement('textarea');
     descInput.id = 'task-desc-input';
     descInput.placeholder = 'Describe la tarea…';
-    descInput.rows = 3;
+    descInput.rows = 5;
     descInput.maxLength = MAX_DESC;
 
     descField.appendChild(descLabel);
@@ -380,6 +623,435 @@ export class DojoTaskDialog extends HTMLElement {
     dueField.appendChild(dueInput);
     dialog.appendChild(dueField);
 
+    // ── Campo: Etiquetas (US-23) ──────────────────────────────────────────
+    const labelsField = document.createElement('div');
+    labelsField.className = 'labels-field';
+
+    const labelsLabel = document.createElement('label');
+    labelsLabel.textContent = 'Etiquetas (opcional)';
+    labelsField.appendChild(labelsLabel);
+
+    const chips = document.createElement('div');
+    chips.className = 'labels-chips';
+    chips.setAttribute('aria-label', 'Etiquetas seleccionadas');
+    labelsField.appendChild(chips);
+
+    const picker = document.createElement('div');
+    picker.className = 'labels-picker';
+    picker.id = 'labels-picker-dropdown';
+    picker.setAttribute('aria-label', 'Selector de etiquetas disponibles');
+    labelsField.appendChild(picker);
+
+    // Paleta WCAG AA (contraste ≥ 4.5:1 con #FFFFFF) — US-13
+    const PRESET_COLORS = [
+      '#B91C1C', '#C2410C', '#B45309', '#15803D',
+      '#1D4ED8', '#4338CA', '#6D28D9', '#BE185D',
+      '#0E7490', '#374151',
+    ];
+    const PRESET_COLOR_NAMES = [
+      'Rojo', 'Naranja', 'Ámbar', 'Verde',
+      'Azul', 'Índigo', 'Violeta', 'Rosa',
+      'Cian', 'Gris',
+    ];
+
+    let pickerOpen   = false;
+    let searchTerm   = '';
+    let showCreateForm = false;
+    let pendingColor = PRESET_COLORS[0];
+
+    // Navegación por teclado dentro del picker
+    picker.addEventListener('keydown', (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        if (showCreateForm) {
+          showCreateForm = false;
+          renderPicker();
+          requestAnimationFrame(() =>
+            picker.querySelector<HTMLInputElement>('.labels-search')?.focus()
+          );
+        } else {
+          pickerOpen = false;
+          picker.classList.remove('open');
+          chips.querySelector<HTMLElement>('.add-label-btn')?.focus();
+        }
+        return;
+      }
+      if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        const focusable = Array.from(
+          picker.querySelectorAll<HTMLElement>(
+            'input[type="checkbox"], .label-create-option, .color-swatch, .label-btn, .label-btn-primary, input[type="color"]'
+          )
+        );
+        if (focusable.length < 2) return;
+        const current = focusable.indexOf(this._shadow.activeElement as HTMLElement);
+        if (ev.key === 'ArrowDown') {
+          ev.preventDefault();
+          const next = current >= 0 ? (current + 1) % focusable.length : 0;
+          focusable[next].focus();
+        } else {
+          ev.preventDefault();
+          const prev = current >= 0 ? (current - 1 + focusable.length) % focusable.length : focusable.length - 1;
+          focusable[prev].focus();
+        }
+      }
+    });
+
+    // ── Render chips ───────────────────────────────────────────────────────
+    const renderChips = (): void => {
+      chips.innerHTML = '';
+
+      this._selectedLabelIds.forEach(labelId => {
+        const label = this._allLabels.find(l => l.id === labelId);
+        if (!label) return;
+
+        let textColor = '#ffffff';
+        const HEX_COLOR_RE = /^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/;
+        if (HEX_COLOR_RE.test(label.color)) {
+          try { textColor = pickTextColor(label.color); } catch { /* fallback blanco */ }
+        }
+
+        const chip = document.createElement('span');
+        chip.className = 'label-chip';
+        chip.style.backgroundColor = label.color;
+        chip.style.color = textColor;
+
+        const chipText = document.createElement('span');
+        chipText.textContent = label.name;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'label-chip-remove';
+        removeBtn.setAttribute('aria-label', `Quitar etiqueta ${label.name}`);
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          this._selectedLabelIds.delete(labelId);
+          renderChips();
+          renderPicker();
+        });
+
+        chip.appendChild(chipText);
+        chip.appendChild(removeBtn);
+        chips.appendChild(chip);
+      });
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'add-label-btn';
+      addBtn.textContent = '＋ Etiqueta';
+      addBtn.setAttribute('aria-expanded', String(pickerOpen));
+      addBtn.setAttribute('aria-controls', 'labels-picker-dropdown');
+      addBtn.addEventListener('click', () => {
+        pickerOpen = !pickerOpen;
+        picker.classList.toggle('open', pickerOpen);
+        addBtn.setAttribute('aria-expanded', String(pickerOpen));
+        if (pickerOpen) {
+          renderPicker();
+          requestAnimationFrame(() =>
+            picker.querySelector<HTMLInputElement>('.labels-search')?.focus()
+          );
+        }
+      });
+      chips.appendChild(addBtn);
+    };
+
+    // ── Formulario inline de creación (US-23 + US-09 pattern) ─────────────
+    const buildCreateForm = (name: string): HTMLElement => {
+      const form = document.createElement('div');
+      form.className = 'label-create-form';
+      form.setAttribute('role', 'group');
+      form.setAttribute('aria-label', `Crear etiqueta "${name}"`);
+
+      const formTitle = document.createElement('span');
+      formTitle.className = 'label-create-form-title';
+      formTitle.textContent = `Color para "${name}"`;
+      form.appendChild(formTitle);
+
+      const palette = document.createElement('div');
+      palette.className = 'label-color-palette';
+      PRESET_COLORS.forEach(c => {
+        const swatch = document.createElement('button');
+        swatch.type = 'button';
+        swatch.className = 'color-swatch' + (pendingColor === c ? ' selected' : '');
+        swatch.style.backgroundColor = c;
+        const colorName = PRESET_COLOR_NAMES[PRESET_COLORS.indexOf(c)] ?? c;
+        swatch.setAttribute('aria-label', `Color ${colorName}`);
+        swatch.setAttribute('aria-pressed', String(pendingColor === c));
+        swatch.title = colorName;
+        swatch.dataset['color'] = c;
+        swatch.addEventListener('click', () => {
+          pendingColor = c;
+          palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
+            const active = s.dataset['color'] === c;
+            s.classList.toggle('selected', active);
+            s.setAttribute('aria-pressed', String(active));
+          });
+          const ci = form.querySelector<HTMLInputElement>('.label-color-input');
+          if (ci) ci.value = c;
+          updateContrastWarning(c);
+        });
+        palette.appendChild(swatch);
+      });
+      form.appendChild(palette);
+
+      const customRow = document.createElement('div');
+      customRow.className = 'label-custom-color-row';
+      const customLbl = document.createElement('span');
+      customLbl.textContent = 'Personalizado:';
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.className = 'label-color-input';
+      colorInput.value = pendingColor;
+      colorInput.setAttribute('aria-label', 'Color personalizado para la etiqueta');
+      colorInput.addEventListener('input', () => {
+        pendingColor = colorInput.value;
+        palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
+          const active = s.dataset['color'] === pendingColor;
+          s.classList.toggle('selected', active);
+          s.setAttribute('aria-pressed', String(active));
+        });
+        updateContrastWarning(pendingColor);
+      });
+      customRow.appendChild(customLbl);
+      customRow.appendChild(colorInput);
+      form.appendChild(customRow);
+
+      // Advertencia de contraste WCAG (US-13)
+      const contrastWarning = document.createElement('div');
+      contrastWarning.className = 'label-contrast-warning';
+      contrastWarning.setAttribute('role', 'alert');
+      contrastWarning.style.display = 'none';
+      form.appendChild(contrastWarning);
+
+      const errorEl = document.createElement('span');
+      errorEl.className = 'label-error';
+      errorEl.setAttribute('role', 'alert');
+      errorEl.setAttribute('aria-live', 'polite');
+      errorEl.style.display = 'none';
+      form.appendChild(errorEl);
+
+      const formActions = document.createElement('div');
+      formActions.className = 'label-create-actions';
+
+      const cancelFormBtn = document.createElement('button');
+      cancelFormBtn.type = 'button';
+      cancelFormBtn.className = 'label-btn';
+      cancelFormBtn.textContent = 'Cancelar';
+      cancelFormBtn.addEventListener('click', () => {
+        showCreateForm = false;
+        pendingColor = PRESET_COLORS[0];
+        renderPicker();
+        requestAnimationFrame(() =>
+          picker.querySelector<HTMLInputElement>('.labels-search')?.focus()
+        );
+      });
+
+      const updateContrastWarning = (color: string): void => {
+        const isPreset = PRESET_COLORS.includes(color);
+        if (isPreset || meetsWcagAA('#FFFFFF', color)) {
+          contrastWarning.style.display = 'none';
+          confirmCreateBtn.disabled = false;
+          return;
+        }
+        const suggested = suggestAccessibleColor(color, '#FFFFFF');
+        contrastWarning.innerHTML = '';
+        const msg = document.createElement('span');
+        msg.textContent = 'El color no tiene suficiente contraste con texto blanco (mínimo 4.5:1 WCAG AA).';
+        contrastWarning.appendChild(msg);
+        const row = document.createElement('span');
+        row.style.cssText = 'display:inline-flex;align-items:center;gap:0.375rem;font-size:0.75rem;';
+        const sw = document.createElement('span');
+        sw.style.cssText = `display:inline-block;width:14px;height:14px;border-radius:3px;background:${suggested};border:1px solid rgba(0,0,0,.2);flex-shrink:0;`;
+        sw.setAttribute('aria-hidden', 'true');
+        const applyBtn = document.createElement('button');
+        applyBtn.type = 'button';
+        applyBtn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:.75rem;color:var(--dojo-primary,#1D4ED8);padding:0;font-family:inherit;text-decoration:underline;';
+        applyBtn.textContent = `Usar versión accesible (${suggested})`;
+        applyBtn.addEventListener('click', () => {
+          pendingColor = suggested;
+          colorInput.value = suggested;
+          palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
+            const active = s.dataset['color'] === suggested;
+            s.classList.toggle('selected', active);
+            s.setAttribute('aria-pressed', String(active));
+          });
+          updateContrastWarning(suggested);
+        });
+        row.appendChild(sw);
+        row.appendChild(applyBtn);
+        contrastWarning.appendChild(row);
+        contrastWarning.style.display = '';
+        confirmCreateBtn.disabled = true;
+      };
+
+      const confirmCreateBtn = document.createElement('button');
+      confirmCreateBtn.type = 'button';
+      confirmCreateBtn.className = 'label-btn label-btn-primary';
+      confirmCreateBtn.textContent = 'Crear';
+      confirmCreateBtn.setAttribute('aria-label', `Confirmar creación de etiqueta "${name}"`);
+      confirmCreateBtn.addEventListener('click', async () => {
+        if (!pendingColor) {
+          errorEl.textContent = 'Debes seleccionar un color.';
+          errorEl.style.display = '';
+          return;
+        }
+        confirmCreateBtn.disabled = true;
+        confirmCreateBtn.textContent = '…';
+        try {
+          const newLabel = await createLabel({ name, color: pendingColor });
+          this._allLabels = [...this._allLabels, newLabel].sort((a, b) =>
+            a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+          );
+          this._selectedLabelIds.add(newLabel.id);
+          this.dispatchEvent(new CustomEvent('dojo:label-created', {
+            bubbles: true, composed: true,
+            detail: { label: newLabel },
+          }));
+          searchTerm     = '';
+          showCreateForm = false;
+          pendingColor   = PRESET_COLORS[0];
+          renderChips();
+          pickerOpen = false;
+          picker.classList.remove('open');
+          chips.querySelector<HTMLElement>('.add-label-btn')?.focus();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Error al crear la etiqueta';
+          errorEl.textContent = msg;
+          errorEl.style.display = '';
+          confirmCreateBtn.disabled = false;
+          confirmCreateBtn.textContent = 'Crear';
+        }
+      });
+
+      formActions.appendChild(cancelFormBtn);
+      formActions.appendChild(confirmCreateBtn);
+      form.appendChild(formActions);
+      return form;
+    };
+
+    // ── Render picker con búsqueda ────────────────────────────────────────
+    const renderPicker = (): void => {
+      picker.innerHTML = '';
+
+      const searchInput = document.createElement('input');
+      searchInput.type = 'text';
+      searchInput.className = 'labels-search';
+      searchInput.placeholder = 'Buscar o crear etiqueta…';
+      searchInput.maxLength = 30;
+      searchInput.value = searchTerm;
+      searchInput.setAttribute('aria-label', 'Buscar etiqueta');
+      searchInput.setAttribute('autocomplete', 'off');
+      searchInput.addEventListener('input', () => {
+        const newVal = searchInput.value;
+        if (newVal === searchTerm) return;
+        searchTerm = newVal;
+        const trimmedNew = newVal.trim();
+        if (showCreateForm) {
+          const hasExact = this._allLabels.some(
+            l => l.name.toLowerCase() === trimmedNew.toLowerCase()
+          );
+          if (!trimmedNew || hasExact) showCreateForm = false;
+        }
+        renderPicker();
+        requestAnimationFrame(() => {
+          const s = picker.querySelector<HTMLInputElement>('.labels-search');
+          if (s) { s.focus(); const len = s.value.length; s.setSelectionRange(len, len); }
+        });
+      });
+      picker.appendChild(searchInput);
+
+      const trimmed = searchTerm.trim();
+      const filtered = trimmed
+        ? this._allLabels.filter(l => l.name.toLowerCase().includes(trimmed.toLowerCase()))
+        : this._allLabels;
+
+      if (filtered.length === 0 && !trimmed) {
+        const empty = document.createElement('p');
+        empty.style.cssText = 'padding:.375rem .75rem;font-size:.8125rem;color:var(--dojo-text-secondary);margin:0';
+        empty.textContent = 'No hay etiquetas. Escribe un nombre para crear una.';
+        picker.appendChild(empty);
+      } else {
+        filtered.forEach(label => {
+          const isSelected = this._selectedLabelIds.has(label.id);
+
+          const optionEl = document.createElement('label');
+          optionEl.className = 'label-option';
+
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = isSelected;
+          cb.setAttribute('aria-label', label.name);
+          cb.addEventListener('change', () => {
+            if (cb.checked) {
+              this._selectedLabelIds.add(label.id);
+            } else {
+              this._selectedLabelIds.delete(label.id);
+            }
+            renderChips();
+          });
+
+          const dot = document.createElement('span');
+          dot.className = 'label-dot';
+          dot.style.backgroundColor = label.color;
+          dot.setAttribute('aria-hidden', 'true');
+
+          const namePart = document.createElement('span');
+          namePart.textContent = label.name;
+
+          optionEl.appendChild(cb);
+          optionEl.appendChild(dot);
+          optionEl.appendChild(namePart);
+          picker.appendChild(optionEl);
+        });
+      }
+
+      // Opción / formulario de creación cuando no hay coincidencia exacta
+      if (trimmed) {
+        const hasExact = this._allLabels.some(
+          l => l.name.toLowerCase() === trimmed.toLowerCase()
+        );
+        if (!hasExact) {
+          if (showCreateForm) {
+            picker.appendChild(buildCreateForm(trimmed));
+          } else {
+            const createOpt = document.createElement('div');
+            createOpt.className = 'label-create-option';
+            createOpt.setAttribute('role', 'button');
+            createOpt.setAttribute('tabindex', '0');
+            const icon = document.createElement('span');
+            icon.setAttribute('aria-hidden', 'true');
+            icon.textContent = '＋';
+            const labelEl = document.createElement('span');
+            labelEl.textContent = `Crear etiqueta "${trimmed}"`;
+            createOpt.appendChild(icon);
+            createOpt.appendChild(labelEl);
+            const activate = (): void => {
+              showCreateForm = true;
+              pendingColor   = PRESET_COLORS[0];
+              renderPicker();
+              requestAnimationFrame(() =>
+                picker.querySelector<HTMLInputElement>('.labels-search')?.focus()
+              );
+            };
+            createOpt.addEventListener('click', activate);
+            createOpt.addEventListener('keydown', (ev: KeyboardEvent) => {
+              if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); activate(); }
+            });
+            picker.appendChild(createOpt);
+          }
+        } else {
+          const matchedLabel = this._allLabels.find(l => l.name.toLowerCase() === trimmed.toLowerCase())!;
+          if (matchedLabel.name !== trimmed) {
+            const notice = document.createElement('p');
+            notice.className = 'label-info-notice';
+            notice.textContent = `ℹ️\u00a0«${matchedLabel.name}» ya existe — selecciónala en la lista.`;
+            picker.appendChild(notice);
+          }
+        }
+      }
+    };
+
+    renderChips();
+    dialog.appendChild(labelsField);
+
     // ── Acciones ───────────────────────────────────────────────────────────
     const actions = document.createElement('div');
     actions.className = 'actions';
@@ -411,6 +1083,7 @@ export class DojoTaskDialog extends HTMLElement {
           title,
           description: descInput.value.trim(),
           priority:    priSelect.value as Priority,
+          labelIds:    [...this._selectedLabelIds],
           dueDate:     (() => {
             if (!dueInput.value) return null;
             const parts = dueInput.value.split('-');
@@ -422,6 +1095,10 @@ export class DojoTaskDialog extends HTMLElement {
           })(),
         },
       }));
+
+      // Limpieza defensiva del picker antes de cerrar (US-23 review)
+      pickerOpen = false;
+      picker.classList.remove('open');
       this._close();
     });
 

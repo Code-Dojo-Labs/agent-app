@@ -35,6 +35,8 @@
    - [Paso 21 — Exportación e importación de datos (US-19 / Issue #37)](#paso-21--exportación-e-importación-de-datos-us-19--issue-37)
    - [Paso 22 — Historial de actividad por tarea (US-20 / Issue #38)](#paso-22--historial-de-actividad-por-tarea-us-20--issue-38)
    - [Paso 23 — Subtareas / Checklist (US-21 / Issue #39)](#paso-23--subtareas--checklist-us-21--issue-39)
+   - [Paso 24 — Múltiples tableros (US-22 / Issue #40)](#paso-24--múltiples-tableros-us-22)
+   - [Paso 25 — Etiquetas durante la creación de tareas (US-23 / Issue #41)](#paso-25--etiquetas-durante-la-creación-de-tareas-us-23--issue-41)
 
 ---
 
@@ -2297,3 +2299,63 @@ Grid responsiva (`grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))`)
 - `deleteTasksByBoard(boardId)` opera con un solo índice lookup en lugar de resolver columnas primero.
 - Ligera desnormalización compensada por simplicidad operacional.
 - El índice `by-board` en tasks permite consultas directas sin joins.
+
+---
+
+## Paso 25 — Etiquetas durante la creación de tareas (US-23 / Issue #41)
+
+> **Issue:** #41 · **PR:** #57 · **Rama:** `feat/41-etiquetas-creacion-tareas`
+
+### Problema
+
+Al crear una tarea, el usuario no podía asignarle etiquetas. Debía crear la tarea primero y luego abrirla para añadir etiquetas desde el panel de detalle, lo que requería un segundo paso innecesario.
+
+### Solución
+
+#### Selector de etiquetas en `dojo-task-dialog`
+
+Se añade una sección "Etiquetas (opcional)" en el formulario de creación, entre el campo de fecha de vencimiento y las acciones. El selector sigue el mismo patrón de chips + picker dropdown implementado en `dojo-task-detail` (US-09/US-10):
+
+1. **Chips** — Las etiquetas seleccionadas se muestran como chips coloreados con botón `×` para desseleccionar. Un botón "＋ Etiqueta" abre/cierra el picker.
+
+2. **Picker dropdown** — Listado de etiquetas existentes como checkboxes con dot de color y nombre. Campo de búsqueda para filtrar por nombre.
+
+3. **Creación inline** — Si el texto de búsqueda no coincide con ninguna etiqueta existente, aparece la opción "Crear etiqueta '[nombre]'" que despliega un formulario de selección de color con paleta presets WCAG AA y color personalizado con validación de contraste.
+
+4. **Estado** — `_allLabels: Label[]` se carga asíncronamente via `getAllLabels()` al invocar `openCreate()`. `_selectedLabelIds: Set<string>` mantiene la selección local durante la sesión del diálogo.
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `src/components/organisms/dojo-task-dialog/dojo-task-dialog.ts` | Selector de etiquetas con chips, picker, creación inline, estilos CSS, evento actualizado |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | `_handleCreateTask()` extrae `labelIds` del evento y lo pasa a `createTask()` |
+
+#### Receta: Selector de etiquetas en diálogo de creación
+
+1. **Imports** — Se añaden `Label` (tipo), `getAllLabels`, `createLabel` (repositorio de labels) y `pickTextColor`, `meetsWcagAA`, `suggestAccessibleColor` (utilidades de contraste).
+
+2. **`openCreate()`** — Antes de construir el formulario, llama `getAllLabels()` para poblar `_allLabels`. Resetea `_selectedLabelIds`. El formulario se construye en `.finally()` para garantizar la apertura incluso si la carga falla.
+
+3. **`renderChips()`** — Recorre `_selectedLabelIds` y crea un `<span class="label-chip">` por cada etiqueta con color de fondo, texto con contraste calculado por `pickTextColor()`, y botón `×` que elimina del Set y re-renderiza.
+
+4. **`renderPicker()`** — Crea campo de búsqueda, filtra `_allLabels` por nombre, y genera `<label class="label-option">` con checkbox por cada etiqueta. Si la búsqueda no tiene coincidencia exacta, muestra opción de crear etiqueta inline.
+
+5. **`buildCreateForm(name)`** — Formulario inline con paleta de 10 colores preset WCAG AA, input de color personalizado, advertencia de contraste si no cumple 4.5:1, y botón "Crear" que llama `createLabel()`, añade al Set de seleccionados y despacha `dojo:label-created` para notificar al tablero.
+
+6. **Evento `dojo:dialog-create-task`** — El detail ahora incluye `labelIds: [...this._selectedLabelIds]`.
+
+7. **`_handleCreateTask()` en `dojo-kanban-board`** — Extrae `labelIds` del event detail (con fallback `[]`) y lo pasa a `createTask()`.
+
+#### Cambios de diseño del diálogo
+
+- `max-width: 560px` (antes 460px) para acomodar el selector de etiquetas
+- Textarea: `rows: 5` (antes 3) y `min-height: 120px` (antes 80px)
+
+### Accesibilidad (WCAG 2.1)
+
+- `aria-label` en chips, botones de eliminación, picker y búsqueda
+- `aria-expanded` y `aria-controls` en botón "＋ Etiqueta"
+- Navegación por teclado: Escape cierra picker/formulario, ArrowUp/Down navega opciones
+- `role="button"` y `tabindex="0"` en opción de crear etiqueta
+- Validación de contraste WCAG AA en creación inline de etiquetas

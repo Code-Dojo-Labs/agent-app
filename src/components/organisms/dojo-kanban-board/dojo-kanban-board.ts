@@ -1181,12 +1181,13 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private async _handleCreateTask(e: CustomEvent): Promise<void> {
-    const { statusId, title, description, priority, dueDate } = e.detail as {
+    const { statusId, title, description, priority, dueDate, labelIds } = e.detail as {
       statusId:    string;
       title:       string;
       description: string;
       priority:    string;
       dueDate?:    string | null;
+      labelIds?:   string[];
     };
     // Validar que la columna exista (puede haberse eliminado mientras el diálogo estaba abierto)
     if (!this._columns.some(c => c.id === statusId)) {
@@ -1201,7 +1202,7 @@ export class DojoKanbanBoard extends HTMLElement {
         statusId,
         boardId:   this._boardId,
         priority:  priority as Task['priority'],
-        labelIds:  [],
+        labelIds:  labelIds ?? [],
         order:     tasks.length,
         dueDate:   dueDate ?? null,
       });
