@@ -1095,6 +1095,10 @@ export class DojoTaskDialog extends HTMLElement {
           })(),
         },
       }));
+
+      // Limpieza defensiva del picker antes de cerrar (US-23 review)
+      pickerOpen = false;
+      picker.classList.remove('open');
       this._close();
     });
 
