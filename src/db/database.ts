@@ -5,13 +5,14 @@
  * Toda la asincronía basada en eventos (IDBRequest) se encapsula en Promesas.
  *
  * Object Stores:
- *   - tasks   : keyPath = 'id'  | índices: by-status, by-priority, by-created
- *   - columns : keyPath = 'id'
- *   - labels  : keyPath = 'id'  | índice: by-name (unique)
+ *   - tasks    : keyPath = 'id'  | índices: by-status, by-priority, by-created
+ *   - columns  : keyPath = 'id'
+ *   - labels   : keyPath = 'id'  | índice: by-name (unique)
+ *   - activity : keyPath = 'id'  | índice: by-taskId (US-20)
  */
 
 const DB_NAME    = 'kanban-app-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 /** Instancia singleton de la base de datos (se inicializa una sola vez). */
 let _db: IDBDatabase | null = null;
@@ -88,7 +89,13 @@ export function openDatabase(): Promise<IDBDatabase> {
       }
 
       // ── Migraciones futuras ─────────────────────────────────────────
-      // if (oldVersion < 2) { ... }
+      // v1 → v2: object store de actividad (US-20)
+      if (oldVersion < 2) {
+        const activityStore = db.createObjectStore('activity', { keyPath: 'id' });
+        activityStore.createIndex('by-taskId', 'taskId', { unique: false });
+      }
+
+      // if (oldVersion < 3) { ... }
     };
   });
 
