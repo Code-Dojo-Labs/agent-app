@@ -13,7 +13,6 @@
  */
 
 import { openDatabase } from './db/database.js';
-import { seedDefaultColumns } from './db/column.repository.js';
 import { seedDefaultLabels } from './db/label.repository.js';
 import { initTheme } from './utils/theme.js';
 
@@ -27,13 +26,10 @@ async function bootstrap(): Promise<void> {
     // 2. Abrir (o crear) la base de datos
     await openDatabase();
 
-    // 3. Seed de columnas por defecto (solo si el store está vacío)
-    await seedDefaultColumns();
-
-    // 4. Seed de etiquetas por defecto (solo si el store está vacío)
+    // 3. Seed de etiquetas por defecto (solo si el store está vacío)
     await seedDefaultLabels();
 
-    // 5. Registrar Web Components — US-01 Visualización del tablero Kanban
+    // 4. Registrar Web Components — US-01 Visualización del tablero Kanban
     await import('./components/organisms/dojo-app/dojo-app.js');
 
     // 6. Montar la app (el elemento <dojo-app> ya está en el HTML)

@@ -119,3 +119,18 @@ export async function reorderTasks(statusId: string, orderedIds: string[]): Prom
 
   await idbTransaction(tx);
 }
+
+/**
+ * Elimina todas las tareas de un tablero (US-22).
+ */
+export async function deleteTasksByBoard(boardId: string): Promise<void> {
+  const db    = await openDatabase();
+  const tx    = db.transaction('tasks', 'readwrite');
+  const store = tx.objectStore('tasks');
+  const index = store.index('by-board');
+  const tasks = await idbRequest<Task[]>(index.getAll(boardId));
+  for (const task of tasks) {
+    store.delete(task.id);
+  }
+  await idbTransaction(tx);
+}

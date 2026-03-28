@@ -13,7 +13,7 @@ import type { Column } from '../types/models.js';
 // ── Tipos internos ─────────────────────────────────────────────────────────
 
 type CreateColumnInput = Omit<Column, 'id'>;
-type UpdateColumnInput = Partial<Omit<Column, 'id'>>;
+type UpdateColumnInput = Partial<Omit<Column, 'id' | 'boardId'>>;
 
 // ── Implementación ─────────────────────────────────────────────────────────
 
@@ -21,6 +21,14 @@ type UpdateColumnInput = Partial<Omit<Column, 'id'>>;
 export async function getAllColumns(): Promise<Column[]> {
   const { store } = await getStore('columns');
   const columns   = await idbRequest<Column[]>(store.getAll());
+  return columns.sort((a, b) => a.order - b.order);
+}
+
+/** Devuelve todas las columnas de un tablero, ordenadas por `order` ascendente (US-22). */
+export async function getColumnsByBoard(boardId: string): Promise<Column[]> {
+  const { store } = await getStore('columns');
+  const index     = store.index('by-board');
+  const columns   = await idbRequest<Column[]>(index.getAll(boardId));
   return columns.sort((a, b) => a.order - b.order);
 }
 
@@ -70,16 +78,26 @@ export async function deleteColumn(id: string): Promise<void> {
 }
 
 /**
- * Inserta las columnas por defecto si el Object Store está vacío.
- * Se llama una sola vez durante la inicialización de la aplicación.
+ * Inserta las columnas por defecto para un tablero dado.
+ * @param boardId - ID del tablero al que pertenecerán las columnas.
  */
-export async function seedDefaultColumns(): Promise<void> {
-  const existing = await getAllColumns();
-  if (existing.length > 0) return;
-
+export async function seedDefaultColumns(boardId: string): Promise<void> {
   const { store, tx } = await getStore('columns', 'readwrite');
   for (const col of DEFAULT_COLUMNS) {
-    store.add({ ...col, id: generateUUID() });
+    store.add({ ...col, id: generateUUID(), boardId });
+  }
+  await idbTransaction(tx);
+}
+
+/**
+ * Elimina todas las columnas de un tablero (US-22).
+ */
+export async function deleteColumnsByBoard(boardId: string): Promise<void> {
+  const cols = await getColumnsByBoard(boardId);
+  if (cols.length === 0) return;
+  const { store, tx } = await getStore('columns', 'readwrite');
+  for (const col of cols) {
+    store.delete(col.id);
   }
   await idbTransaction(tx);
 }

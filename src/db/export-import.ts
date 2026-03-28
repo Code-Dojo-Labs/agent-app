@@ -11,7 +11,7 @@
  */
 
 import { openDatabase, idbRequest, idbTransaction } from './database.js';
-import type { Column, Task, Label, ActivityEvent } from '../types/models.js';
+import type { Column, Task, Label, ActivityEvent, Board } from '../types/models.js';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,7 @@ export interface BoardExport {
   tasks: Task[];
   labels: Label[];
   activity?: ActivityEvent[];
+  boards?: Board[];
 }
 
 /** Resultado de la validación de un archivo importado. */
@@ -57,13 +58,21 @@ export async function exportBoardData(): Promise<BoardExport> {
   // Incluir activity si el store existe (DB v2+)
   const allNames = db.objectStoreNames;
   const hasActivity = allNames.contains('activity');
-  const txStores = hasActivity ? [...storeNames, 'activity'] : [...storeNames];
+  const hasBoards   = allNames.contains('boards');
+  const txStores = [
+    ...storeNames,
+    ...(hasActivity ? ['activity'] : []),
+    ...(hasBoards   ? ['boards']   : []),
+  ];
   const tx = db.transaction(txStores, 'readonly');
   const columns  = await idbRequest<Column[]>(tx.objectStore('columns').getAll());
   const tasks    = await idbRequest<Task[]>(tx.objectStore('tasks').getAll());
   const labels   = await idbRequest<Label[]>(tx.objectStore('labels').getAll());
   const activity = hasActivity
     ? await idbRequest<ActivityEvent[]>(tx.objectStore('activity').getAll())
+    : [];
+  const boards   = hasBoards
+    ? await idbRequest<Board[]>(tx.objectStore('boards').getAll())
     : [];
 
   return {
@@ -73,6 +82,7 @@ export async function exportBoardData(): Promise<BoardExport> {
     tasks,
     labels:     labels.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })),
     activity:   activity.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    boards:     boards.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
   };
 }
 
@@ -183,9 +193,12 @@ export async function importBoardData(data: BoardExport): Promise<void> {
   const db = await openDatabase();
   const allNames = db.objectStoreNames;
   const hasActivity = allNames.contains('activity');
-  const storeNames = hasActivity
-    ? ['columns', 'tasks', 'labels', 'activity']
-    : ['columns', 'tasks', 'labels'];
+  const hasBoards   = allNames.contains('boards');
+  const storeNames = [
+    'columns', 'tasks', 'labels',
+    ...(hasActivity ? ['activity'] : []),
+    ...(hasBoards   ? ['boards']   : []),
+  ];
   const tx = db.transaction(storeNames, 'readwrite');
 
   const colStore   = tx.objectStore('columns');
@@ -208,6 +221,27 @@ export async function importBoardData(data: BoardExport): Promise<void> {
     activityStore.clear();
     if (data.activity) {
       for (const evt of data.activity) activityStore.add(evt);
+    }
+  }
+
+  // 4. Importar tableros si existen en el archivo y el store está disponible (US-22)
+  if (hasBoards) {
+    const boardStore = tx.objectStore('boards');
+    boardStore.clear();
+    if (data.boards && data.boards.length > 0) {
+      for (const board of data.boards) boardStore.add(board);
+    } else {
+      // Si no hay boards en los datos importados (export antiguo),
+      // crear un tablero por defecto para las columnas/tareas importadas.
+      const defaultId = crypto.randomUUID();
+      boardStore.add({ id: defaultId, name: 'Mi tablero', emoji: '🥋', createdAt: new Date().toISOString() });
+      // Asignar boardId a columnas y tareas que no lo tienen
+      for (const col of data.columns) {
+        if (!col.boardId) colStore.put({ ...col, boardId: defaultId });
+      }
+      for (const task of data.tasks) {
+        if (!task.boardId) taskStore.put({ ...task, boardId: defaultId });
+      }
     }
   }
 
