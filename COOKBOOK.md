@@ -34,6 +34,7 @@
    - [Paso 20 — Modo oscuro automático (US-18 / Issue #36)](#paso-20--modo-oscuro-automático-us-18--issue-36)
    - [Paso 21 — Exportación e importación de datos (US-19 / Issue #37)](#paso-21--exportación-e-importación-de-datos-us-19--issue-37)
    - [Paso 22 — Historial de actividad por tarea (US-20 / Issue #38)](#paso-22--historial-de-actividad-por-tarea-us-20--issue-38)
+   - [Paso 23 — Subtareas / Checklist (US-21 / Issue #39)](#paso-23--subtareas--checklist-us-21--issue-39)
 
 ---
 
@@ -2147,3 +2148,64 @@ Las fechas se formatean con `Intl.RelativeTimeFormat('es', { numeric: 'auto' })`
 - La UI responde inmediatamente sin esperar la escritura del evento.
 - En caso de error, el evento se pierde silenciosamente (solo log en consola) sin afectar la operación principal.
 - La lectura de actividad al abrir el panel es síncrona respecto al usuario (espera resultado antes de renderizar).
+
+### Paso 23 — Subtareas / Checklist (US-21 / Issue #39)
+
+| Campo | Valor |
+|---|---|
+| **Issue** | #39 |
+| **User Story** | US-21 — Subtareas (Checklist) |
+| **Branch** | `feat/39-subtareas-checklist` |
+| **PR** | #55 |
+
+#### Problema
+
+Las tareas del tablero no tenían forma de descomponerse en pasos más pequeños. Los usuarios necesitan poder crear listas de verificación dentro de cada tarea, marcar subtareas como completadas y ver el progreso tanto en el detalle como en la tarjeta del tablero.
+
+#### Decisión de diseño
+
+Las subtareas se almacenan como un array embebido (`subtasks: Subtask[]`) directamente en el objeto `Task`, sin crear un nuevo object store en IndexedDB. Esto simplifica la persistencia: `updateTask()` ya maneja la serialización completa del objeto, por lo que no se requirieron cambios en la capa de base de datos ni migración de versión.
+
+#### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `src/types/models.ts` | Nueva interfaz `Subtask { id, text, completed }` + campo opcional `subtasks?: Subtask[]` en `Task` |
+| `src/components/organisms/dojo-task-detail/dojo-task-detail.ts` | Sección completa de subtareas: heading, barra de progreso, checklist interactivo, input para añadir |
+| `src/components/atoms/dojo-task-card/dojo-task-card.ts` | Método `setSubtaskProgress(done, total)` + indicador visual de progreso en miniatura |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | Pasa datos de subtareas a tarjetas en render + actualización inline sin re-render completo |
+
+#### Receta: Sección de subtareas en el detalle de tarea
+
+1. **Modelo** — Se define `Subtask` como tipo con `id: string`, `text: string`, `completed: boolean`. El campo `subtasks` es opcional en `Task` para retrocompatibilidad con tareas existentes.
+
+2. **`_buildSubtasksField(task)`** — Construye un contenedor `.subtasks-section` con:
+   - Heading "Subtareas"
+   - Texto de progreso "X / Y completadas" (solo si `total > 0`)
+   - Barra de progreso visual (`.subtasks-progress-bar` + `.subtasks-progress-fill`)
+   - Lista `<ul>` con un `<li>` por subtarea: checkbox + texto + botón eliminar
+   - Fila de input + botón "+ Añadir" para crear subtareas
+
+3. **Interacciones** — Cada acción (toggle checkbox, eliminar, añadir) actualiza el array de subtareas y llama `this._save({ subtasks: [...] })`, que despacha `dojo:task-field-updated`. La sección se reconstruye in-place con `_rebuildSubtasksSection()` usando `replaceWith()`.
+
+4. **Tarjeta** — `DojoTaskCard` expone `setSubtaskProgress(done, total)` que renderiza una barra de progreso miniatura con texto "X / Y" cuando hay subtareas. Si `total === 0`, no se muestra nada.
+
+5. **Tablero** — `_renderTaskCards()` calcula `done`/`total` de cada tarea y llama `setSubtaskProgress()`. En `_handleTaskFieldUpdated()`, si `changes.subtasks` está presente, actualiza la tarjeta inline sin refrescar toda la columna.
+
+#### Accesibilidad (WCAG 2.1)
+
+- `aria-label` descriptivos en checkboxes, botones de eliminar e input
+- Rol `list` en el contenedor de subtareas
+- Foco automático en el input tras añadir una subtarea (`requestAnimationFrame`)
+
+#### ADR-28 — Subtareas embebidas en Task (sin store separado)
+
+**Contexto:** Se necesita almacenar subtareas asociadas a cada tarea. Las opciones eran: (1) store separado `subtasks` con referencia por `taskId`, o (2) array embebido en el objeto `Task`.
+
+**Decisión:** Embeber `subtasks: Subtask[]` directamente en el objeto `Task`.
+
+**Consecuencias:**
+- Sin migración de base de datos (se mantiene versión 2).
+- `updateTask()` persiste subtareas automáticamente al serializar el objeto completo.
+- Exportación/importación funciona sin cambios (el campo es opcional y se incluye automáticamente).
+- Limitación teórica: no se pueden consultar subtareas independientemente por índice. En la práctica, el volumen de subtareas por tarea es bajo (~10-20) y no justifica la complejidad adicional.

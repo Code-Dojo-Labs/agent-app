@@ -55,6 +55,7 @@ interface ActiveFilter {
 /** Contrato de la propiedad taskLabels expuesta por dojo-task-card (US-10). */
 interface TaskCardElement extends HTMLElement {
   taskLabels: Label[];
+  setSubtaskProgress(done: number, total: number): void;
 }
 
 // ── Clase ──────────────────────────────────────────────────────────────────
@@ -838,6 +839,13 @@ export class DojoKanbanBoard extends HTMLElement {
       card.setAttribute('task-created-at', task.createdAt);
       if (task.dueDate) card.setAttribute('task-due-date', task.dueDate);
       (card as TaskCardElement).taskLabels = this._getTaskLabels(task);
+      const subs = task.subtasks ?? [];
+      if (subs.length > 0) {
+        (card as TaskCardElement).setSubtaskProgress(
+          subs.filter(s => s.completed).length,
+          subs.length
+        );
+      }
       colEl.appendChild(card);
     }
   }
@@ -1291,7 +1299,7 @@ export class DojoKanbanBoard extends HTMLElement {
         } else if (changes.labelIds !== undefined && this._activeFilter.labelIds?.length) {
           // Etiquetas cambiaron y hay filtro activo — puede que la tarjeta deba desaparecer
           this._refreshColumnCards(sourceColumnId);
-        } else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined || changes.dueDate !== undefined) {
+        } else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined || changes.dueDate !== undefined || changes.subtasks !== undefined) {
           const colEl = this._shadow.querySelector(
             `dojo-kanban-column[column-id="${CSS.escape(sourceColumnId)}"]`
           );
@@ -1307,6 +1315,13 @@ export class DojoKanbanBoard extends HTMLElement {
                 } else {
                   cardEl.removeAttribute('task-due-date');
                 }
+              }
+              if (changes.subtasks !== undefined) {
+                const subs = updated.subtasks ?? [];
+                (cardEl as TaskCardElement).setSubtaskProgress(
+                  subs.filter(s => s.completed).length,
+                  subs.length
+                );
               }
             }
           }
