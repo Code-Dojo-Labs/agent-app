@@ -27,6 +27,8 @@ export interface Subtask {
 export interface Task {
   /** UUID v4 generado en el cliente. */
   id: string;
+  /** FK → Board.id — tablero al que pertenece (US-22). */
+  boardId: string;
   /** Título visible de la tarea. Máx. 120 caracteres. */
   title: string;
   /** Descripción en formato Markdown. Puede estar vacío. */
@@ -55,6 +57,8 @@ export interface Task {
 export interface Column {
   /** UUID v4. */
   id: string;
+  /** FK → Board.id — tablero al que pertenece (US-22). */
+  boardId: string;
   /** Nombre visible de la columna. Máx. 50 caracteres. */
   name: string;
   /** Emoji o nombre de ícono que representa el estado (ej. "✅"). */
@@ -66,7 +70,7 @@ export interface Column {
 }
 
 /** Columnas por defecto que se insertan al inicializar la base de datos. */
-export const DEFAULT_COLUMNS: Omit<Column, 'id'>[] = [
+export const DEFAULT_COLUMNS: Omit<Column, 'id' | 'boardId'>[] = [
   { name: 'Backlog',      icon: '📋', order: 0 },
   { name: 'Por hacer',    icon: '🔲', order: 1 },
   { name: 'En progreso',  icon: '🔄', order: 2 },
@@ -74,6 +78,23 @@ export const DEFAULT_COLUMNS: Omit<Column, 'id'>[] = [
   { name: 'Hecho',        icon: '✅', order: 4 },
   { name: 'Bloqueado',    icon: '🚫', order: 5 },
 ];
+
+// ── Board (US-22) ──────────────────────────────────────────────────────────
+
+/** Representa un tablero Kanban independiente. */
+export interface Board {
+  /** UUID v4. */
+  id: string;
+  /** Nombre visible del tablero. Máx. 60 caracteres. */
+  name: string;
+  /** Emoji decorativo opcional del tablero. */
+  emoji?: string;
+  /** Fecha de creación en formato ISO 8601. */
+  createdAt: string;
+}
+
+/** Nombre del tablero por defecto creado en la migración. */
+export const DEFAULT_BOARD_NAME = 'Mi tablero';
 
 // ── Label ──────────────────────────────────────────────────────────────────
 

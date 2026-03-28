@@ -2209,3 +2209,91 @@ Las subtareas se almacenan como un array embebido (`subtasks: Subtask[]`) direct
 - `updateTask()` persiste subtareas automáticamente al serializar el objeto completo.
 - Exportación/importación funciona sin cambios (el campo es opcional y se incluye automáticamente).
 - Limitación teórica: no se pueden consultar subtareas independientemente por índice. En la práctica, el volumen de subtareas por tarea es bajo (~10-20) y no justifica la complejidad adicional.
+
+---
+
+## Paso 24 — Múltiples tableros (US-22)
+
+> **Issue:** #40 · **PR:** #56 · **Rama:** `feat/40-multiples-tableros`
+
+### Problema
+
+La aplicación soportaba un único tablero implícito. Todas las columnas y tareas vivían en un espacio global sin particionamiento.
+
+### Solución
+
+#### Modelo de datos
+
+Se añade la interfaz `Board` (`id`, `name`, `emoji?`, `createdAt`) en `models.ts`. Se agrega `boardId: string` a las interfaces `Task` y `Column`. Las etiquetas permanecen globales (compartidas entre tableros).
+
+#### Migración de base de datos (v2 → v3)
+
+En `database.ts`, el bloque `if (oldVersion < 3)`:
+
+1. Crea el object store `boards` (keyPath = `id`).
+2. Genera un tablero por defecto con `crypto.randomUUID()` (sincrónico en `onupgradeneeded`).
+3. Crea el índice `by-board` en los stores `columns` y `tasks`.
+4. Itera registros existentes con `openCursor()` y asigna `boardId` al tablero por defecto.
+
+```
+boards store  → keyPath: 'id'
+columns store → nuevo índice: 'by-board' sobre 'boardId'
+tasks store   → nuevo índice: 'by-board' sobre 'boardId'
+```
+
+#### Repositorio de tableros (`board.repository.ts`)
+
+CRUD completo: `getAllBoards`, `getBoardById`, `createBoard`, `updateBoard`, `deleteBoard`. Tipos `CreateBoardInput` y `UpdateBoardInput` derivados con `Omit<>`.
+
+#### Repositorios actualizados
+
+- **`column.repository.ts`**: `getColumnsByBoard(boardId)` usa índice `by-board`. `seedDefaultColumns(boardId)` acepta parámetro. `deleteColumnsByBoard(boardId)` para limpieza en cascada.
+- **`task.repository.ts`**: `deleteTasksByBoard(boardId)` para eliminación en cascada al borrar un tablero.
+
+#### Componente `dojo-board-selector` (Organismo)
+
+Grid responsiva (`grid-template-columns: repeat(auto-fill, minmax(220px, 1fr))`) que muestra tarjetas con emoji, nombre y fecha. Funcionalidades:
+
+- **Crear tablero**: Formulario inline (nombre + emoji). Al crear, llama `createBoard()` + `seedDefaultColumns(boardId)`.
+- **Renombrar tablero**: Formulario inline con valores precargados. Llama `updateBoard()`.
+- **Eliminar tablero**: Diálogo de confirmación. Ejecuta `deleteTasksByBoard` → `deleteColumnsByBoard` → `deleteBoard`. Previene eliminar el último tablero.
+- Evento `dojo:board-selected` con `{ boardId }` al hacer click.
+
+#### Componente `dojo-kanban-board` actualizado
+
+- Nuevo atributo observado `board-id` (via `observedAttributes` + `attributeChangedCallback`).
+- `_loadBoard()` usa `getColumnsByBoard(this._boardId)` en lugar de `getAllColumns()`.
+- `createColumn()` y `createTask()` incluyen `boardId` del tablero activo.
+- No carga datos si `boardId` está vacío (espera a que se establezca).
+
+#### Orquestación en `dojo-app`
+
+- Importa `dojo-board-selector` y `getAllBoards`.
+- Estado `_activeBoardId`: si vacío → vista selector, si presente → vista tablero.
+- Atributo `view="board"` en el host controla visibilidad via CSS (header actions, botón "← Tableros").
+- `_autoSelectSingleBoard()`: si solo hay un tablero, navega directamente (UX optimizada).
+- `_navigateToBoard(boardId)`: oculta selector, muestra kanban con `board-id` attribute.
+- `_showBoardSelector()`: oculta kanban, muestra selector con `refresh()`.
+
+#### Export/Import actualizado
+
+`BoardExport` incluye campo opcional `boards?: Board[]`. La exportación lee el store `boards`. La importación es retrocompatible: si los datos importados no incluyen `boards`, crea un tablero por defecto y asigna `boardId` a columnas y tareas importadas.
+
+### Accesibilidad (WCAG 2.1)
+
+- Grid con `role="list"`, tarjetas con `role="listitem"` y `tabindex="0"`
+- `aria-label` descriptivos en tarjetas, botones de acción y formularios
+- Navegación con teclado (Enter/Space para seleccionar, Escape para cancelar)
+- Diálogo de eliminación con `role="alertdialog"` y `aria-labelledby`
+- Botones de acción visibles en hover/focus-within
+
+### ADR-29 — boardId en Task y Column (no solo en Column)
+
+**Contexto:** Dado que las tareas pertenecen a columnas y las columnas a tableros, `boardId` en `Task` es técnicamente redundante. Sin embargo, se necesitan operaciones de eliminación en cascada eficientes al borrar un tablero.
+
+**Decisión:** Añadir `boardId` directamente en `Task` además de en `Column`.
+
+**Consecuencias:**
+- `deleteTasksByBoard(boardId)` opera con un solo índice lookup en lugar de resolver columnas primero.
+- Ligera desnormalización compensada por simplicidad operacional.
+- El índice `by-board` en tasks permite consultas directas sin joins.

@@ -14,9 +14,11 @@
 
 import '../dojo-kanban-board/dojo-kanban-board.js';
 import '../dojo-label-manager/dojo-label-manager.js';
+import '../dojo-board-selector/dojo-board-selector.js';
 import '../../atoms/dojo-theme-toggle/dojo-theme-toggle.js';
 
 import type { Label } from '../../../types/models.js';
+import { getAllBoards } from '../../../db/board.repository.js';
 import {
   exportBoardData,
   downloadBoardExport,
@@ -32,6 +34,8 @@ export class DojoApp extends HTMLElement {
   /** Datos pendientes de importación (tras validación, previo a confirmación). */
   private _pendingImport: import('../../../db/export-import.js').BoardExport | null = null;
   private _toastTimer: ReturnType<typeof setTimeout> | null = null;
+  /** ID del tablero activo. Si es vacío, se muestra el selector de tableros (US-22). */
+  private _activeBoardId = '';
 
   /** Referencia estable para poder eliminar el listener de teclado del diálogo de importación. */
   private _onImportKeydown = (e: KeyboardEvent): void => {
@@ -69,6 +73,7 @@ export class DojoApp extends HTMLElement {
     // Guarda de idempotencia: evita re-render al mover el elemento en el DOM
     if (this._shadow.childElementCount > 0) return;
     this._render();
+    this._autoSelectSingleBoard();
   }
 
   disconnectedCallback(): void {
@@ -281,6 +286,38 @@ export class DojoApp extends HTMLElement {
       dojo-kanban-board {
         height: 100%;
       }
+      dojo-board-selector {
+        height: 100%;
+      }
+
+      /* Botón "Volver a tableros" */
+      .back-btn {
+        display: none;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.3125rem 0.625rem;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius, 6px);
+        background: transparent;
+        color: var(--dojo-text-secondary);
+        font-size: 0.8125rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        white-space: nowrap;
+      }
+      .back-btn:hover {
+        background: var(--dojo-bg);
+        color: var(--dojo-text-primary);
+        border-color: var(--dojo-primary, #1D4ED8);
+      }
+      .back-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
+      :host([view="board"]) .back-btn { display: inline-flex; }
+      :host([view="board"]) .header-actions { display: flex; }
+      :host(:not([view="board"])) .header-actions { display: none; }
     `;
     this._shadow.appendChild(style);
 
@@ -366,6 +403,22 @@ export class DojoApp extends HTMLElement {
 
     appHeader.appendChild(logo);
     appHeader.appendChild(title);
+
+    // Botón "Volver a tableros" (US-22) — visible solo en vista de tablero
+    const backBtn = document.createElement('button');
+    backBtn.className = 'back-btn';
+    backBtn.type = 'button';
+    backBtn.setAttribute('aria-label', 'Volver a la lista de tableros');
+    const backIcon = document.createElement('span');
+    backIcon.setAttribute('aria-hidden', 'true');
+    backIcon.textContent = '←';
+    const backText = document.createElement('span');
+    backText.textContent = 'Tableros';
+    backBtn.appendChild(backIcon);
+    backBtn.appendChild(backText);
+    backBtn.addEventListener('click', () => this._showBoardSelector());
+    appHeader.appendChild(backBtn);
+
     appHeader.appendChild(headerActions);
     appHeader.appendChild(themeToggle);
     this._shadow.appendChild(appHeader);
@@ -375,9 +428,21 @@ export class DojoApp extends HTMLElement {
     boardArea.className = 'board-area';
     boardArea.setAttribute('role', 'main');
 
+    // Selector de tableros (vista por defecto — US-22)
+    const boardSelector = document.createElement('dojo-board-selector');
+    boardArea.appendChild(boardSelector);
+
+    // Tablero Kanban (se muestra al seleccionar un tablero)
     const board = document.createElement('dojo-kanban-board');
+    board.style.display = 'none';
     boardArea.appendChild(board);
     this._shadow.appendChild(boardArea);
+
+    // Escuchar selección de tablero (US-22)
+    this._shadow.addEventListener('dojo:board-selected', (e: Event) => {
+      const { boardId } = (e as CustomEvent).detail as { boardId: string };
+      this._navigateToBoard(boardId);
+    });
 
     // ── Panel de gestión de etiquetas (US-11) ───────────────────────────────────────
     const labelMgr = document.createElement('dojo-label-manager');
@@ -431,6 +496,49 @@ export class DojoApp extends HTMLElement {
     toast.setAttribute('role', 'status');
     toast.setAttribute('aria-live', 'polite');
     this._shadow.appendChild(toast);
+  }
+
+  // ── Navegación entre vistas (US-22) ──────────────────────────────────────
+
+  /**
+   * Si solo hay un tablero, navega directamente a él.
+   * Si hay múltiples, se queda en el selector.
+   */
+  private async _autoSelectSingleBoard(): Promise<void> {
+    try {
+      const boards = await getAllBoards();
+      if (boards.length === 1) {
+        this._navigateToBoard(boards[0].id);
+      }
+    } catch {
+      // Si falla, se queda en el selector
+    }
+  }
+
+  private _navigateToBoard(boardId: string): void {
+    this._activeBoardId = boardId;
+    this.setAttribute('view', 'board');
+
+    const selector = this._shadow.querySelector('dojo-board-selector') as HTMLElement | null;
+    const board    = this._shadow.querySelector('dojo-kanban-board') as HTMLElement | null;
+    if (selector) selector.style.display = 'none';
+    if (board) {
+      board.style.display = '';
+      board.setAttribute('board-id', boardId);
+    }
+  }
+
+  private _showBoardSelector(): void {
+    this._activeBoardId = '';
+    this.removeAttribute('view');
+
+    const selector = this._shadow.querySelector('dojo-board-selector') as HTMLElement | null;
+    const board    = this._shadow.querySelector('dojo-kanban-board') as HTMLElement | null;
+    if (board) board.style.display = 'none';
+    if (selector) {
+      selector.style.display = '';
+      (selector as any).refresh?.();
+    }
   }
 
   // ── Export/Import (US-19) ────────────────────────────────────────────────

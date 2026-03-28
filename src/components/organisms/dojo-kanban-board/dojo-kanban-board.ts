@@ -29,7 +29,7 @@
  */
 
 import type { Column, Task, Label, Priority } from '../../../types/models.js';
-import { getAllColumns, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
+import { getColumnsByBoard, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
 import { getTasksByStatus, createTask, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
 import { getAllLabels } from '../../../db/label.repository.js';
 import { addActivityEvent, deleteActivitiesByTaskId } from '../../../db/activity.repository.js';
@@ -62,8 +62,10 @@ interface TaskCardElement extends HTMLElement {
 
 export class DojoKanbanBoard extends HTMLElement {
   static readonly TAG = 'dojo-kanban-board';
+  static get observedAttributes(): string[] { return ['board-id']; }
 
   private _shadow: ShadowRoot;
+  private _boardId = '';
   private _activeFilter: ActiveFilter = {};
   /** columnId → lista de todas las tareas de esa columna (sin filtrar) */
   private _tasksByColumn: Map<string, Task[]> = new Map();
@@ -88,9 +90,19 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   connectedCallback(): void {
+    this._boardId = this.getAttribute('board-id') ?? '';
     this._render();
-    this._loadBoard();
+    if (this._boardId) this._loadBoard();
   }
+
+  attributeChangedCallback(name: string, oldVal: string | null, newVal: string | null): void {
+    if (name === 'board-id' && newVal && newVal !== oldVal) {
+      this._boardId = newVal;
+      if (this._shadow.childElementCount > 0) this._loadBoard();
+    }
+  }
+
+  get boardId(): string { return this._boardId; }
 
   // ── API pública ──────────────────────────────────────────────────────────
 
@@ -753,7 +765,7 @@ export class DojoKanbanBoard extends HTMLElement {
 
     try {
       const [columns, labels] = await Promise.all([
-        getAllColumns(),
+        getColumnsByBoard(this._boardId),
         getAllLabels(),
       ]);
       this._labels = labels;
@@ -1074,7 +1086,7 @@ export class DojoKanbanBoard extends HTMLElement {
       ? Math.max(...this._columns.map(c => c.order)) + 1
       : 0;
     try {
-      const newCol = await createColumn({ name, icon, order: nextOrder });
+      const newCol = await createColumn({ name, icon, order: nextOrder, boardId: this._boardId });
       this._columns.push(newCol);
       this._tasksByColumn.set(newCol.id, []);
       this._renderColumns(this._columns);
@@ -1187,6 +1199,7 @@ export class DojoKanbanBoard extends HTMLElement {
         title,
         description,
         statusId,
+        boardId:   this._boardId,
         priority:  priority as Task['priority'],
         labelIds:  [],
         order:     tasks.length,

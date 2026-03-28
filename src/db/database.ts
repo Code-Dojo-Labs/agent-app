@@ -5,14 +5,15 @@
  * Toda la asincronía basada en eventos (IDBRequest) se encapsula en Promesas.
  *
  * Object Stores:
- *   - tasks    : keyPath = 'id'  | índices: by-status, by-priority, by-created
- *   - columns  : keyPath = 'id'
+ *   - tasks    : keyPath = 'id'  | índices: by-status, by-priority, by-created, by-board
+ *   - columns  : keyPath = 'id'  | índice: by-board
  *   - labels   : keyPath = 'id'  | índice: by-name (unique)
  *   - activity : keyPath = 'id'  | índice: by-taskId (US-20)
+ *   - boards   : keyPath = 'id'  (US-22)
  */
 
 const DB_NAME    = 'kanban-app-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /** Instancia singleton de la base de datos (se inicializa una sola vez). */
 let _db: IDBDatabase | null = null;
@@ -95,7 +96,62 @@ export function openDatabase(): Promise<IDBDatabase> {
         activityStore.createIndex('by-taskId', 'taskId', { unique: false });
       }
 
-      // if (oldVersion < 3) { ... }
+      // v2 → v3: múltiples tableros (US-22)
+      if (oldVersion < 3) {
+        // Nuevo store 'boards'
+        db.createObjectStore('boards', { keyPath: 'id' });
+
+        // Crear tablero por defecto y asignar boardId a datos existentes.
+        // Usamos crypto.randomUUID() directamente aquí porque generateUUID es
+        // un import externo y onupgradeneeded debe ser synchronous.
+        const defaultBoardId = crypto.randomUUID();
+        const now            = new Date().toISOString();
+
+        const tx = (event.target as IDBOpenDBRequest).transaction!;
+
+        // Insertar tablero por defecto
+        const boardStore = tx.objectStore('boards');
+        boardStore.add({
+          id: defaultBoardId,
+          name: 'Mi tablero',
+          emoji: '🥋',
+          createdAt: now,
+        });
+
+        // Añadir índice by-board a columns y asignar boardId a columnas existentes
+        const colStore = tx.objectStore('columns');
+        colStore.createIndex('by-board', 'boardId', { unique: false });
+        const colReq = colStore.openCursor();
+        colReq.onsuccess = () => {
+          const cursor = colReq.result;
+          if (cursor) {
+            const col = cursor.value;
+            if (!col.boardId) {
+              col.boardId = defaultBoardId;
+              cursor.update(col);
+            }
+            cursor.continue();
+          }
+        };
+
+        // Añadir índice by-board a tasks y asignar boardId a tareas existentes
+        const taskStore = tx.objectStore('tasks');
+        taskStore.createIndex('by-board', 'boardId', { unique: false });
+        const taskReq = taskStore.openCursor();
+        taskReq.onsuccess = () => {
+          const cursor = taskReq.result;
+          if (cursor) {
+            const task = cursor.value;
+            if (!task.boardId) {
+              task.boardId = defaultBoardId;
+              cursor.update(task);
+            }
+            cursor.continue();
+          }
+        };
+      }
+
+      // if (oldVersion < 4) { ... }
     };
   });
 
