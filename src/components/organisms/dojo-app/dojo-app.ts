@@ -29,6 +29,36 @@ export class DojoApp extends HTMLElement {
   static readonly TAG = 'dojo-app';
 
   private _shadow: ShadowRoot;
+  /** Datos pendientes de importación (tras validación, previo a confirmación). */
+  private _pendingImport: import('../../../db/export-import.js').BoardExport | null = null;
+  private _toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Referencia estable para poder eliminar el listener de teclado del diálogo de importación. */
+  private _onImportKeydown = (e: KeyboardEvent): void => {
+    if (!this.hasAttribute('import-confirm')) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      this._hideImportConfirm();
+      return;
+    }
+    // Focus trap: mantener Tab dentro del diálogo (WCAG 2.1 SC 2.1.2)
+    if (e.key === 'Tab') {
+      const focusable = Array.from(
+        this._shadow.querySelectorAll<HTMLElement>('.import-dialog button:not([disabled])')
+      ).filter(el => el.offsetParent !== null);
+      if (focusable.length < 2) return;
+      const first  = focusable[0];
+      const last   = focusable[focusable.length - 1];
+      const active = this._shadow.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  };
 
   constructor() {
     super();
@@ -39,6 +69,10 @@ export class DojoApp extends HTMLElement {
     // Guarda de idempotencia: evita re-render al mover el elemento en el DOM
     if (this._shadow.childElementCount > 0) return;
     this._render();
+  }
+
+  disconnectedCallback(): void {
+    document.removeEventListener('keydown', this._onImportKeydown);
   }
 
   private _render(): void {
@@ -401,9 +435,6 @@ export class DojoApp extends HTMLElement {
 
   // ── Export/Import (US-19) ────────────────────────────────────────────────
 
-  /** Datos pendientes de importación (tras validación, previo a confirmación). */
-  private _pendingImport: import('../../../db/export-import.js').BoardExport | null = null;
-
   private async _handleExport(): Promise<void> {
     try {
       const data = await exportBoardData();
@@ -440,6 +471,8 @@ export class DojoApp extends HTMLElement {
     this.setAttribute('import-confirm', '');
     const dialog = this._shadow.querySelector<HTMLElement>('.import-dialog');
     dialog?.setAttribute('aria-hidden', 'false');
+    document.removeEventListener('keydown', this._onImportKeydown);
+    document.addEventListener('keydown', this._onImportKeydown);
     requestAnimationFrame(() => {
       this._shadow.querySelector<HTMLElement>('.import-cancel-btn')?.focus();
     });
@@ -447,6 +480,7 @@ export class DojoApp extends HTMLElement {
 
   private _hideImportConfirm(): void {
     this.removeAttribute('import-confirm');
+    document.removeEventListener('keydown', this._onImportKeydown);
     const dialog = this._shadow.querySelector<HTMLElement>('.import-dialog');
     dialog?.setAttribute('aria-hidden', 'true');
     this._pendingImport = null;
@@ -467,8 +501,6 @@ export class DojoApp extends HTMLElement {
       this._showToast(msg, true);
     }
   }
-
-  private _toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _showToast(message: string, isError = false): void {
     const toast = this._shadow.querySelector<HTMLElement>('.toast');
