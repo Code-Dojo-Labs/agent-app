@@ -26,11 +26,12 @@
  * --dojo-primary, --dojo-radius, --dojo-radius-sm, --dojo-shadow
  */
 
-import type { Task, Column, Label, Priority, ActivityEvent } from '../../../types/models.js';
+import type { Task, Column, Label, Priority, ActivityEvent, Subtask } from '../../../types/models.js';
 import { parseMarkdown } from '../../../utils/markdown.js';
 import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 import { createLabel } from '../../../db/label.repository.js';
 import { getActivitiesByTaskId } from '../../../db/activity.repository.js';
+import { generateUUID } from '../../../utils/uuid.js';
 
 // ── Constantes ─────────────────────────────────────────────────────────────
 
@@ -723,6 +724,128 @@ export class DojoTaskDetail extends HTMLElement {
       .activity-icon { font-size: 0.75rem; }
       .activity-desc { color: var(--dojo-text-primary); }
       .activity-time { white-space: nowrap; font-size: 0.6875rem; }
+
+      /* ── Subtareas / checklist (US-21) ── */
+      .subtasks-section {
+        border-top: 1px solid var(--dojo-border);
+        padding-top: 0.875rem;
+      }
+      .subtasks-heading {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--dojo-text-primary);
+        margin: 0 0 0.25rem;
+      }
+      .subtasks-progress-text {
+        font-size: 0.6875rem;
+        color: var(--dojo-text-secondary);
+        margin: 0 0 0.5rem;
+      }
+      .subtasks-progress-bar {
+        width: 100%;
+        height: 4px;
+        background: var(--dojo-border);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+      }
+      .subtasks-progress-fill {
+        height: 100%;
+        background: var(--dojo-primary, #1D4ED8);
+        border-radius: 2px;
+        transition: width 0.2s ease;
+      }
+      .subtasks-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+      .subtask-item {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.8125rem;
+        color: var(--dojo-text-primary);
+        padding: 0.25rem 0;
+      }
+      .subtask-item input[type="checkbox"] {
+        flex-shrink: 0;
+        cursor: pointer;
+        accent-color: var(--dojo-primary, #1D4ED8);
+      }
+      .subtask-text {
+        flex: 1;
+        line-height: 1.4;
+        word-break: break-word;
+      }
+      .subtask-text.completed {
+        text-decoration: line-through;
+        color: var(--dojo-text-secondary);
+      }
+      .subtask-delete-btn {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 0.125rem 0.25rem;
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.6875rem;
+        color: var(--dojo-text-secondary);
+        opacity: 0;
+        transition: opacity 0.15s, color 0.15s;
+      }
+      .subtask-item:hover .subtask-delete-btn,
+      .subtask-item:focus-within .subtask-delete-btn {
+        opacity: 1;
+      }
+      .subtask-delete-btn:hover {
+        color: #EF4444;
+      }
+      .subtask-delete-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+        opacity: 1;
+      }
+      .subtask-add-row {
+        display: flex;
+        gap: 0.375rem;
+        margin-top: 0.375rem;
+      }
+      .subtask-add-input {
+        flex: 1;
+        font-size: 0.8125rem;
+        font-family: inherit;
+        padding: 0.375rem 0.5rem;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        background: var(--dojo-bg);
+        color: var(--dojo-text-primary);
+        outline: none;
+      }
+      .subtask-add-input:focus {
+        border-color: var(--dojo-primary, #1D4ED8);
+        box-shadow: 0 0 0 2px rgba(29,78,216,.15);
+      }
+      .subtask-add-btn {
+        font-size: 0.75rem;
+        font-family: inherit;
+        padding: 0.375rem 0.625rem;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        background: var(--dojo-primary, #1D4ED8);
+        color: #FFFFFF;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .subtask-add-btn:hover {
+        opacity: 0.9;
+      }
+      .subtask-add-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
     `;
     this._shadow.appendChild(style);
 
@@ -776,6 +899,7 @@ export class DojoTaskDetail extends HTMLElement {
     body.appendChild(this._buildDueDateField(task));
     body.appendChild(this._buildDescriptionField(task));
     body.appendChild(this._buildLabelsField(task));
+    body.appendChild(this._buildSubtasksField(task));
     body.appendChild(this._buildMetadata(task));
 
     // US-20: Sección de actividad (se carga de forma asíncrona)
@@ -1544,6 +1668,141 @@ export class DojoTaskDetail extends HTMLElement {
     section.appendChild(lbl);
     section.appendChild(row);
     return section;
+  }
+
+  // ── Sección de subtareas / checklist (US-21) ──────────────────────────────
+
+  private _buildSubtasksField(task: Task): HTMLElement {
+    const section = document.createElement('div');
+    section.className = 'subtasks-section';
+
+    const heading = document.createElement('h3');
+    heading.className = 'subtasks-heading';
+    heading.textContent = 'Subtareas';
+    section.appendChild(heading);
+
+    const subtasks = task.subtasks ?? [];
+    const total     = subtasks.length;
+    const completed = subtasks.filter(s => s.completed).length;
+
+    // Progreso (solo si hay subtareas)
+    if (total > 0) {
+      const progressText = document.createElement('p');
+      progressText.className = 'subtasks-progress-text';
+      progressText.textContent = `${completed} / ${total} completadas`;
+      section.appendChild(progressText);
+
+      const progressBar = document.createElement('div');
+      progressBar.className = 'subtasks-progress-bar';
+      const progressFill = document.createElement('div');
+      progressFill.className = 'subtasks-progress-fill';
+      progressFill.style.width = `${Math.round((completed / total) * 100)}%`;
+      progressBar.appendChild(progressFill);
+      section.appendChild(progressBar);
+    }
+
+    // Lista de subtareas
+    const list = document.createElement('ul');
+    list.className = 'subtasks-list';
+    list.setAttribute('role', 'list');
+
+    for (const sub of subtasks) {
+      list.appendChild(this._buildSubtaskItem(sub, subtasks));
+    }
+
+    section.appendChild(list);
+
+    // Fila para añadir nueva subtarea
+    const addRow = document.createElement('div');
+    addRow.className = 'subtask-add-row';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'subtask-add-input';
+    input.placeholder = 'Nueva subtarea…';
+    input.maxLength = 200;
+    input.setAttribute('aria-label', 'Texto de nueva subtarea');
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'subtask-add-btn';
+    addBtn.textContent = '+ Añadir';
+
+    const addSubtask = (): void => {
+      const text = input.value.trim();
+      if (!text || !this._task) return;
+      const newSub: Subtask = { id: generateUUID(), text, completed: false };
+      const updated = [...(this._task.subtasks ?? []), newSub];
+      this._save({ subtasks: updated });
+      this._rebuildSubtasksSection(section);
+      // Enfocar el input tras la reconstrucción
+      requestAnimationFrame(() => {
+        section.querySelector<HTMLInputElement>('.subtask-add-input')?.focus();
+      });
+    };
+
+    addBtn.addEventListener('click', addSubtask);
+    input.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addSubtask();
+      }
+    });
+
+    addRow.appendChild(input);
+    addRow.appendChild(addBtn);
+    section.appendChild(addRow);
+
+    return section;
+  }
+
+  private _buildSubtaskItem(sub: Subtask, allSubtasks: Subtask[]): HTMLElement {
+    const li = document.createElement('li');
+    li.className = 'subtask-item';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = sub.completed;
+    checkbox.setAttribute('aria-label', `Marcar "${sub.text}" como ${sub.completed ? 'pendiente' : 'completada'}`);
+    checkbox.addEventListener('change', () => {
+      if (!this._task) return;
+      const updated = (this._task.subtasks ?? []).map(s =>
+        s.id === sub.id ? { ...s, completed: checkbox.checked } : s
+      );
+      this._save({ subtasks: updated });
+      // Reconstruir la sección para actualizar progreso
+      const section = li.closest('.subtasks-section') as HTMLElement | null;
+      if (section) this._rebuildSubtasksSection(section);
+    });
+
+    const textEl = document.createElement('span');
+    textEl.className = `subtask-text${sub.completed ? ' completed' : ''}`;
+    textEl.textContent = sub.text;
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'subtask-delete-btn';
+    deleteBtn.textContent = '✕';
+    deleteBtn.setAttribute('aria-label', `Eliminar subtarea: ${sub.text}`);
+    deleteBtn.addEventListener('click', () => {
+      if (!this._task) return;
+      const updated = (this._task.subtasks ?? []).filter(s => s.id !== sub.id);
+      this._save({ subtasks: updated });
+      const section = li.closest('.subtasks-section') as HTMLElement | null;
+      if (section) this._rebuildSubtasksSection(section);
+    });
+
+    li.appendChild(checkbox);
+    li.appendChild(textEl);
+    li.appendChild(deleteBtn);
+    return li;
+  }
+
+  /** Reconstruye la sección de subtareas in-place para reflejar progreso actualizado. */
+  private _rebuildSubtasksSection(oldSection: HTMLElement): void {
+    if (!this._task) return;
+    const newSection = this._buildSubtasksField(this._task);
+    oldSection.replaceWith(newSection);
   }
 
   // ── Sección de actividad (US-20) ──────────────────────────────────────────

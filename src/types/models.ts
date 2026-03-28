@@ -9,6 +9,18 @@
 
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
 
+// ── Subtask (US-21) ────────────────────────────────────────────────────────
+
+/** Elemento de checklist embebido en una tarea. */
+export interface Subtask {
+  /** UUID v4. */
+  id: string;
+  /** Texto descriptivo de la subtarea. */
+  text: string;
+  /** Si la subtarea está completada. */
+  completed: boolean;
+}
+
 // ── Task ───────────────────────────────────────────────────────────────────
 
 /** Representa una tarjeta del tablero Kanban. */
@@ -31,6 +43,8 @@ export interface Task {
   updatedAt: string;
   /** Fecha de vencimiento en formato ISO 8601. Null/undefined = sin vencimiento (US-17). */
   dueDate?: string | null;
+  /** Lista de subtareas (checklist). Puede estar vacía (US-21). */
+  subtasks?: Subtask[];
   /** Posición dentro de la columna (para ordenamiento manual). */
   order: number;
 }

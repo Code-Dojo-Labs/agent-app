@@ -50,6 +50,19 @@ export class DojoTaskCard extends HTMLElement {
     if (this.isConnected) this._render();
   }
 
+  /** Progreso de subtareas (US-21): [completadas, total] */
+  private _subtasksDone  = 0;
+  private _subtasksTotal = 0;
+
+  get subtasksDone(): number  { return this._subtasksDone; }
+  get subtasksTotal(): number { return this._subtasksTotal; }
+
+  setSubtaskProgress(done: number, total: number): void {
+    this._subtasksDone  = done;
+    this._subtasksTotal = total;
+    if (this.isConnected) this._render();
+  }
+
   constructor() {
     super();
     this._shadow = this.attachShadow({ mode: 'open' });
@@ -329,6 +342,34 @@ export class DojoTaskCard extends HTMLElement {
         color: var(--dojo-text-muted, var(--dojo-text-secondary));
       }
 
+      /* Progreso de subtareas (US-21) */
+      .subtask-progress {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+      }
+      .subtask-progress-text {
+        font-size: 0.625rem;
+        color: var(--dojo-text-muted, var(--dojo-text-secondary));
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .subtask-progress-bar {
+        flex: 1;
+        height: 4px;
+        background: var(--dojo-border);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .subtask-progress-fill {
+        height: 100%;
+        background: var(--dojo-primary, #1D4ED8);
+        border-radius: 2px;
+        transition: width 0.2s;
+      }
+
       /* Chips de etiquetas (US-10) */
       .chip-row {
         display: flex;
@@ -407,6 +448,27 @@ export class DojoTaskCard extends HTMLElement {
         chipRow.appendChild(chip);
       }
       this._shadow.appendChild(chipRow);
+    }
+
+    // ── Progreso de subtareas (US-21) ───────────────────────────────────
+    if (this._subtasksTotal > 0) {
+      const progressRow = document.createElement('div');
+      progressRow.className = 'subtask-progress';
+
+      const pText = document.createElement('span');
+      pText.className = 'subtask-progress-text';
+      pText.textContent = `${this._subtasksDone} / ${this._subtasksTotal}`;
+      progressRow.appendChild(pText);
+
+      const pBar = document.createElement('div');
+      pBar.className = 'subtask-progress-bar';
+      const pFill = document.createElement('div');
+      pFill.className = 'subtask-progress-fill';
+      pFill.style.width = `${Math.round((this._subtasksDone / this._subtasksTotal) * 100)}%`;
+      pBar.appendChild(pFill);
+      progressRow.appendChild(pBar);
+
+      this._shadow.appendChild(progressRow);
     }
 
     // ── Título ────────────────────────────────────────────────────────────
