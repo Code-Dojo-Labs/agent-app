@@ -58,7 +58,8 @@ export class DojoTaskCard extends HTMLElement {
   get subtasksTotal(): number { return this._subtasksTotal; }
 
   setSubtaskProgress(done: number, total: number): void {
-    this._subtasksDone  = done;
+    if (!Number.isFinite(done) || !Number.isFinite(total) || total < 0) return;
+    this._subtasksDone  = Math.max(0, Math.min(done, total));
     this._subtasksTotal = total;
     if (this.isConnected) this._render();
   }
@@ -462,6 +463,11 @@ export class DojoTaskCard extends HTMLElement {
 
       const pBar = document.createElement('div');
       pBar.className = 'subtask-progress-bar';
+      pBar.setAttribute('role', 'progressbar');
+      pBar.setAttribute('aria-valuenow', String(this._subtasksDone));
+      pBar.setAttribute('aria-valuemin', '0');
+      pBar.setAttribute('aria-valuemax', String(this._subtasksTotal));
+      pBar.setAttribute('aria-label', `Progreso: ${this._subtasksDone} de ${this._subtasksTotal} subtareas`);
       const pFill = document.createElement('div');
       pFill.className = 'subtask-progress-fill';
       pFill.style.width = `${Math.round((this._subtasksDone / this._subtasksTotal) * 100)}%`;

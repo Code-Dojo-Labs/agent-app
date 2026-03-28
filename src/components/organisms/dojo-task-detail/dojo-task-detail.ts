@@ -1694,6 +1694,11 @@ export class DojoTaskDetail extends HTMLElement {
 
       const progressBar = document.createElement('div');
       progressBar.className = 'subtasks-progress-bar';
+      progressBar.setAttribute('role', 'progressbar');
+      progressBar.setAttribute('aria-valuenow', String(completed));
+      progressBar.setAttribute('aria-valuemin', '0');
+      progressBar.setAttribute('aria-valuemax', String(total));
+      progressBar.setAttribute('aria-label', `Progreso de subtareas: ${completed} de ${total}`);
       const progressFill = document.createElement('div');
       progressFill.className = 'subtasks-progress-fill';
       progressFill.style.width = `${Math.round((completed / total) * 100)}%`;
