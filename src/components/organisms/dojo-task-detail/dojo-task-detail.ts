@@ -26,10 +26,11 @@
  * --dojo-primary, --dojo-radius, --dojo-radius-sm, --dojo-shadow
  */
 
-import type { Task, Column, Label, Priority } from '../../../types/models.js';
+import type { Task, Column, Label, Priority, ActivityEvent } from '../../../types/models.js';
 import { parseMarkdown } from '../../../utils/markdown.js';
 import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 import { createLabel } from '../../../db/label.repository.js';
+import { getActivitiesByTaskId } from '../../../db/activity.repository.js';
 
 // ── Constantes ─────────────────────────────────────────────────────────────
 
@@ -39,6 +40,9 @@ const PRIORITIES: { value: Priority; label: string; icon: string }[] = [
   { value: 'high',   label: 'Alta',    icon: '⬆️' },
   { value: 'urgent', label: 'Urgente', icon: '🔥' },
 ];
+
+/** Instancia cacheada de Intl.RelativeTimeFormat para fechas de actividad (US-20). */
+const RTF_ES = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
 
 // ── Clase ──────────────────────────────────────────────────────────────────
 
@@ -681,6 +685,44 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .meta-key   { font-weight: 600; }
       .meta-value { color: var(--dojo-text-primary); }
+
+      /* ── Actividad (US-20) ── */
+      .activity-section {
+        border-top: 1px solid var(--dojo-border);
+        padding-top: 0.875rem;
+      }
+      .activity-heading {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--dojo-text-primary);
+        margin: 0 0 0.5rem;
+      }
+      .activity-empty {
+        font-size: 0.75rem;
+        color: var(--dojo-text-secondary);
+        margin: 0;
+      }
+      .activity-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-height: 14rem;
+        overflow-y: auto;
+      }
+      .activity-item {
+        display: grid;
+        grid-template-columns: 1.25rem 1fr auto;
+        gap: 0.375rem;
+        align-items: baseline;
+        font-size: 0.75rem;
+        color: var(--dojo-text-secondary);
+      }
+      .activity-icon { font-size: 0.75rem; }
+      .activity-desc { color: var(--dojo-text-primary); }
+      .activity-time { white-space: nowrap; font-size: 0.6875rem; }
     `;
     this._shadow.appendChild(style);
 
@@ -735,6 +777,12 @@ export class DojoTaskDetail extends HTMLElement {
     body.appendChild(this._buildDescriptionField(task));
     body.appendChild(this._buildLabelsField(task));
     body.appendChild(this._buildMetadata(task));
+
+    // US-20: Sección de actividad (se carga de forma asíncrona)
+    const activityContainer = document.createElement('div');
+    activityContainer.className = 'activity-section';
+    body.appendChild(activityContainer);
+    this._loadActivitySection(task.id, activityContainer);
 
     panel.appendChild(body);
 
@@ -1496,6 +1544,123 @@ export class DojoTaskDetail extends HTMLElement {
     section.appendChild(lbl);
     section.appendChild(row);
     return section;
+  }
+
+  // ── Sección de actividad (US-20) ──────────────────────────────────────────
+
+  private async _loadActivitySection(taskId: string, container: HTMLElement): Promise<void> {
+    try {
+      const events = await getActivitiesByTaskId(taskId);
+      // Verificar que el panel sigue mostrando la misma tarea (race condition)
+      if (this._task?.id !== taskId) return;
+      this._renderActivityEvents(events, container);
+    } catch (err) {
+      console.error('[dojo-task-detail] Error al cargar actividad:', err);
+    }
+  }
+
+  private _renderActivityEvents(events: ActivityEvent[], container: HTMLElement): void {
+    container.innerHTML = '';
+
+    const heading = document.createElement('h3');
+    heading.className = 'activity-heading';
+    heading.textContent = 'Actividad';
+    container.appendChild(heading);
+
+    if (events.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'activity-empty';
+      empty.textContent = 'Sin actividad registrada.';
+      container.appendChild(empty);
+      return;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'activity-list';
+    list.setAttribute('role', 'list');
+
+    for (const evt of events) {
+      const li = document.createElement('li');
+      li.className = 'activity-item';
+
+      const icon = document.createElement('span');
+      icon.className = 'activity-icon';
+      icon.textContent = this._activityIcon(evt.type);
+      icon.setAttribute('aria-hidden', 'true');
+
+      const desc = document.createElement('span');
+      desc.className = 'activity-desc';
+      desc.textContent = this._activityDescription(evt);
+
+      const time = document.createElement('time');
+      time.className = 'activity-time';
+      time.setAttribute('datetime', evt.createdAt);
+      time.textContent = this._formatRelativeTime(evt.createdAt);
+
+      li.appendChild(icon);
+      li.appendChild(desc);
+      li.appendChild(time);
+      list.appendChild(li);
+    }
+
+    container.appendChild(list);
+  }
+
+  private _activityIcon(type: string): string {
+    switch (type) {
+      case 'created':         return '✨';
+      case 'status_change':   return '📋';
+      case 'priority_change': return '⚡';
+      case 'label_added':     return '🏷️';
+      case 'label_removed':   return '🗑️';
+      default:                return '📝';
+    }
+  }
+
+  private _activityDescription(evt: ActivityEvent): string {
+    const p = evt.payload;
+    switch (evt.type) {
+      case 'created':
+        return 'Tarea creada';
+      case 'status_change':
+        return `Movida de "${p.from}" a "${p.to}"`;
+      case 'priority_change':
+        return `Prioridad cambiada de "${this._priorityLabel(p.from as string)}" a "${this._priorityLabel(p.to as string)}"`;
+      case 'label_added':
+        return `Etiqueta "${p.labelName}" añadida`;
+      case 'label_removed':
+        return `Etiqueta "${p.labelName}" eliminada`;
+      default:
+        return 'Cambio registrado';
+    }
+  }
+
+  private _priorityLabel(value: string): string {
+    const map: Record<string, string> = {
+      low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente',
+    };
+    return map[value] ?? value;
+  }
+
+  private _formatRelativeTime(iso: string): string {
+    try {
+      const date = new Date(iso);
+      const now  = Date.now();
+      const diff = now - date.getTime();
+      const secs = Math.floor(diff / 1000);
+      const mins = Math.floor(secs / 60);
+      const hrs  = Math.floor(mins / 60);
+      const days = Math.floor(hrs / 24);
+
+      const rtf = RTF_ES;
+      if (secs < 60)  return rtf.format(-secs, 'second');
+      if (mins < 60)  return rtf.format(-mins, 'minute');
+      if (hrs  < 24)  return rtf.format(-hrs,  'hour');
+      if (days < 30)  return rtf.format(-days, 'day');
+      return this._formatDate(iso);
+    } catch {
+      return iso;
+    }
   }
 
   private _buildMetadata(task: Task): HTMLElement {

@@ -32,6 +32,7 @@ import type { Column, Task, Label, Priority } from '../../../types/models.js';
 import { getAllColumns, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
 import { getTasksByStatus, createTask, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
 import { getAllLabels } from '../../../db/label.repository.js';
+import { addActivityEvent, deleteActivitiesByTaskId } from '../../../db/activity.repository.js';
 import '../../molecules/dojo-kanban-column/dojo-kanban-column.js';
 import '../../atoms/dojo-task-card/dojo-task-card.js';
 import '../../atoms/dojo-add-column-button/dojo-add-column-button.js';
@@ -960,6 +961,12 @@ export class DojoKanbanBoard extends HTMLElement {
         const newSourceTasks = sourceTasks.filter(t => t.id !== taskId);
 
         await updateTask(taskId, { statusId: targetColumnId });
+
+        // US-20: registrar cambio de estado por drag & drop
+        const fromName = this._columns.find(c => c.id === sourceColumnId)?.name ?? sourceColumnId;
+        const toName   = this._columns.find(c => c.id === targetColumnId)?.name ?? targetColumnId;
+        addActivityEvent({ taskId, type: 'status_change', payload: { from: fromName, to: toName } });
+
         await reorderTasks(targetColumnId, newTargetTasks.map(t => t.id));
         if (newSourceTasks.length > 0) {
           await reorderTasks(sourceColumnId, newSourceTasks.map(t => t.id));
@@ -1106,6 +1113,8 @@ export class DojoKanbanBoard extends HTMLElement {
       } else {
         // Eliminar todas las tareas de la columna
         await Promise.all(tasks.map(t => deleteTask(t.id)));
+        // US-20: limpiar historial de actividad de todas las tareas eliminadas
+        tasks.forEach(t => deleteActivitiesByTaskId(t.id));
       }
 
       await deleteColumn(columnId);
@@ -1175,6 +1184,10 @@ export class DojoKanbanBoard extends HTMLElement {
         order:     tasks.length,
         dueDate:   dueDate ?? null,
       });
+
+      // US-20: registrar evento de creación
+      addActivityEvent({ taskId: newTask.id, type: 'created', payload: {} });
+
       this._tasksByColumn.set(statusId, [...tasks, newTask]);
       this._refreshColumnCards(statusId);
       this._updateColumnCounts();
@@ -1209,12 +1222,14 @@ export class DojoKanbanBoard extends HTMLElement {
       changes: Partial<Task>;
     };
 
-    // Localizar columna origen desde el caché
+    // Localizar columna origen y tarea anterior desde el caché
     let sourceColumnId: string | null = null;
+    let oldTask: Task | undefined;
     for (const [colId, tasks] of this._tasksByColumn) {
-      if (tasks.some(t => t.id === taskId)) { sourceColumnId = colId; break; }
+      const found = tasks.find(t => t.id === taskId);
+      if (found) { sourceColumnId = colId; oldTask = found; break; }
     }
-    if (!sourceColumnId) return;
+    if (!sourceColumnId || !oldTask) return;
 
     // Guard: validar que el statusId destino existe (previene race condition — Fix #1)
     if (changes.statusId && !this._columns.some(c => c.id === changes.statusId)) {
@@ -1225,6 +1240,32 @@ export class DojoKanbanBoard extends HTMLElement {
     try {
       const updated = await updateTask(taskId, changes);
       const targetColumnId = updated.statusId;
+
+      // US-20: registrar eventos de actividad según los campos que cambiaron
+      if (changes.statusId && changes.statusId !== sourceColumnId) {
+        const fromName = this._columns.find(c => c.id === sourceColumnId)?.name ?? sourceColumnId;
+        const toName   = this._columns.find(c => c.id === changes.statusId)?.name ?? changes.statusId;
+        addActivityEvent({ taskId, type: 'status_change', payload: { from: fromName, to: toName } });
+      }
+      if (changes.priority !== undefined && changes.priority !== oldTask.priority) {
+        addActivityEvent({ taskId, type: 'priority_change', payload: { from: oldTask.priority, to: changes.priority } });
+      }
+      if (changes.labelIds !== undefined) {
+        const oldSet = new Set(oldTask.labelIds);
+        const newSet = new Set(changes.labelIds);
+        for (const id of changes.labelIds) {
+          if (!oldSet.has(id)) {
+            const lbl = this._labels.find(l => l.id === id);
+            addActivityEvent({ taskId, type: 'label_added', payload: { labelId: id, labelName: lbl?.name ?? id } });
+          }
+        }
+        for (const id of oldTask.labelIds) {
+          if (!newSet.has(id)) {
+            const lbl = this._labels.find(l => l.id === id);
+            addActivityEvent({ taskId, type: 'label_removed', payload: { labelId: id, labelName: lbl?.name ?? id } });
+          }
+        }
+      }
 
       if (changes.statusId && changes.statusId !== sourceColumnId) {
         // ── Cambio de columna (movimiento) ────────────────────────────────
@@ -1300,6 +1341,8 @@ export class DojoKanbanBoard extends HTMLElement {
 
     try {
       await deleteTask(taskId);
+      // US-20: limpiar historial de actividad de la tarea eliminada
+      deleteActivitiesByTaskId(taskId);
 
       // Actualizar caché
       const remaining = (this._tasksByColumn.get(columnId) ?? []).filter(t => t.id !== taskId);

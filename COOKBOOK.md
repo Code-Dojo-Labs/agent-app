@@ -33,6 +33,7 @@
    - [Paso 19 — Tarjeta de tarea en el tablero (US-16 / Issue #17)](#paso-19--tarjeta-de-tarea-en-el-tablero-us-16--issue-17)
    - [Paso 20 — Modo oscuro automático (US-18 / Issue #36)](#paso-20--modo-oscuro-automático-us-18--issue-36)
    - [Paso 21 — Exportación e importación de datos (US-19 / Issue #37)](#paso-21--exportación-e-importación-de-datos-us-19--issue-37)
+   - [Paso 22 — Historial de actividad por tarea (US-20 / Issue #38)](#paso-22--historial-de-actividad-por-tarea-us-20--issue-38)
 
 ---
 
@@ -2039,3 +2040,110 @@ Se implementó un diálogo inline en el Shadow DOM de `dojo-app` (no un componen
 - Integridad garantizada: nunca hay datos parcialmente importados.
 - No requiere rollback manual.
 - Limitación: archivos extremadamente grandes podrían alcanzar límites de memoria del navegador (aceptable para uso de tablero personal).
+
+---
+
+### Paso 22 — Historial de actividad por tarea (US-20 / Issue #38)
+
+> **PR:** [#54](https://github.com/Code-Dojo-Labs/agent-app/pull/54) — `feat/38-historial-actividad-tarea`
+> **Fecha:** 2026-03-28
+
+#### Resumen
+
+Se implementó un sistema de historial de actividad que registra automáticamente los cambios realizados en cada tarea (creación, cambio de estado, cambio de prioridad, adición/eliminación de etiquetas) y los presenta en una línea temporal dentro del panel de detalle.
+
+#### Arquitectura
+
+```
+src/types/models.ts                          ← Interfaz ActivityEvent + ActivityEventType
+src/db/database.ts                           ← Migración v1 → v2 (store activity)
+src/db/activity.repository.ts                ← CRUD de eventos de actividad (nuevo)
+src/db/export-import.ts                      ← Soporte de activity en export/import
+src/components/organisms/
+  ├── dojo-kanban-board/dojo-kanban-board.ts  ← Registro de eventos en handlers
+  └── dojo-task-detail/dojo-task-detail.ts    ← Sección UI de actividad
+```
+
+##### Modelo de datos
+
+```ts
+type ActivityEventType = 'created' | 'status_change' | 'priority_change' | 'label_added' | 'label_removed';
+
+interface ActivityEvent {
+  id: string;          // UUID v4
+  taskId: string;      // FK → Task.id
+  type: ActivityEventType;
+  payload: Record<string, unknown>;  // Datos específicos por tipo
+  createdAt: string;   // ISO 8601
+}
+```
+
+**Payloads por tipo:**
+
+| Tipo | Payload |
+|---|---|
+| `created` | `{}` |
+| `status_change` | `{ from: string, to: string }` (nombres de columna) |
+| `priority_change` | `{ from: string, to: string }` (valores de prioridad) |
+| `label_added` | `{ labelId: string, labelName: string }` |
+| `label_removed` | `{ labelId: string, labelName: string }` |
+
+##### Migración de IndexedDB
+
+Se incrementó `DB_VERSION` de 1 a 2. La migración `v1 → v2` crea el object store `activity` con keyPath `id` e índice `by-taskId` (no único). La estructura de migración incremental existente garantiza que usuarios con datos en v1 migran sin pérdida.
+
+##### Repositorio `activity.repository.ts`
+
+| Función | Descripción |
+|---|---|
+| `addActivityEvent(input)` | Crea un evento con UUID e ISO timestamp auto-generados |
+| `getActivitiesByTaskId(taskId)` | Devuelve eventos ordenados del más reciente al más antiguo |
+| `deleteActivitiesByTaskId(taskId)` | Elimina todos los eventos de una tarea (limpieza al borrar) |
+
+##### Puntos de integración en `dojo-kanban-board`
+
+Los eventos se registran en los handlers existentes sin modificar el flujo principal:
+
+- **`_handleCreateTask`** → `addActivityEvent({ type: 'created' })` tras `createTask()`
+- **`_handleTaskFieldUpdated`** → Detecta cambios comparando caché vs nuevos valores:
+  - `statusId` diferente → `status_change` con nombres de columna
+  - `priority` diferente → `priority_change` con valores anterior/nuevo
+  - `labelIds` diferente → diff de conjuntos para `label_added`/`label_removed`
+- **`_handleTaskDrop`** (drag & drop) → `status_change` al mover entre columnas
+- **`_handleTaskDeleteConfirm`** → `deleteActivitiesByTaskId()` para limpieza
+- **Eliminación de columna con tareas** → Limpieza de actividad por cada tarea
+
+##### Sección de actividad en `dojo-task-detail`
+
+La sección se carga de forma **asíncrona** tras construir el panel, evitando bloquear la apertura. Un guard de race condition verifica que el `taskId` aún coincida antes de renderizar.
+
+Cada evento se muestra en un grid de 3 columnas: ícono — descripción — fecha relativa. La lista tiene `max-height: 14rem` con scroll vertical para tareas con historial extenso.
+
+Las fechas se formatean con `Intl.RelativeTimeFormat('es', { numeric: 'auto' })` (ej. "hace 5 minutos", "ayer").
+
+##### Exportación/Importación
+
+`export-import.ts` se actualizó para incluir el campo opcional `activity` en `BoardExport`. La exportación detecta si el store `activity` existe (retrocompatibilidad con DB v1). La importación maneja archivos sin campo `activity` sin error.
+
+#### Criterios US-20 cubiertos
+
+| Scenario Gherkin | Estado |
+|---|---|
+| Registrar evento de creación de tarea | ✅ `addActivityEvent` en `_handleCreateTask` |
+| Registrar cambio de columna (estado) | ✅ Selector + drag & drop |
+| Registrar cambio de prioridad | ✅ Comparación old vs new en `_handleTaskFieldUpdated` |
+| Registrar adición de etiqueta | ✅ Diff de conjuntos `labelIds` |
+| Registrar eliminación de etiqueta | ✅ Diff de conjuntos `labelIds` |
+| Visualizar historial en panel de detalle | ✅ Sección asíncrona con lista cronológica inversa |
+| Tarea sin actividad registrada | ✅ Evento "Tarea creada" como mínimo |
+
+#### ADR-27 — Eventos de actividad como fire-and-forget
+
+**Contexto:** El registro de actividad es una funcionalidad secundaria; no debe impactar el rendimiento de las operaciones principales (crear, mover, editar tareas).
+
+**Decisión:** Las llamadas a `addActivityEvent()` no se esperan con `await` en los handlers del kanban board. Se ejecutan como fire-and-forget, permitiendo que la escritura en IndexedDB ocurra en segundo plano.
+
+**Consecuencias:**
+- La UI responde inmediatamente sin esperar la escritura del evento.
+- En caso de error, el evento se pierde silenciosamente (solo log en consola) sin afectar la operación principal.
+- La lectura de actividad al abrir el panel es síncrona respecto al usuario (espera resultado antes de renderizar).

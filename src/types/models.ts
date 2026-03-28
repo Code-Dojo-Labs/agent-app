@@ -87,3 +87,27 @@ export const DEFAULT_LABELS: Omit<Label, 'id'>[] = [
   { name: 'Testing',         color: '#0E7490' },
   { name: 'Infraestructura', color: '#374151' },
 ];
+
+// ── ActivityEvent (US-20) ──────────────────────────────────────────────────
+
+/** Tipos de evento registrados en el historial de actividad. */
+export type ActivityEventType =
+  | 'created'
+  | 'status_change'
+  | 'priority_change'
+  | 'label_added'
+  | 'label_removed';
+
+/** Registro de un evento de actividad asociado a una tarea. */
+export interface ActivityEvent {
+  /** UUID v4. */
+  id: string;
+  /** FK → Task.id. */
+  taskId: string;
+  /** Tipo de evento. */
+  type: ActivityEventType;
+  /** Datos adicionales del evento (varían según el tipo). */
+  payload: Record<string, unknown>;
+  /** Fecha del evento en formato ISO 8601. */
+  createdAt: string;
+}
