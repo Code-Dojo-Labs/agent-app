@@ -26,8 +26,7 @@
  * --dojo-primary, --dojo-radius, --dojo-radius-sm, --dojo-shadow
  */
 
-import type { Task, Column, Label, Priority } from '../../../types/models.js';
-import type { ActivityEvent } from '../../../types/models.js';
+import type { Task, Column, Label, Priority, ActivityEvent } from '../../../types/models.js';
 import { parseMarkdown } from '../../../utils/markdown.js';
 import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 import { createLabel } from '../../../db/label.repository.js';
@@ -41,6 +40,9 @@ const PRIORITIES: { value: Priority; label: string; icon: string }[] = [
   { value: 'high',   label: 'Alta',    icon: '⬆️' },
   { value: 'urgent', label: 'Urgente', icon: '🔥' },
 ];
+
+/** Instancia cacheada de Intl.RelativeTimeFormat para fechas de actividad (US-20). */
+const RTF_ES = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
 
 // ── Clase ──────────────────────────────────────────────────────────────────
 
@@ -1650,7 +1652,7 @@ export class DojoTaskDetail extends HTMLElement {
       const hrs  = Math.floor(mins / 60);
       const days = Math.floor(hrs / 24);
 
-      const rtf = new Intl.RelativeTimeFormat('es', { numeric: 'auto' });
+      const rtf = RTF_ES;
       if (secs < 60)  return rtf.format(-secs, 'second');
       if (mins < 60)  return rtf.format(-mins, 'minute');
       if (hrs  < 24)  return rtf.format(-hrs,  'hour');
