@@ -32,6 +32,7 @@
    - [Paso 18 — Búsqueda y filtrado de tareas (US-15 / Issue #16)](#paso-18--búsqueda-y-filtrado-de-tareas-us-15--issue-16)
    - [Paso 19 — Tarjeta de tarea en el tablero (US-16 / Issue #17)](#paso-19--tarjeta-de-tarea-en-el-tablero-us-16--issue-17)
    - [Paso 20 — Modo oscuro automático (US-18 / Issue #36)](#paso-20--modo-oscuro-automático-us-18--issue-36)
+   - [Paso 21 — Exportación e importación de datos (US-19 / Issue #37)](#paso-21--exportación-e-importación-de-datos-us-19--issue-37)
 
 ---
 
@@ -1933,3 +1934,108 @@ Para evitar el destello de tema incorrecto antes de que carguen los módulos ES,
 - Sin conflictos de especificidad CSS.
 - Funcionalidad de override manual sin necesidad de `[data-theme="light"]` adicional.
 - Requiere JavaScript habilitado (aceptable para esta SPA).
+
+---
+
+### Paso 21 — Exportación e importación de datos (US-19 / Issue #37)
+
+> **PR:** [#53](https://github.com/Code-Dojo-Labs/agent-app/pull/53) — `feat/37-exportacion-importacion-datos`
+> **Fecha:** 2026-03-28
+
+#### Resumen
+
+Se implementó la funcionalidad de exportación e importación completa del tablero en formato JSON versionado, permitiendo copias de seguridad y transferencia de datos entre navegadores o dispositivos.
+
+#### Arquitectura
+
+```
+src/db/export-import.ts          ← Servicio de exportación/importación (nuevo)
+src/components/organisms/
+  └── dojo-app/dojo-app.ts       ← UI: botones, diálogo de confirmación, toasts
+```
+
+##### Servicio `export-import.ts`
+
+El servicio encapsula toda la lógica de serialización, validación e importación atómica:
+
+| Función | Responsabilidad |
+|---|---|
+| `exportBoardData()` | Lee columns, tasks y labels en una sola transacción `readonly` atómica |
+| `downloadBoardExport(data)` | Genera un `Blob` JSON y dispara la descarga con nombre `dojo-kanban-export-{timestamp}.json` |
+| `readImportFile(file)` | Lee un `File` del navegador y lo parsea como JSON |
+| `validateImportData(raw)` | Valida estructura, versión, y tipos de cada entidad (Column, Task, Label) |
+| `importBoardData(data)` | Reemplaza los datos en una sola transacción `readwrite` atómica (clear + add) |
+
+##### Formato de exportación (v1)
+
+```json
+{
+  "version": 1,
+  "exportedAt": "2026-03-28T12:00:00.000Z",
+  "columns": [ { "id": "...", "name": "...", "icon": "...", "order": 0 } ],
+  "tasks": [ { "id": "...", "title": "...", ... } ],
+  "labels": [ { "id": "...", "name": "...", "color": "#..." } ]
+}
+```
+
+El campo `version` permite migraciones futuras sin romper archivos antiguos. La constante `SUPPORTED_VERSIONS` controla qué versiones son aceptadas al importar.
+
+##### Validación de importación
+
+La función `validateImportData()` comprueba:
+1. Estructura raíz: `version` (number), `exportedAt` (string), `columns`/`tasks`/`labels` (arrays).
+2. Versión soportada: solo `SUPPORTED_VERSIONS` (actualmente `{1}`).
+3. Integridad de cada entidad: campos obligatorios con tipos correctos (`_isValidColumn`, `_isValidTask`, `_isValidLabel`).
+
+Si la validación falla, se devuelve un mensaje descriptivo al usuario sin intentar la importación.
+
+##### Atomicidad de la importación
+
+```typescript
+const tx = db.transaction(['columns', 'tasks', 'labels'], 'readwrite');
+colStore.clear();
+taskStore.clear();
+labelStore.clear();
+for (const col of data.columns)   colStore.add(col);
+for (const task of data.tasks)    taskStore.add(task);
+for (const label of data.labels)  labelStore.add(label);
+await idbTransaction(tx);
+```
+
+Al usar una única transacción `readwrite`, si algún paso falla (store corrupto, datos inválidos), IndexedDB revierte **todos** los cambios automáticamente. Los datos del usuario nunca quedan en estado parcial.
+
+##### Flujo de UI
+
+1. **Exportar:** click en 📤 → `exportBoardData()` → `downloadBoardExport()` → descarga automática + toast de éxito.
+2. **Importar:** click en 📥 → `<input type="file">` oculto → selección de archivo → `readImportFile()` → `validateImportData()` → diálogo de confirmación → `importBoardData()` → recarga del tablero + toast de éxito.
+
+##### Diálogo de confirmación
+
+Se implementó un diálogo inline en el Shadow DOM de `dojo-app` (no un componente separado) con:
+- `role="alertdialog"` + `aria-labelledby` + `aria-describedby` para accesibilidad.
+- Focus automático al botón "Cancelar" (acción segura por defecto).
+- Cierre al hacer clic en el backdrop.
+- Botón "Importar y reemplazar" en rojo (`--dojo-danger`) para señalar la acción destructiva.
+
+#### Criterios US-19 cubiertos
+
+| Scenario Gherkin | Estado |
+|---|---|
+| Exportar datos del tablero completo | ✅ `exportBoardData()` lee los 3 stores |
+| Formato del archivo exportado (version, exportedAt, columns, tasks, labels) | ✅ Estructura validada |
+| Importar datos reemplazando los existentes | ✅ Transacción atómica clear + add |
+| Cancelar importación antes de reemplazar datos | ✅ Diálogo con botón Cancelar |
+| Importar un archivo con formato inválido | ✅ `validateImportData()` devuelve error descriptivo |
+| Importar un archivo con versión no soportada | ✅ Validación de `SUPPORTED_VERSIONS` |
+| Exportar tablero vacío | ✅ Devuelve JSON válido con arrays vacíos |
+
+#### ADR-26 — Transacción atómica para import/export
+
+**Contexto:** La importación reemplaza todos los datos del tablero. Un fallo a mitad de la operación podría dejar la base de datos en estado inconsistente (tareas sin columnas, etiquetas huérfanas).
+
+**Decisión:** Usar una única transacción `readwrite` que abarca los tres object stores (`columns`, `tasks`, `labels`). Si cualquier operación falla, IndexedDB aborta y revierte la transacción completa.
+
+**Consecuencias:**
+- Integridad garantizada: nunca hay datos parcialmente importados.
+- No requiere rollback manual.
+- Limitación: archivos extremadamente grandes podrían alcanzar límites de memoria del navegador (aceptable para uso de tablero personal).
