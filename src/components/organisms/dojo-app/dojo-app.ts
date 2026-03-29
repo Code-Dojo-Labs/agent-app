@@ -15,6 +15,7 @@
 import '../dojo-kanban-board/dojo-kanban-board.js';
 import '../dojo-label-manager/dojo-label-manager.js';
 import '../dojo-project-manager/dojo-project-manager.js';
+import '../dojo-command-palette/dojo-command-palette.js';
 import '../dojo-board-selector/dojo-board-selector.js';
 import '../../atoms/dojo-theme-toggle/dojo-theme-toggle.js';
 
@@ -470,6 +471,22 @@ export class DojoApp extends HTMLElement {
     const projectMgr = document.createElement('dojo-project-manager');
     this._shadow.appendChild(projectMgr);
 
+    // ── Paleta de comandos (US-28) ───────────────────────────────────────────────────
+    const palette = document.createElement('dojo-command-palette');
+    this._shadow.appendChild(palette);
+
+    // Seleccionar tarea desde la paleta
+    this._shadow.addEventListener('dojo:palette-select-task', (e: Event) => {
+      const { taskId } = (e as CustomEvent).detail as { taskId: string };
+      (board as any).openTaskById?.(taskId);
+    });
+
+    // Crear tarea desde la paleta
+    this._shadow.addEventListener('dojo:palette-create-task', (e: Event) => {
+      const { title } = (e as CustomEvent).detail as { title: string };
+      (board as any).openCreateTaskWithTitle?.(title);
+    });
+
     // Cuando se crea/actualiza/elimina un proyecto, refrescar el tablero
     this._shadow.addEventListener('dojo:project-created', () => {
       (board as any)._loadBoard?.();
@@ -554,11 +571,13 @@ export class DojoApp extends HTMLElement {
 
     const selector = this._shadow.querySelector('dojo-board-selector') as HTMLElement | null;
     const board    = this._shadow.querySelector('dojo-kanban-board') as HTMLElement | null;
+    const palette  = this._shadow.querySelector('dojo-command-palette') as any;
     if (selector) selector.style.display = 'none';
     if (board) {
       board.style.display = '';
       board.setAttribute('board-id', boardId);
     }
+    if (palette) palette.boardId = boardId;
   }
 
   private _showBoardSelector(): void {
@@ -572,6 +591,8 @@ export class DojoApp extends HTMLElement {
       selector.style.display = '';
       (selector as any).refresh?.();
     }
+    const palette = this._shadow.querySelector('dojo-command-palette') as any;
+    if (palette) palette.boardId = '';
   }
 
   // ── Export/Import (US-19) ────────────────────────────────────────────────

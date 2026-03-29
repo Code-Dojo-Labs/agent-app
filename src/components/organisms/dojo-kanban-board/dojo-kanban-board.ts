@@ -110,6 +110,31 @@ export class DojoKanbanBoard extends HTMLElement {
 
   get boardId(): string { return this._boardId; }
 
+  /** US-28: Abre el panel de detalle de una tarea por su ID (para la paleta de comandos). */
+  async openTaskById(taskId: string): Promise<void> {
+    let task: Task | undefined;
+    for (const tasks of this._tasksByColumn.values()) {
+      task = tasks.find(t => t.id === taskId);
+      if (task) break;
+    }
+    if (!task) return;
+    try {
+      const labels = await getAllLabels();
+      const detail = this._getTaskDetail() as any;
+      if (detail?.openTask) detail.openTask(task, this._columns, labels);
+    } catch (err) {
+      console.error('[dojo-kanban-board] Error al abrir detalle de tarea:', err);
+    }
+  }
+
+  /** US-28: Abre el diálogo de creación con título prellenado (para la paleta de comandos). */
+  openCreateTaskWithTitle(title: string): void {
+    const col = this._columns[0];
+    if (!col) return;
+    const taskDialog = this._getTaskDialog() as any;
+    if (taskDialog?.openCreate) taskDialog.openCreate(col.id, col.name, title);
+  }
+
   // ── API pública ──────────────────────────────────────────────────────────
 
   get activeFilter(): ActiveFilter { return this._activeFilter; }
