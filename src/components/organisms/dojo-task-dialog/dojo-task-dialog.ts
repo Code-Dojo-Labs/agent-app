@@ -48,6 +48,8 @@ export class DojoTaskDialog extends HTMLElement {
   private _selectedLabelIds: Set<string> = new Set();
   // US-26: estado de proyectos
   private _allProjects: Project[] = [];
+  // US-28: título prellenado desde la paleta de comandos
+  private _prefillTitle = '';
 
   // Referencia estable para poder eliminar el listener de teclado
   private _onDocKeydown = (e: KeyboardEvent): void => {
@@ -69,9 +71,10 @@ export class DojoTaskDialog extends HTMLElement {
 
   // ── API pública ───────────────────────────────────────────────────────────
 
-  openCreate(columnId: string, columnName: string): void {
+  openCreate(columnId: string, columnName: string, prefillTitle = ''): void {
     this._columnId   = columnId;
     this._columnName = columnName;
+    this._prefillTitle = prefillTitle;
     this._selectedLabelIds = new Set();
     // Cargar etiquetas (US-23) y proyectos (US-26), luego construir el formulario
     Promise.all([
@@ -1141,6 +1144,13 @@ export class DojoTaskDialog extends HTMLElement {
     actions.appendChild(cancelBtn);
     actions.appendChild(confirmBtn);
     dialog.appendChild(actions);
+
+    // US-28: Prellenar título si se proporcionó desde la paleta de comandos
+    if (this._prefillTitle) {
+      titleInput.value = this._prefillTitle;
+      charCount.textContent = `${this._prefillTitle.length} / ${MAX_TITLE}`;
+      this._prefillTitle = '';
+    }
 
     // Foco inicial al input de título
     setTimeout(() => titleInput.focus(), 50);
