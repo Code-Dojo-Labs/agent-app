@@ -1153,6 +1153,14 @@ export class DojoTaskDetail extends HTMLElement {
     section.appendChild(tabs);
     section.appendChild(textarea);
     section.appendChild(previewPanel);
+
+    // US-25: si la descripción tiene contenido, abrir en vista previa por defecto
+    if (task.description.trim()) {
+      switchToPreview();
+      editTab.setAttribute('tabindex', '-1');
+      previewTab.setAttribute('tabindex', '0');
+    }
+
     return section;
   }
 
