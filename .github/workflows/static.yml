@@ -1,0 +1,33 @@
+name: Deploy to GitHub Pages
+
+on:
+  pull_request:
+    branches:
+      - init
+    types: [closed] # Solo se ejecuta si el PR se cerró (y aceptó)
+
+jobs:
+  build-and-deploy:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ⚙️
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install and Build 🏗️
+        run: |
+          npm install
+          npm run build
+
+      - name: Deploy 🚀
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist # Cambia esto a 'build' o 'out' según tu carpeta de salida
+          branch: gh-pages # Rama donde se subirá el código transpilado
