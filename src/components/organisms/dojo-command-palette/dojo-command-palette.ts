@@ -44,6 +44,8 @@ export class DojoCommandPalette extends HTMLElement {
   private _previousFocus: HTMLElement | null = null;
   /** ID del tablero activo para filtrar tareas. */
   private _boardId = '';
+  /** Indica que el caché de tareas debe refrescarse en la próxima apertura. */
+  private _cacheDirty = true;
 
   // ── Refs (se asignan en _render) ───────────────────────────────────────
 
@@ -57,6 +59,11 @@ export class DojoCommandPalette extends HTMLElement {
   private _onDocKeydown = (e: KeyboardEvent): void => {
     // Cmd/Ctrl+K para abrir
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      // No abrir si hay otro modal activo (import dialog, task detail, etc.)
+      const host = this.getRootNode() as ShadowRoot | Document;
+      const openModal = host.querySelector?.('[aria-modal="true"]:not([aria-hidden="true"])');
+      if (openModal && openModal !== this._shadow.querySelector('.palette')) return;
+
       e.preventDefault();
       if (this.hasAttribute('open')) {
         this.hide();
@@ -108,7 +115,13 @@ export class DojoCommandPalette extends HTMLElement {
 
   /** Configura el ID del tablero activo (filtra tareas). */
   set boardId(id: string) {
+    if (this._boardId !== id) this._cacheDirty = true;
     this._boardId = id;
+  }
+
+  /** Marca el caché de tareas como sucio para refrescarlo en la próxima apertura. */
+  invalidateCache(): void {
+    this._cacheDirty = true;
   }
 
   /** Abre la paleta y carga las tareas. */
@@ -116,13 +129,16 @@ export class DojoCommandPalette extends HTMLElement {
     this._previousFocus = (this._shadow.activeElement ?? document.activeElement) as HTMLElement | null;
     this.setAttribute('open', '');
 
-    try {
-      const allTasks = await getAllTasks();
-      this._tasks = this._boardId
-        ? allTasks.filter(t => t.boardId === this._boardId)
-        : allTasks;
-    } catch {
-      this._tasks = [];
+    if (this._cacheDirty) {
+      try {
+        const allTasks = await getAllTasks();
+        this._tasks = this._boardId
+          ? allTasks.filter(t => t.boardId === this._boardId)
+          : allTasks;
+      } catch {
+        this._tasks = [];
+      }
+      this._cacheDirty = false;
     }
 
     this._input.value = '';

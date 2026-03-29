@@ -487,6 +487,14 @@ export class DojoApp extends HTMLElement {
       (board as any).openCreateTaskWithTitle?.(title);
     });
 
+    // Invalidar caché de la paleta cuando las tareas cambian
+    const invalidatePalette = (): void => {
+      (palette as any).invalidateCache?.();
+    };
+    this._shadow.addEventListener('dojo:task-field-updated',   invalidatePalette);
+    this._shadow.addEventListener('dojo:task-delete-confirm',  invalidatePalette);
+    this._shadow.addEventListener('dojo:board-ready',          invalidatePalette);
+
     // Cuando se crea/actualiza/elimina un proyecto, refrescar el tablero
     this._shadow.addEventListener('dojo:project-created', () => {
       (board as any)._loadBoard?.();
@@ -656,6 +664,9 @@ export class DojoApp extends HTMLElement {
       this._hideImportConfirm();
       // Recargar el tablero completo para reflejar los nuevos datos
       (board as any)._loadBoard?.();
+      // Invalidar caché de la paleta tras importar datos
+      const palette = this._shadow.querySelector('dojo-command-palette') as any;
+      palette?.invalidateCache?.();
       this._showToast('Datos importados correctamente.');
     } catch (err) {
       this._hideImportConfirm();
