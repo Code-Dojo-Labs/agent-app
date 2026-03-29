@@ -14,6 +14,7 @@
 
 import '../dojo-kanban-board/dojo-kanban-board.js';
 import '../dojo-label-manager/dojo-label-manager.js';
+import '../dojo-project-manager/dojo-project-manager.js';
 import '../dojo-board-selector/dojo-board-selector.js';
 import '../../atoms/dojo-theme-toggle/dojo-theme-toggle.js';
 
@@ -354,6 +355,22 @@ export class DojoApp extends HTMLElement {
       (labelMgr as any).show();
     });
 
+    // ── Botón Gestionar proyectos (US-26) ───────────────────────────────────
+    const manageProjectBtn = document.createElement('button');
+    manageProjectBtn.className = 'header-btn';
+    manageProjectBtn.type = 'button';
+    manageProjectBtn.setAttribute('aria-label', 'Gestionar proyectos');
+    const projBtnIcon = document.createElement('span');
+    projBtnIcon.setAttribute('aria-hidden', 'true');
+    projBtnIcon.textContent = '📁';
+    const projBtnText = document.createElement('span');
+    projBtnText.textContent = 'Proyectos';
+    manageProjectBtn.appendChild(projBtnIcon);
+    manageProjectBtn.appendChild(projBtnText);
+    manageProjectBtn.addEventListener('click', () => {
+      (projectMgr as any).show();
+    });
+
     // ── Botón Exportar (US-19) ──────────────────────────────────────────────
     const exportBtn = document.createElement('button');
     exportBtn.className = 'header-btn';
@@ -397,6 +414,7 @@ export class DojoApp extends HTMLElement {
     const headerActions = document.createElement('div');
     headerActions.className = 'header-actions';
     headerActions.appendChild(manageLabelBtn);
+    headerActions.appendChild(manageProjectBtn);
     headerActions.appendChild(exportBtn);
     headerActions.appendChild(importBtn);
     headerActions.appendChild(importInput);
@@ -447,6 +465,21 @@ export class DojoApp extends HTMLElement {
     // ── Panel de gestión de etiquetas (US-11) ───────────────────────────────────────
     const labelMgr = document.createElement('dojo-label-manager');
     this._shadow.appendChild(labelMgr);
+
+    // ── Panel de gestión de proyectos (US-26) ────────────────────────────────────────
+    const projectMgr = document.createElement('dojo-project-manager');
+    this._shadow.appendChild(projectMgr);
+
+    // Cuando se crea/actualiza/elimina un proyecto, refrescar el tablero
+    this._shadow.addEventListener('dojo:project-created', () => {
+      (board as any)._loadBoard?.();
+    });
+    this._shadow.addEventListener('dojo:project-updated', () => {
+      (board as any)._loadBoard?.();
+    });
+    this._shadow.addEventListener('dojo:project-deleted', () => {
+      (board as any)._loadBoard?.();
+    });
 
     // Cuando se actualiza una etiqueta, propagar al tablero para refrescar los chips
     this._shadow.addEventListener('dojo:label-updated', (e: Event) => {

@@ -11,7 +11,7 @@
  */
 
 import { openDatabase, idbRequest, idbTransaction } from './database.js';
-import type { Column, Task, Label, ActivityEvent, Board } from '../types/models.js';
+import type { Column, Task, Label, ActivityEvent, Board, Project } from '../types/models.js';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,7 @@ export interface BoardExport {
   labels: Label[];
   activity?: ActivityEvent[];
   boards?: Board[];
+  projects?: Project[];
 }
 
 /** Resultado de la validación de un archivo importado. */
@@ -59,10 +60,12 @@ export async function exportBoardData(): Promise<BoardExport> {
   const allNames = db.objectStoreNames;
   const hasActivity = allNames.contains('activity');
   const hasBoards   = allNames.contains('boards');
+  const hasProjects = allNames.contains('projects');
   const txStores = [
     ...storeNames,
     ...(hasActivity ? ['activity'] : []),
     ...(hasBoards   ? ['boards']   : []),
+    ...(hasProjects ? ['projects'] : []),
   ];
   const tx = db.transaction(txStores, 'readonly');
   const columns  = await idbRequest<Column[]>(tx.objectStore('columns').getAll());
@@ -74,6 +77,9 @@ export async function exportBoardData(): Promise<BoardExport> {
   const boards   = hasBoards
     ? await idbRequest<Board[]>(tx.objectStore('boards').getAll())
     : [];
+  const projects = hasProjects
+    ? await idbRequest<Project[]>(tx.objectStore('projects').getAll())
+    : [];
 
   return {
     version:    CURRENT_VERSION,
@@ -83,6 +89,7 @@ export async function exportBoardData(): Promise<BoardExport> {
     labels:     labels.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })),
     activity:   activity.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     boards:     boards.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    projects:   projects.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
   };
 }
 
@@ -194,10 +201,12 @@ export async function importBoardData(data: BoardExport): Promise<void> {
   const allNames = db.objectStoreNames;
   const hasActivity = allNames.contains('activity');
   const hasBoards   = allNames.contains('boards');
+  const hasProjects = allNames.contains('projects');
   const storeNames = [
     'columns', 'tasks', 'labels',
     ...(hasActivity ? ['activity'] : []),
     ...(hasBoards   ? ['boards']   : []),
+    ...(hasProjects ? ['projects'] : []),
   ];
   const tx = db.transaction(storeNames, 'readwrite');
 
@@ -242,6 +251,27 @@ export async function importBoardData(data: BoardExport): Promise<void> {
       for (const task of data.tasks) {
         if (!task.boardId) taskStore.put({ ...task, boardId: defaultId });
       }
+    }
+  }
+
+  // 5. Importar proyectos si existen en el archivo y el store está disponible (US-26)
+  if (hasProjects) {
+    const projectStore = tx.objectStore('projects');
+    projectStore.clear();
+    if (data.projects && data.projects.length > 0) {
+      for (const project of data.projects) projectStore.add(project);
+    } else {
+      // Si no hay projects en los datos importados (export antiguo),
+      // crear un proyecto General por defecto.
+      const defaultProjId = crypto.randomUUID();
+      projectStore.add({
+        id: defaultProjId,
+        name: 'General',
+        prefix: 'GEN',
+        description: 'Proyecto por defecto para tareas sin proyecto asignado.',
+        nextTaskNumber: 1,
+        createdAt: new Date().toISOString(),
+      });
     }
   }
 

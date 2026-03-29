@@ -13,7 +13,7 @@
  */
 
 const DB_NAME    = 'kanban-app-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 /** Instancia singleton de la base de datos (se inicializa una sola vez). */
 let _db: IDBDatabase | null = null;
@@ -151,7 +151,57 @@ export function openDatabase(): Promise<IDBDatabase> {
         };
       }
 
-      // if (oldVersion < 4) { ... }
+      // v3 → v4: proyectos — agrupación de tareas (US-26)
+      if (oldVersion < 4) {
+        const tx = (event.target as IDBOpenDBRequest).transaction!;
+        const now = new Date().toISOString();
+
+        // Nuevo store 'projects' con índice único por prefijo
+        const projectStore = db.createObjectStore('projects', { keyPath: 'id' });
+        projectStore.createIndex('by-prefix', 'prefix', { unique: true });
+
+        // Crear proyecto por defecto "General" con prefijo "GEN"
+        const defaultProjectId = crypto.randomUUID();
+        projectStore.add({
+          id:             defaultProjectId,
+          name:           'General',
+          prefix:         'GEN',
+          description:    'Proyecto por defecto para tareas sin proyecto asignado.',
+          nextTaskNumber: 1,
+          createdAt:      now,
+        });
+
+        // Añadir índice by-project en tasks y asignar projectId + taskNumber a tareas existentes
+        const taskStore = tx.objectStore('tasks');
+        taskStore.createIndex('by-project', 'projectId', { unique: false });
+        let counter = 0;
+        const taskReq = taskStore.openCursor();
+        taskReq.onsuccess = () => {
+          const cursor = taskReq.result;
+          if (cursor) {
+            const task = cursor.value;
+            if (!task.projectId) {
+              counter++;
+              task.projectId  = defaultProjectId;
+              task.taskNumber = `GEN-${String(counter).padStart(3, '0')}`;
+              cursor.update(task);
+            }
+            cursor.continue();
+          } else {
+            // Actualizar nextTaskNumber del proyecto General
+            const projReq = tx.objectStore('projects').get(defaultProjectId);
+            projReq.onsuccess = () => {
+              const proj = projReq.result;
+              if (proj) {
+                proj.nextTaskNumber = counter + 1;
+                tx.objectStore('projects').put(proj);
+              }
+            };
+          }
+        };
+      }
+
+      // if (oldVersion < 5) { ... }
     };
   });
 

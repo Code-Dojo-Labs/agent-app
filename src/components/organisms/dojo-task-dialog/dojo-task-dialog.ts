@@ -24,8 +24,9 @@
  * --dojo-danger, --dojo-radius, --dojo-radius-sm, --dojo-shadow
  */
 
-import type { Priority, Label } from '../../../types/models.js';
+import type { Priority, Label, Project } from '../../../types/models.js';
 import { getAllLabels, createLabel } from '../../../db/label.repository.js';
+import { getAllProjects } from '../../../db/project.repository.js';
 import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 
 const PRIORITIES: { value: Priority; label: string }[] = [
@@ -45,6 +46,8 @@ export class DojoTaskDialog extends HTMLElement {
   // US-23: estado de etiquetas
   private _allLabels: Label[] = [];
   private _selectedLabelIds: Set<string> = new Set();
+  // US-26: estado de proyectos
+  private _allProjects: Project[] = [];
 
   // Referencia estable para poder eliminar el listener de teclado
   private _onDocKeydown = (e: KeyboardEvent): void => {
@@ -70,14 +73,16 @@ export class DojoTaskDialog extends HTMLElement {
     this._columnId   = columnId;
     this._columnName = columnName;
     this._selectedLabelIds = new Set();
-    // Cargar etiquetas (US-23) y luego construir el formulario
-    getAllLabels()
-      .then(labels => { this._allLabels = labels; })
-      .catch(() => { this._allLabels = []; })
-      .finally(() => {
-        this._buildForm();
-        this._open();
-      });
+    // Cargar etiquetas (US-23) y proyectos (US-26), luego construir el formulario
+    Promise.all([
+      getAllLabels().catch(() => [] as Label[]),
+      getAllProjects().catch(() => [] as Project[]),
+    ]).then(([labels, projects]) => {
+      this._allLabels = labels;
+      this._allProjects = projects;
+      this._buildForm();
+      this._open();
+    });
   }
 
   // ── Estado del diálogo ────────────────────────────────────────────────────
@@ -623,6 +628,31 @@ export class DojoTaskDialog extends HTMLElement {
     dueField.appendChild(dueInput);
     dialog.appendChild(dueField);
 
+    // ── Campo: Proyecto (US-26) ────────────────────────────────────────────
+    const projField = document.createElement('div');
+    projField.className = 'field';
+
+    const projLabel = document.createElement('label');
+    projLabel.setAttribute('for', 'task-project-select');
+    projLabel.textContent = 'Proyecto';
+
+    const projSelect = document.createElement('select');
+    projSelect.id = 'task-project-select';
+    projSelect.setAttribute('aria-label', 'Seleccionar proyecto');
+
+    for (const proj of this._allProjects) {
+      const opt = document.createElement('option');
+      opt.value = proj.id;
+      opt.textContent = `${proj.prefix} — ${proj.name}`;
+      // Seleccionar "General" por defecto
+      if (proj.prefix === 'GEN') opt.selected = true;
+      projSelect.appendChild(opt);
+    }
+
+    projField.appendChild(projLabel);
+    projField.appendChild(projSelect);
+    dialog.appendChild(projField);
+
     // ── Campo: Etiquetas (US-23) ──────────────────────────────────────────
     const labelsField = document.createElement('div');
     labelsField.className = 'labels-field';
@@ -1084,6 +1114,7 @@ export class DojoTaskDialog extends HTMLElement {
           description: descInput.value.trim(),
           priority:    priSelect.value as Priority,
           labelIds:    [...this._selectedLabelIds],
+          projectId:   projSelect.value || undefined,
           dueDate:     (() => {
             if (!dueInput.value) return null;
             const parts = dueInput.value.split('-');
