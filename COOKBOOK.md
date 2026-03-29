@@ -37,6 +37,7 @@
    - [Paso 23 — Subtareas / Checklist (US-21 / Issue #39)](#paso-23--subtareas--checklist-us-21--issue-39)
    - [Paso 24 — Múltiples tableros (US-22 / Issue #40)](#paso-24--múltiples-tableros-us-22)
    - [Paso 25 — Etiquetas durante la creación de tareas (US-23 / Issue #41)](#paso-25--etiquetas-durante-la-creación-de-tareas-us-23--issue-41)
+   - [Paso 26 — Vista previa Markdown por defecto (US-25 / Issue #43)](#paso-26--vista-previa-markdown-por-defecto-us-25--issue-43)
 
 ---
 
@@ -2359,3 +2360,45 @@ Se añade una sección "Etiquetas (opcional)" en el formulario de creación, ent
 - Navegación por teclado: Escape cierra picker/formulario, ArrowUp/Down navega opciones
 - `role="button"` y `tabindex="0"` en opción de crear etiqueta
 - Validación de contraste WCAG AA en creación inline de etiquetas
+
+---
+
+## Paso 26 — Vista previa Markdown por defecto (US-25 / Issue #43)
+
+> **Issue:** #43 · **PR:** #58 · **Rama:** `feat/43-vista-previa-markdown-defecto`
+
+### Problema
+
+Al abrir el panel de detalle de una tarea, la descripción se mostraba siempre en modo "Editar" (textarea sin renderizar). El usuario debía cambiar manualmente al tab "Vista previa" para leer la descripción con formato Markdown, lo que añadía un paso innecesario.
+
+### Solución
+
+Se modifica `_buildDescriptionField()` en `dojo-task-detail` para que el tab activo al abrir la tarea dependa del contenido de la descripción:
+
+- **Si `task.description.trim()` tiene contenido**: se invoca `switchToPreview()` inmediatamente tras construir el DOM. Esto activa el tab "Vista previa", oculta el textarea, renderiza el Markdown y ajusta los atributos `aria-selected` y `tabindex` (roving tabindex).
+- **Si la descripción está vacía o solo contiene whitespace**: no se ejecuta ningún cambio; el tab "Editar" permanece activo con el textarea visible y su placeholder.
+
+#### Archivo modificado
+
+| Archivo | Cambio |
+|---|---|
+| `src/components/organisms/dojo-task-detail/dojo-task-detail.ts` | Comprobación de contenido + `switchToPreview()` al final de `_buildDescriptionField()` |
+
+#### Receta
+
+1. Al final de `_buildDescriptionField()`, después de `section.appendChild(previewPanel)`, se añade:
+   ```ts
+   if (task.description.trim()) {
+     switchToPreview();
+     editTab.setAttribute('tabindex', '-1');
+     previewTab.setAttribute('tabindex', '0');
+   }
+   ```
+2. `switchToPreview()` ya existía: activa el tab "Vista previa", oculta textarea, muestra panel con Markdown renderizado via `parseMarkdown()`.
+3. El ajuste manual de `tabindex` es necesario porque `switchToPreview()` no modifica el roving tabindex (solo los handlers de click/keyboard lo hacían).
+
+### Accesibilidad (WCAG 2.1)
+
+- Roving tabindex correctamente inicializado: el tab activo tiene `tabindex="0"`, el inactivo `tabindex="-1"`
+- `aria-selected` refleja el tab activo al abrir
+- Navegación por teclado (ArrowLeft/Right, Home/End) funciona sin cambios
