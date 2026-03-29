@@ -107,21 +107,23 @@ export async function updateProject(id: string, changes: UpdateProjectInput): Pr
  * No permite eliminar el proyecto por defecto "General".
  */
 export async function deleteProject(id: string): Promise<void> {
-  const project = await getProjectById(id);
+  const db = await openDatabase();
+  const tx = db.transaction(['projects', 'tasks'], 'readwrite');
+  const projectStore = tx.objectStore('projects');
+
+  const project = await idbRequest<Project | undefined>(projectStore.get(id));
   if (!project) return;
 
   if (project.prefix === DEFAULT_PROJECT_PREFIX) {
     throw new Error('No se puede eliminar el proyecto por defecto "General".');
   }
 
-  // Buscar el proyecto General para reasignación
-  const generalProject = await getProjectByPrefix(DEFAULT_PROJECT_PREFIX);
+  // Buscar el proyecto General para reasignación dentro de la misma transacción
+  const prefixIndex    = projectStore.index('by-prefix');
+  const generalProject = await idbRequest<Project | undefined>(prefixIndex.get(DEFAULT_PROJECT_PREFIX));
   if (!generalProject) {
     throw new Error('No se encontró el proyecto "General" para reasignar tareas.');
   }
-
-  const db = await openDatabase();
-  const tx = db.transaction(['projects', 'tasks'], 'readwrite');
 
   // Reasignar tareas del proyecto eliminado al proyecto General
   const taskStore = tx.objectStore('tasks');
@@ -134,7 +136,7 @@ export async function deleteProject(id: string): Promise<void> {
   }
 
   // Eliminar el proyecto
-  tx.objectStore('projects').delete(id);
+  projectStore.delete(id);
   await idbTransaction(tx);
 }
 

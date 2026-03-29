@@ -1269,10 +1269,11 @@ export class DojoKanbanBoard extends HTMLElement {
       } else {
         // Asignar al proyecto General si no se especificó proyecto
         const general = await getProjectByPrefix('GEN');
-        if (general) {
-          resolvedProjectId = general.id;
-          taskNumber = await getNextTaskNumber(general.id);
+        if (!general) {
+          throw new Error('No se encontró el proyecto "General" (GEN). Ejecute seedDefaultProject().');
         }
+        resolvedProjectId = general.id;
+        taskNumber = await getNextTaskNumber(general.id);
       }
 
       const newTask = await createTask({
