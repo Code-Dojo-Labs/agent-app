@@ -14,6 +14,7 @@
 
 import { openDatabase } from './db/database.js';
 import { seedDefaultLabels } from './db/label.repository.js';
+import { seedDefaultProject } from './db/project.repository.js';
 import { initTheme } from './utils/theme.js';
 
 // ── Inicialización ─────────────────────────────────────────────────────────
@@ -28,6 +29,9 @@ async function bootstrap(): Promise<void> {
 
     // 3. Seed de etiquetas por defecto (solo si el store está vacío)
     await seedDefaultLabels();
+
+    // 3b. Seed de proyecto por defecto "General" (US-26)
+    await seedDefaultProject();
 
     // 4. Registrar Web Components — US-01 Visualización del tablero Kanban
     await import('./components/organisms/dojo-app/dojo-app.js');

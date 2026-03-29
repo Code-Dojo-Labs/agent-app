@@ -28,10 +28,11 @@
  * --dojo-shadow, --dojo-radius, --dojo-primary
  */
 
-import type { Column, Task, Label, Priority } from '../../../types/models.js';
+import type { Column, Task, Label, Priority, Project } from '../../../types/models.js';
 import { getColumnsByBoard, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
 import { getTasksByStatus, createTask, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
 import { getAllLabels } from '../../../db/label.repository.js';
+import { getAllProjects, getNextTaskNumber, getProjectByPrefix } from '../../../db/project.repository.js';
 import { addActivityEvent, deleteActivitiesByTaskId } from '../../../db/activity.repository.js';
 import '../../molecules/dojo-kanban-column/dojo-kanban-column.js';
 import '../../atoms/dojo-task-card/dojo-task-card.js';
@@ -50,6 +51,7 @@ interface ActiveFilter {
   labelIds?: string[];
   searchText?: string;
   sortBy?: SortMode;
+  projectId?: string;
 }
 
 /** Contrato de la propiedad taskLabels expuesta por dojo-task-card (US-10). */
@@ -73,6 +75,8 @@ export class DojoKanbanBoard extends HTMLElement {
   private _columns: Column[] = [];
   /** Lista completa de etiquetas (US-10) */
   private _labels: Label[] = [];
+  /** Lista completa de proyectos (US-26) */
+  private _projects: Project[] = [];
   // Referencias UI del toolbar de filtros (US-15)
   private _filterBarContent: HTMLElement | null = null;
   private _filterClearAllBtn: HTMLButtonElement | null = null;
@@ -83,6 +87,8 @@ export class DojoKanbanBoard extends HTMLElement {
   private _selectedLabelIds: Set<string> = new Set();
   private _selectedPriorities: Set<Priority> = new Set();
   private _filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  // US-26: referencia UI del filtro de proyecto
+  private _filterProjectSelect: HTMLSelectElement | null = null;
 
   constructor() {
     super();
@@ -560,6 +566,31 @@ export class DojoKanbanBoard extends HTMLElement {
 
     content.appendChild(labelSection);
 
+    // ── Selector de proyecto (US-26) ──────────────────────────────────────
+    const projectSep = document.createElement('div');
+    projectSep.className = 'filter-sep';
+    projectSep.setAttribute('aria-hidden', 'true');
+    content.appendChild(projectSep);
+
+    const projectLabel = document.createElement('span');
+    projectLabel.className = 'filter-label';
+    projectLabel.textContent = 'Proyecto:';
+    content.appendChild(projectLabel);
+
+    const projectSelect = document.createElement('select');
+    projectSelect.className = 'filter-search';
+    projectSelect.setAttribute('aria-label', 'Filtrar por proyecto');
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'Todos';
+    projectSelect.appendChild(allOpt);
+    this._filterProjectSelect = projectSelect;
+    projectSelect.addEventListener('change', () => {
+      this.activeFilter = { ...this._activeFilter, projectId: projectSelect.value || undefined };
+      this._updateClearAllVisibility();
+    });
+    content.appendChild(projectSelect);
+
     // ── Botón "Limpiar filtros" ───────────────────────────────────────────
     const clearAllBtn = document.createElement('button');
     clearAllBtn.className = 'filter-clear';
@@ -657,13 +688,40 @@ export class DojoKanbanBoard extends HTMLElement {
     this._updateClearAllVisibility();
   }
 
+  /** Reconstruye las opciones del selector de proyectos (US-26). */
+  private _rebuildProjectFilterSelect(): void {
+    if (!this._filterProjectSelect) return;
+    // Preservar selección actual
+    const currentValue = this._filterProjectSelect.value;
+    // Limpiar opciones (excepto "Todos")
+    while (this._filterProjectSelect.options.length > 1) {
+      this._filterProjectSelect.remove(1);
+    }
+    for (const proj of this._projects) {
+      const opt = document.createElement('option');
+      opt.value = proj.id;
+      opt.textContent = `${proj.prefix} — ${proj.name}`;
+      this._filterProjectSelect.appendChild(opt);
+    }
+    // Restaurar selección si sigue existiendo
+    if (this._projects.some(p => p.id === currentValue)) {
+      this._filterProjectSelect.value = currentValue;
+    } else {
+      this._filterProjectSelect.value = '';
+      if (this._activeFilter.projectId) {
+        this._activeFilter = { ...this._activeFilter, projectId: undefined };
+      }
+    }
+  }
+
   /** Muestra/oculta el botón "Limpiar filtros" y actualiza el estado visual del toggle. */
   private _updateClearAllVisibility(): void {
     if (!this._filterClearAllBtn || !this._filterToggleBtn) return;
     const hasActive =
       (this._activeFilter.priorities?.length ?? 0) > 0 ||
       (this._activeFilter.labelIds?.length ?? 0) > 0 ||
-      !!(this._activeFilter.searchText);
+      !!(this._activeFilter.searchText) ||
+      !!(this._activeFilter.projectId);
     this._filterClearAllBtn.style.display = hasActive ? '' : 'none';
     this._filterToggleBtn.classList.toggle('has-active', hasActive);
   }
@@ -678,6 +736,7 @@ export class DojoKanbanBoard extends HTMLElement {
       this._filterDebounceTimer = null;
     }
     if (this._filterSearchInput) this._filterSearchInput.value = '';
+    if (this._filterProjectSelect) this._filterProjectSelect.value = '';
     if (this._filterBarContent) {
       this._filterBarContent.querySelectorAll<HTMLButtonElement>('[data-priority]').forEach(b => {
         b.classList.remove('active');
@@ -764,12 +823,15 @@ export class DojoKanbanBoard extends HTMLElement {
     this._tasksByColumn.clear();
 
     try {
-      const [columns, labels] = await Promise.all([
+      const [columns, labels, projects] = await Promise.all([
         getColumnsByBoard(this._boardId),
         getAllLabels(),
+        getAllProjects(),
       ]);
       this._labels = labels;
+      this._projects = projects;
       this._rebuildLabelFilterChips(); // Poblar chips de etiquetas en el toolbar (US-15)
+      this._rebuildProjectFilterSelect(); // Poblar selector de proyectos (US-26)
 
       // Cargar tareas de todas las columnas en paralelo
       const taskResults = await Promise.all(
@@ -849,6 +911,7 @@ export class DojoKanbanBoard extends HTMLElement {
       card.setAttribute('task-title',      task.title);
       card.setAttribute('task-priority',   task.priority);
       card.setAttribute('task-created-at', task.createdAt);
+      if (task.taskNumber) card.setAttribute('task-number', task.taskNumber);
       if (task.dueDate) card.setAttribute('task-due-date', task.dueDate);
       (card as TaskCardElement).taskLabels = this._getTaskLabels(task);
       const subs = task.subtasks ?? [];
@@ -903,7 +966,7 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private _filterTasks(tasks: Task[]): Task[] {
-    const { priorities, labelIds, searchText } = this._activeFilter;
+    const { priorities, labelIds, searchText, projectId } = this._activeFilter;
     const lowerSearch = searchText ? searchText.toLowerCase() : null;
     return tasks.filter(task => {
       if (priorities && priorities.length > 0 && !priorities.includes(task.priority)) return false;
@@ -912,6 +975,7 @@ export class DojoKanbanBoard extends HTMLElement {
         const hasLabel = labelIds.some(id => taskLabelIds.includes(id));
         if (!hasLabel) return false;
       }
+      if (projectId && task.projectId !== projectId) return false;
       if (lowerSearch) {
         const titleMatch = task.title.toLowerCase().includes(lowerSearch);
         const descMatch  = (task.description ?? '').toLowerCase().includes(lowerSearch);
@@ -1181,13 +1245,14 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private async _handleCreateTask(e: CustomEvent): Promise<void> {
-    const { statusId, title, description, priority, dueDate, labelIds } = e.detail as {
+    const { statusId, title, description, priority, dueDate, labelIds, projectId } = e.detail as {
       statusId:    string;
       title:       string;
       description: string;
       priority:    string;
       dueDate?:    string | null;
       labelIds?:   string[];
+      projectId?:  string;
     };
     // Validar que la columna exista (puede haberse eliminado mientras el diálogo estaba abierto)
     if (!this._columns.some(c => c.id === statusId)) {
@@ -1196,15 +1261,32 @@ export class DojoKanbanBoard extends HTMLElement {
     }
     const tasks = this._tasksByColumn.get(statusId) ?? [];
     try {
+      // US-26: resolver proyecto y obtener taskNumber
+      let resolvedProjectId = projectId || '';
+      let taskNumber = '';
+      if (resolvedProjectId) {
+        taskNumber = await getNextTaskNumber(resolvedProjectId);
+      } else {
+        // Asignar al proyecto General si no se especificó proyecto
+        const general = await getProjectByPrefix('GEN');
+        if (!general) {
+          throw new Error('No se encontró el proyecto "General" (GEN). Ejecute seedDefaultProject().');
+        }
+        resolvedProjectId = general.id;
+        taskNumber = await getNextTaskNumber(general.id);
+      }
+
       const newTask = await createTask({
         title,
         description,
         statusId,
-        boardId:   this._boardId,
-        priority:  priority as Task['priority'],
-        labelIds:  labelIds ?? [],
-        order:     tasks.length,
-        dueDate:   dueDate ?? null,
+        boardId:     this._boardId,
+        projectId:   resolvedProjectId,
+        taskNumber,
+        priority:    priority as Task['priority'],
+        labelIds:    labelIds ?? [],
+        order:       tasks.length,
+        dueDate:     dueDate ?? null,
       });
 
       // US-20: registrar evento de creación

@@ -29,6 +29,10 @@ export interface Task {
   id: string;
   /** FK → Board.id — tablero al que pertenece (US-22). */
   boardId: string;
+  /** FK → Project.id — proyecto al que pertenece (US-26). */
+  projectId: string;
+  /** Identificador legible del proyecto, ej. "WEB-005" (US-26). */
+  taskNumber: string;
   /** Título visible de la tarea. Máx. 120 caracteres. */
   title: string;
   /** Descripción en formato Markdown. Puede estar vacío. */
@@ -95,6 +99,29 @@ export interface Board {
 
 /** Nombre del tablero por defecto creado en la migración. */
 export const DEFAULT_BOARD_NAME = 'Mi tablero';
+
+// ── Project (US-26) ────────────────────────────────────────────────────────
+
+/** Representa un proyecto que agrupa tareas con identificadores legibles. */
+export interface Project {
+  /** UUID v4. */
+  id: string;
+  /** Nombre visible del proyecto. Máx. 60 caracteres. */
+  name: string;
+  /** Prefijo único (máx. 5 caracteres, uppercase, solo letras). Inmutable tras creación. */
+  prefix: string;
+  /** Descripción opcional del proyecto. */
+  description: string;
+  /** Siguiente número secuencial para asignar a la próxima tarea. */
+  nextTaskNumber: number;
+  /** Fecha de creación en formato ISO 8601. */
+  createdAt: string;
+}
+
+/** Nombre del proyecto por defecto. */
+export const DEFAULT_PROJECT_NAME = 'General';
+/** Prefijo del proyecto por defecto. */
+export const DEFAULT_PROJECT_PREFIX = 'GEN';
 
 // ── Label ──────────────────────────────────────────────────────────────────
 

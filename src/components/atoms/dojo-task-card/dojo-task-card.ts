@@ -36,7 +36,7 @@ export class DojoTaskCard extends HTMLElement {
   static readonly TAG = 'dojo-task-card';
 
   static get observedAttributes(): string[] {
-    return ['task-id', 'task-title', 'task-priority', 'task-created-at', 'task-due-date'];
+    return ['task-id', 'task-title', 'task-priority', 'task-created-at', 'task-due-date', 'task-number'];
   }
 
   private _shadow: ShadowRoot;
@@ -101,6 +101,7 @@ export class DojoTaskCard extends HTMLElement {
   get priority(): string  { return this.getAttribute('task-priority') ?? 'medium'; }
   get createdAt(): string { return this.getAttribute('task-created-at') ?? ''; }
   get dueDate(): string   { return this.getAttribute('task-due-date') ?? ''; }
+  get taskNumber(): string { return this.getAttribute('task-number') ?? ''; }
 
   // ── Drag handlers ─────────────────────────────────────────────────────────
 
@@ -277,6 +278,16 @@ export class DojoTaskCard extends HTMLElement {
         line-height: 1.4;
         word-break: break-word;
         margin: 0 0 0.5rem 0;
+      }
+
+      /* Identificador de proyecto (US-26) */
+      .task-number {
+        font-size: 0.625rem;
+        font-weight: 600;
+        color: var(--dojo-primary, #1D4ED8);
+        letter-spacing: 0.04em;
+        margin-bottom: 0.125rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
 
       /* Footer: prioridad (izq) + fecha (der) */
@@ -475,6 +486,14 @@ export class DojoTaskCard extends HTMLElement {
       progressRow.appendChild(pBar);
 
       this._shadow.appendChild(progressRow);
+    }
+
+    // ── Identificador de proyecto (US-26) ──────────────────────────────────
+    if (this.taskNumber) {
+      const numEl = document.createElement('span');
+      numEl.className = 'task-number';
+      numEl.textContent = this.taskNumber;
+      this._shadow.appendChild(numEl);
     }
 
     // ── Título ────────────────────────────────────────────────────────────

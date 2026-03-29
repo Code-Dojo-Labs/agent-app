@@ -38,6 +38,7 @@
    - [Paso 24 — Múltiples tableros (US-22 / Issue #40)](#paso-24--múltiples-tableros-us-22)
    - [Paso 25 — Etiquetas durante la creación de tareas (US-23 / Issue #41)](#paso-25--etiquetas-durante-la-creación-de-tareas-us-23--issue-41)
    - [Paso 26 — Vista previa Markdown por defecto (US-25 / Issue #43)](#paso-26--vista-previa-markdown-por-defecto-us-25--issue-43)
+   - [Paso 27 — Agrupación de tareas por proyectos (US-26 / Issue #44)](#paso-27--agrupación-de-tareas-por-proyectos-us-26--issue-44)
 
 ---
 
@@ -2402,3 +2403,87 @@ Se modifica `_buildDescriptionField()` en `dojo-task-detail` para que el tab act
 - Roving tabindex correctamente inicializado: el tab activo tiene `tabindex="0"`, el inactivo `tabindex="-1"`
 - `aria-selected` refleja el tab activo al abrir
 - Navegación por teclado (ArrowLeft/Right, Home/End) funciona sin cambios
+
+---
+
+## Paso 27 — Agrupación de tareas por proyectos (US-26 / Issue #44)
+
+> **Issue:** #44 · **PR:** #59 · **Rama:** `feat/44-agrupacion-tareas-proyectos`
+
+### Problema
+
+Todas las tareas existían en un espacio plano sin ninguna forma de agruparlas por contexto, área de trabajo o dominio. El usuario no tenía manera de distinguir a simple vista a qué proyecto o iniciativa pertenecía cada tarea, ni filtrar el tablero para enfocarse en un subconjunto.
+
+### Solución
+
+Se introduce el concepto de **Proyecto** como entidad de primer nivel que agrupa tareas bajo un **prefijo único** e **identificadores secuenciales legibles** (ej. `WEB-005`, `API-012`).
+
+### Decisión de arquitectura (ADR)
+
+| Aspecto | Decisión | Justificación |
+|---|---|---|
+| Identificador de tarea | `PREFIX-NNN` (3 dígitos con pad) | Balance entre legibilidad y escalabilidad; familiar para usuarios de JIRA/Linear |
+| Prefijo inmutable | Una vez creado no se puede cambiar | Los task numbers ya emitidos perderían coherencia si el prefijo muta |
+| Proyecto General | Siempre presente, no eliminable | Garantiza que toda tarea tiene un proyecto asociado; simplifica migraciones |
+| Generación atómica | Read-increment-write en transacción IDB `readwrite` | Evita números duplicados en operaciones concurrentes |
+| Reasignación al eliminar | Tareas pasan a General (preservan task number original) | No se pierden identificadores históricos |
+
+### Archivos creados
+
+| Archivo | Propósito |
+|---|---|
+| `src/db/project.repository.ts` | CRUD de proyectos: `getAllProjects`, `getProjectById`, `getProjectByPrefix`, `createProject`, `updateProject`, `deleteProject`, `getNextTaskNumber`, `seedDefaultProject` |
+| `src/components/organisms/dojo-project-manager/dojo-project-manager.ts` | Panel lateral para gestionar proyectos (crear, editar, eliminar) |
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `src/types/models.ts` | Interfaz `Project`, constantes `DEFAULT_PROJECT_NAME`/`DEFAULT_PROJECT_PREFIX`, campos `projectId` y `taskNumber` en `Task` |
+| `src/db/database.ts` | Migración v3→v4: store `projects`, índice `by-prefix`, índice `by-project` en tasks, seed de General, migración de tareas existentes |
+| `src/db/export-import.ts` | Export/import incluyen el store `projects` |
+| `src/main.ts` | Llama `seedDefaultProject()` al iniciar |
+| `src/components/atoms/dojo-task-card/dojo-task-card.ts` | Atributo `task-number`, getter, CSS y DOM para mostrar el identificador |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | Carga de proyectos, filtro por proyecto, selector de proyecto en toolbar, asignación de proyecto y task number al crear tareas |
+| `src/components/organisms/dojo-task-dialog/dojo-task-dialog.ts` | Selector de proyecto en formulario de creación, carga de proyectos en paralelo con etiquetas |
+| `src/components/organisms/dojo-app/dojo-app.ts` | Botón "Proyectos" en header, monta `<dojo-project-manager>`, refresca tablero ante cambios |
+
+### Receta: Migración de IndexedDB (v3 → v4)
+
+1. **Constante `DB_VERSION`** se incrementa de 3 a 4 en `database.ts`.
+2. En el handler `onupgradeneeded`, se añade un bloque condicional `if (oldVersion < 4)` que:
+   - Crea el object store `projects` con `keyPath: 'id'` e índice único `by-prefix`.
+   - Crea índice `by-project` en el store `tasks` sobre el campo `projectId`.
+   - Inserta un proyecto "General" (prefijo `GEN`) con `nextTaskNumber: 1`.
+   - Recorre todas las tareas existentes con un cursor, asignando `projectId` al General y `taskNumber` secuencial (`GEN-001`, `GEN-002`, …).
+   - Actualiza `nextTaskNumber` del proyecto General tras migrar.
+
+### Receta: Generación atómica de task numbers
+
+1. `getNextTaskNumber(projectId)` abre una transacción `readwrite` sobre el store `projects`.
+2. Lee el proyecto, extrae `nextTaskNumber`, formatea como `PREFIX-NNN`.
+3. Incrementa `nextTaskNumber` y hace `put` en la misma transacción.
+4. Retorna el string formateado.
+5. El `_handleCreateTask()` del kanban-board llama esta función antes de `createTask()`, garantizando unicidad.
+
+### Receta: Panel de gestión de proyectos
+
+1. **Patrón**: Replica la estructura de `dojo-label-manager` (panel lateral + backdrop + ARIA).
+2. **Crear**: Formulario inline con campos nombre, prefijo (auto-uppercase, regex `[A-Z]{1,5}`) y descripción opcional.
+3. **Editar**: Formulario inline con prefijo deshabilitado (inmutable). Solo nombre y descripción editables.
+4. **Eliminar**: Confirmación inline con advertencia de reasignación a General. Proyecto General tiene botón deshabilitado.
+5. **Eventos**: `dojo:project-created`, `dojo:project-updated`, `dojo:project-deleted` burbujean a `dojo-app` que refresca el tablero.
+
+### Receta: Filtro por proyecto en el tablero
+
+1. El `dojo-kanban-board` carga todos los proyectos en `_loadBoard()` y construye un `<select>` en la barra de filtros.
+2. Al cambiar la selección, se actualiza `_activeFilter.projectId` y se invoca `_filterTasks()`.
+3. `_filterTasks()` compara `task.projectId` contra el filtro activo (si existe).
+4. "Limpiar filtros" resetea el select a valor vacío.
+
+### Accesibilidad (WCAG 2.1)
+
+- `aria-label` en selector de proyecto (diálogo y filtro)
+- `aria-modal`, `aria-labelledby`, `inert` en panel de gestión de proyectos
+- Focus trap: Escape cierra el panel
+- Botón eliminar deshabilitado visualmente para proyecto General (`disabled`, `title` explicativo)
