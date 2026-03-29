@@ -39,6 +39,7 @@
    - [Paso 25 — Etiquetas durante la creación de tareas (US-23 / Issue #41)](#paso-25--etiquetas-durante-la-creación-de-tareas-us-23--issue-41)
    - [Paso 26 — Vista previa Markdown por defecto (US-25 / Issue #43)](#paso-26--vista-previa-markdown-por-defecto-us-25--issue-43)
    - [Paso 27 — Agrupación de tareas por proyectos (US-26 / Issue #44)](#paso-27--agrupación-de-tareas-por-proyectos-us-26--issue-44)
+   - [Paso 28 — Búsqueda global con paleta de comandos (US-28 / Issue #46)](#paso-28--búsqueda-global-con-paleta-de-comandos-us-28--issue-46)
 
 ---
 
@@ -2487,3 +2488,82 @@ Se introduce el concepto de **Proyecto** como entidad de primer nivel que agrupa
 - `aria-modal`, `aria-labelledby`, `inert` en panel de gestión de proyectos
 - Focus trap: Escape cierra el panel
 - Botón eliminar deshabilitado visualmente para proyecto General (`disabled`, `title` explicativo)
+
+---
+
+## Paso 28 — Búsqueda global con paleta de comandos (US-28 / Issue #46)
+
+> **Issue:** #46 · **PR:** #60 · **Rama:** `feat/46-busqueda-global-atajos-teclado`
+
+### Problema
+
+No existía una forma rápida de localizar tareas sin recorrer manualmente todas las columnas del tablero. Los usuarios que trabajan con muchas tareas necesitan un mecanismo de búsqueda global accesible desde el teclado.
+
+### Solución
+
+Se introduce una **paleta de comandos** estilo VS Code / Linear que se activa con `Cmd/Ctrl+K`. Permite buscar tareas por título y descripción, navegar a su detalle, y crear tareas rápidamente con el texto de búsqueda como título prellenado.
+
+### Decisión de arquitectura (ADR)
+
+| Aspecto | Decisión | Justificación |
+|---|---|---|
+| Activación | `Cmd/Ctrl+K` | Atajo familiar para usuarios de VS Code, Slack, Linear |
+| Relevancia | Título (score 2) > Descripción (score 1) | Las coincidencias en título son más relevantes para la navegación rápida |
+| Debounce | 150ms | Balance entre responsividad y rendimiento |
+| Scope | Tareas del tablero activo | Evita confusión entre tableros; el `boardId` se sincroniza al navegar |
+| Máx. resultados | 20 | Suficiente para localizar tareas sin saturar la UI |
+| Creación rápida | Siempre visible cuando hay texto | Reduce fricción: si no existe la tarea, se puede crear sin salir del flujo |
+
+### Archivos creados
+
+| Archivo | Propósito |
+|---|---|
+| `src/components/organisms/dojo-command-palette/dojo-command-palette.ts` | Organismo: paleta de comandos con búsqueda, navegación por teclado y creación rápida |
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `src/components/organisms/dojo-app/dojo-app.ts` | Importa y monta `<dojo-command-palette>`, escucha eventos `dojo:palette-select-task` y `dojo:palette-create-task`, sincroniza `boardId` al navegar entre tableros |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | Nuevos métodos públicos `openTaskById(taskId)` y `openCreateTaskWithTitle(title)` para interop con la paleta |
+| `src/components/organisms/dojo-task-dialog/dojo-task-dialog.ts` | `openCreate()` acepta parámetro opcional `prefillTitle` para prellenar el título desde la paleta |
+
+### Receta: Paleta de comandos con combobox ARIA
+
+1. El componente usa Shadow DOM con `role="dialog"` y `aria-modal="true"`.
+2. El input tiene `role="combobox"` con `aria-controls` apuntando al listbox y `aria-autocomplete="list"`.
+3. La lista de resultados usa `role="listbox"` con `role="option"` en cada ítem.
+4. `aria-activedescendant` se actualiza al navegar con flechas para comunicar al screen reader qué opción está seleccionada.
+5. `aria-expanded` refleja si hay resultados visibles.
+
+### Receta: Búsqueda por relevancia con debounce
+
+1. El usuario escribe en el input y se aplica un debounce de 150ms antes de ejecutar la búsqueda.
+2. `_search()` recorre todas las tareas del tablero activo (cargadas en `show()` vía `getAllTasks()`).
+3. Cada tarea recibe un score: 2 si el título contiene el término, 1 si solo la descripción coincide.
+4. Los resultados se ordenan por score descendente y luego por `updatedAt` más reciente.
+5. Se limitan a `MAX_RESULTS` (20) para mantener la UI limpia.
+
+### Receta: Navegación por teclado
+
+1. **Abrir/Cerrar**: `Cmd/Ctrl+K` actúa como toggle. `Escape` cierra. Clic en backdrop cierra.
+2. **Moverse**: `Arrow Down` / `Arrow Up` recorre resultados + opción "Crear tarea" en ciclo.
+3. **Seleccionar**: `Enter` abre el detalle de la tarea seleccionada o dispara la creación rápida.
+4. **Focus**: Al abrir, el input recibe foco. Al cerrar, el foco regresa al elemento anterior (`_previousFocus`).
+
+### Receta: Interop con kanban-board y task-dialog
+
+1. La paleta emite eventos `dojo:palette-select-task` (con `taskId`) y `dojo:palette-create-task` (con `title`).
+2. `dojo-app` escucha estos eventos y los enruta al kanban-board:
+   - `openTaskById(taskId)`: busca la tarea en el caché y la abre en el panel de detalle.
+   - `openCreateTaskWithTitle(title)`: selecciona la primera columna y abre el diálogo de creación con título prellenado.
+3. `dojo-task-dialog.openCreate()` ahora acepta un tercer parámetro opcional `prefillTitle` que se aplica al input y al contador de caracteres.
+
+### Accesibilidad (WCAG 2.1)
+
+- `role="dialog"` + `aria-modal="true"` + `aria-label="Paleta de comandos"`
+- Combobox pattern (`role="combobox"`, `aria-controls`, `aria-activedescendant`, `aria-expanded`)
+- `role="listbox"` con ítems `role="option"` y `aria-selected`
+- Focus management: foco automático al input al abrir, restauración al cerrar
+- Todas las acciones accesibles por teclado sin depender del ratón
+- `aria-label` en prioridad de cada resultado
