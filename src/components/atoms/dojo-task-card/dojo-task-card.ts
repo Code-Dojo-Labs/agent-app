@@ -488,13 +488,15 @@ export class DojoTaskCard extends HTMLElement {
       this._shadow.appendChild(progressRow);
     }
 
-    // ── Título ────────────────────────────────────────────────────────────    // Identificador de proyecto (US-26)
+    // ── Identificador de proyecto (US-26) ──────────────────────────────────
     if (this.taskNumber) {
       const numEl = document.createElement('span');
       numEl.className = 'task-number';
       numEl.textContent = this.taskNumber;
       this._shadow.appendChild(numEl);
     }
+
+    // ── Título ────────────────────────────────────────────────────────────
     const titleEl = document.createElement('p');
     titleEl.className = 'title';
     titleEl.textContent = this.taskTitle;

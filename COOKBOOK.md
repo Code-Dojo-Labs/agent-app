@@ -2379,6 +2379,31 @@ Se modifica `_buildDescriptionField()` en `dojo-task-detail` para que el tab act
 - **Si `task.description.trim()` tiene contenido**: se invoca `switchToPreview()` inmediatamente tras construir el DOM. Esto activa el tab "Vista previa", oculta el textarea, renderiza el Markdown y ajusta los atributos `aria-selected` y `tabindex` (roving tabindex).
 - **Si la descripción está vacía o solo contiene whitespace**: no se ejecuta ningún cambio; el tab "Editar" permanece activo con el textarea visible y su placeholder.
 
+#### Archivo modificado
+
+| Archivo | Cambio |
+|---|---|
+| `src/components/organisms/dojo-task-detail/dojo-task-detail.ts` | Comprobación de contenido + `switchToPreview()` al final de `_buildDescriptionField()` |
+
+#### Receta
+
+1. Al final de `_buildDescriptionField()`, después de `section.appendChild(previewPanel)`, se añade:
+   ```ts
+   if (task.description.trim()) {
+     switchToPreview();
+     editTab.setAttribute('tabindex', '-1');
+     previewTab.setAttribute('tabindex', '0');
+   }
+   ```
+2. `switchToPreview()` ya existía: activa el tab "Vista previa", oculta textarea, muestra panel con Markdown renderizado via `parseMarkdown()`.
+3. El ajuste manual de `tabindex` es necesario porque `switchToPreview()` no modifica el roving tabindex (solo los handlers de click/keyboard lo hacían).
+
+### Accesibilidad (WCAG 2.1)
+
+- Roving tabindex correctamente inicializado: el tab activo tiene `tabindex="0"`, el inactivo `tabindex="-1"`
+- `aria-selected` refleja el tab activo al abrir
+- Navegación por teclado (ArrowLeft/Right, Home/End) funciona sin cambios
+
 ---
 
 ## Paso 27 — Agrupación de tareas por proyectos (US-26 / Issue #44)
@@ -2462,28 +2487,3 @@ Se introduce el concepto de **Proyecto** como entidad de primer nivel que agrupa
 - `aria-modal`, `aria-labelledby`, `inert` en panel de gestión de proyectos
 - Focus trap: Escape cierra el panel
 - Botón eliminar deshabilitado visualmente para proyecto General (`disabled`, `title` explicativo)
-
-#### Archivo modificado
-
-| Archivo | Cambio |
-|---|---|
-| `src/components/organisms/dojo-task-detail/dojo-task-detail.ts` | Comprobación de contenido + `switchToPreview()` al final de `_buildDescriptionField()` |
-
-#### Receta
-
-1. Al final de `_buildDescriptionField()`, después de `section.appendChild(previewPanel)`, se añade:
-   ```ts
-   if (task.description.trim()) {
-     switchToPreview();
-     editTab.setAttribute('tabindex', '-1');
-     previewTab.setAttribute('tabindex', '0');
-   }
-   ```
-2. `switchToPreview()` ya existía: activa el tab "Vista previa", oculta textarea, muestra panel con Markdown renderizado via `parseMarkdown()`.
-3. El ajuste manual de `tabindex` es necesario porque `switchToPreview()` no modifica el roving tabindex (solo los handlers de click/keyboard lo hacían).
-
-### Accesibilidad (WCAG 2.1)
-
-- Roving tabindex correctamente inicializado: el tab activo tiene `tabindex="0"`, el inactivo `tabindex="-1"`
-- `aria-selected` refleja el tab activo al abrir
-- Navegación por teclado (ArrowLeft/Right, Home/End) funciona sin cambios
