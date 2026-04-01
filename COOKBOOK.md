@@ -1,7 +1,7 @@
 # COOKBOOK — ToDo List con Web Components
 
-> **Versión:** 1.0.0  
-> **Última actualización:** 2026-03-26  
+> **Versión:** 1.1.0  
+> **Última actualización:** 2026-04-01  
 > **Mantenido por:** Agente `documentalista`
 
 ---
@@ -40,6 +40,7 @@
    - [Paso 26 — Vista previa Markdown por defecto (US-25 / Issue #43)](#paso-26--vista-previa-markdown-por-defecto-us-25--issue-43)
    - [Paso 27 — Agrupación de tareas por proyectos (US-26 / Issue #44)](#paso-27--agrupación-de-tareas-por-proyectos-us-26--issue-44)
    - [Paso 28 — Búsqueda global con paleta de comandos (US-28 / Issue #46)](#paso-28--búsqueda-global-con-paleta-de-comandos-us-28--issue-46)
+   - [Paso 29 — Sincronización entre pestañas (US-30)](#paso-29--sincronización-entre-pestañas-us-30)
 
 ---
 
@@ -2567,3 +2568,91 @@ Se introduce una **paleta de comandos** estilo VS Code / Linear que se activa co
 - Focus management: foco automático al input al abrir, restauración al cerrar
 - Todas las acciones accesibles por teclado sin depender del ratón
 - `aria-label` en prioridad de cada resultado
+
+---
+
+### Paso 29 — Sincronización entre pestañas (US-30)
+
+| Agente responsable | **Builder** |
+|---|---|
+| Issue original | `US-30` |
+| Rama | `feat/US-30-broadcast-sync` |
+| Commit | `ea73cb5` feat(sync): implement BroadcastChannel sync between tabs (US-30) |
+
+### Contexto
+
+La aplicación Kanban necesita mantener coherencia de datos entre múltiples pestañas del navegador sin depender de un servidor ni librerías externas. El requerimiento es que cualquier cambio realizado en una pestaña (crear/editar/eliminar tareas, columnas, etiquetas) se refleje automáticamente en todas las demás pestañas abiertas de la misma aplicación.
+
+### Archivos creados
+
+| Archivo | Descripción |
+|---|---|
+| `src/utils/broadcast-sync.ts` | **BroadcastSyncService**: Singleton que gestiona el canal BroadcastChannel 'kanban-sync', emisión y suscripción de eventos de sincronización |
+| `src/utils/ui-sync.ts` | **UISyncManager**: Sistema que escucha eventos de BroadcastChannel y actualiza automáticamente componentes Web afectados |
+| `docs/US-30-broadcast-sync.md` | Documentación técnica completa: arquitectura, API, eventos soportados, consideraciones de performance |
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `src/main.ts` | Importa y ejecuta `initializeUISync()` durante el bootstrap de la aplicación |
+| `src/db/task.repository.ts` | Integra `emitSync()` en operaciones CRUD: `task:created`, `task:updated`, `task:deleted`, `task:reordered` |
+| `src/db/column.repository.ts` | Integra eventos de sincronización: `column:created`, `column:updated`, `column:deleted` |
+| `src/db/label.repository.ts` | Integra eventos de sincronización: `label:created`, `label:updated`, `label:deleted` |
+| `src/db/board.repository.ts` | Integra eventos de sincronización: `board:created`, `board:updated`, `board:deleted` |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | Agrega método público `refresh()` que recarga datos desde IndexedDB y re-renderiza UI completa |
+
+### Receta: BroadcastChannel API nativa
+
+1. **Canal de comunicación**: Se crea un `BroadcastChannel('kanban-sync')` único compartido entre todas las pestañas del mismo origen.
+2. **Singleton Pattern**: `BroadcastSyncService.getInstance()` garantiza una sola instancia por pestaña evitando listeners duplicados.
+3. **ID único por pestaña**: `crypto.randomUUID()` identifica cada pestaña para ignorar eventos auto-generados (prevenir loops infinitos).
+4. **Eventos tipificados**: TypeScript define `SyncEventType` con 12 tipos de eventos (`task:created`, `column:updated`, etc.) y payload específico por entidad.
+
+### Receta: Integración automática en repositorios
+
+1. **Interceptores en CRUD**: Cada función de repositorio (`createTask`, `updateTask`, etc.) emite automáticamente un evento tras completar la operación en IndexedDB.
+2. **Consistencia de datos**: Los eventos se emiten **después** de `idbTransaction(tx)` para garantizar que los datos están persistidos antes de notificar otras pestañas.
+3. **Payload optimizado**: Los eventos de creación/actualización incluyen el objeto completo, los de eliminación solo el ID para minimizar transferencia de datos.
+4. **Eventos especiales**: `task:reordered` incluye `{ orderedIds: string[] }` para sincronizar cambios de orden sin transferir tareas completas.
+
+### Receta: Refresco automático de UI
+
+1. **Component Discovery**: `UISyncManager` identifica automáticamente componentes afectados por tipo de evento usando selectores CSS (`dojo-kanban-board`, `dojo-task-card`, etc.).
+2. **Método refresh()**: Los componentes implementan un método público `refresh()` que recarga datos desde IndexedDB y re-renderiza la UI completa.
+3. **Fallback graceful**: Si un componente no tiene `refresh()`, se emite evento `sync-refresh` como mecanismo alternativo.
+4. **Performance optimizada**: Las recargas usan `Promise.all()` para operaciones paralelas en IndexedDB y minimizan re-renders innecesarios.
+
+### Receta: Ciclo de vida de sincronización
+
+```
+Pestaña A: Usuario edita tarea
+    ↓
+taskRepository.updateTask() → emitSync('task:updated', taskId, updatedTask)
+    ↓
+BroadcastChannel.postMessage({ type: 'task:updated', ... })
+    ↓
+Pestaña B: UISyncManager.handleTaskSync() → refreshComponents(['dojo-task-card'])
+    ↓
+dojoTaskCard.refresh() → Recarga desde IndexedDB → Re-renderiza
+```
+
+### Arquitectura Zero Dependencies
+
+1. **BroadcastChannel nativo**: Sin polyfills ni wrappers externos. Soporte nativo Chrome 54+, Firefox 38+, Safari 15.4+.
+2. **Observer Pattern puro**: Sistema de suscripción/emisión implementado sin librerías externas usando `Map<SyncEventType, Set<Function>>`.
+3. **TypeScript estricto**: Tipado completo de eventos y payloads sin dependencias de tiempo de ejecución.
+4. **Degradación elegante**: En navegadores sin BroadcastChannel, la aplicación funciona normalmente sin sincronización.
+
+### Monitoreo y debug
+
+- **Console logs automáticos**: `[UI-Sync] Task created: uuid-123`, `[Kanban Board] Refrescando datos desde IndexedDB (US-30)`
+- **Eventos de diagnóstico**: `window.addEventListener('sync-refresh', ...)` para detectar componentes actualizados por sincronización
+- **Trazabilidad completa**: Cada evento incluye `timestamp` y `tabId` para debugging multi-pestaña
+
+### Consideraciones de performance
+
+- **Propagación eficiente**: BroadcastChannel solo transfiere datos a pestañas del mismo origen, no hay networking ni servidor involucrado
+- **Anti-loop protection**: Eventos originados en la misma pestaña se ignoran automáticamente usando `tabId`
+- **Batching implícito**: IndexedDB transactions naturalmente agrupa múltiples cambios, los eventos de sincronización respetan esta atomicidad
+- **Refresco selectivo**: Solo se refrescan componentes específicos según el tipo de entidad modificada, no toda la aplicación
