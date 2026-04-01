@@ -7,6 +7,7 @@
 
 import { idbRequest, idbTransaction, getStore } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
+import { emitSync } from '../utils/broadcast-sync.js';
 import { DEFAULT_COLUMNS } from '../types/models.js';
 import type { Column } from '../types/models.js';
 
@@ -48,6 +49,10 @@ export async function createColumn(input: CreateColumnInput): Promise<Column> {
   const { store, tx } = await getStore('columns', 'readwrite');
   store.add(column);
   await idbTransaction(tx);
+
+  // Emitir evento de sincronización (US-30)
+  emitSync('column:created', column.id, column);
+
   return column;
 }
 
@@ -64,6 +69,10 @@ export async function updateColumn(id: string, changes: UpdateColumnInput): Prom
   const { store, tx } = await getStore('columns', 'readwrite');
   store.put(updated);
   await idbTransaction(tx);
+
+  // Emitir evento de sincronización (US-30)
+  emitSync('column:updated', updated.id, updated);
+
   return updated;
 }
 
@@ -75,6 +84,9 @@ export async function deleteColumn(id: string): Promise<void> {
   const { store, tx } = await getStore('columns', 'readwrite');
   store.delete(id);
   await idbTransaction(tx);
+
+  // Emitir evento de sincronización (US-30)
+  emitSync('column:deleted', id);
 }
 
 /**
