@@ -14,9 +14,11 @@
 import '../dojo-kanban-board/dojo-kanban-board.js';
 import '../dojo-label-manager/dojo-label-manager.js';
 import '../dojo-project-manager/dojo-project-manager.js';
+import '../dojo-person-manager/dojo-person-manager.js';
 import '../dojo-command-palette/dojo-command-palette.js';
 import '../dojo-board-selector/dojo-board-selector.js';
 import '../../atoms/dojo-theme-toggle/dojo-theme-toggle.js';
+import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 import { getAllBoards } from '../../../db/board.repository.js';
 import { exportBoardData, downloadBoardExport, readImportFile, validateImportData, importBoardData, } from '../../../db/export-import.js';
 export class DojoApp extends HTMLElement {
@@ -350,6 +352,21 @@ export class DojoApp extends HTMLElement {
         manageProjectBtn.addEventListener('click', () => {
             projectMgr.show();
         });
+        // ── Botón Gestionar personas (US-29) ────────────────────────────────────
+        const managePersonBtn = document.createElement('button');
+        managePersonBtn.className = 'header-btn';
+        managePersonBtn.type = 'button';
+        managePersonBtn.setAttribute('aria-label', 'Gestionar personas');
+        const personBtnIcon = document.createElement('span');
+        personBtnIcon.setAttribute('aria-hidden', 'true');
+        personBtnIcon.textContent = '👤';
+        const personBtnText = document.createElement('span');
+        personBtnText.textContent = 'Personas';
+        managePersonBtn.appendChild(personBtnIcon);
+        managePersonBtn.appendChild(personBtnText);
+        managePersonBtn.addEventListener('click', () => {
+            personMgr.show();
+        });
         // ── Botón Exportar (US-19) ──────────────────────────────────────────────
         const exportBtn = document.createElement('button');
         exportBtn.className = 'header-btn';
@@ -390,6 +407,7 @@ export class DojoApp extends HTMLElement {
         headerActions.className = 'header-actions';
         headerActions.appendChild(manageLabelBtn);
         headerActions.appendChild(manageProjectBtn);
+        headerActions.appendChild(managePersonBtn);
         headerActions.appendChild(exportBtn);
         headerActions.appendChild(importBtn);
         headerActions.appendChild(importInput);
@@ -435,6 +453,9 @@ export class DojoApp extends HTMLElement {
         // ── Panel de gestión de proyectos (US-26) ────────────────────────────────────────
         const projectMgr = document.createElement('dojo-project-manager');
         this._shadow.appendChild(projectMgr);
+        // ── Panel de gestión de personas (US-29) ─────────────────────────────────────────
+        const personMgr = document.createElement('dojo-person-manager');
+        this._shadow.appendChild(personMgr);
         // ── Paleta de comandos (US-28) ───────────────────────────────────────────────────
         const palette = document.createElement('dojo-command-palette');
         this._shadow.appendChild(palette);

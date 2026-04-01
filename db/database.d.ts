@@ -5,11 +5,13 @@
  * Toda la asincronía basada en eventos (IDBRequest) se encapsula en Promesas.
  *
  * Object Stores:
- *   - tasks    : keyPath = 'id'  | índices: by-status, by-priority, by-created, by-board
+ *   - tasks    : keyPath = 'id'  | índices: by-status, by-priority, by-created, by-board, by-project
  *   - columns  : keyPath = 'id'  | índice: by-board
  *   - labels   : keyPath = 'id'  | índice: by-name (unique)
  *   - activity : keyPath = 'id'  | índice: by-taskId (US-20)
  *   - boards   : keyPath = 'id'  (US-22)
+ *   - projects : keyPath = 'id'  | índice: by-prefix (unique) (US-26)
+ *   - persons  : keyPath = 'id'  (US-29)
  */
 /**
  * Abre (o reutiliza) la conexión a IndexedDB.

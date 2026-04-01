@@ -57,6 +57,8 @@ export declare class DojoKanbanBoard extends HTMLElement {
     private _labels;
     /** Lista completa de proyectos (US-26) */
     private _projects;
+    /** Lista completa de personas (US-29) */
+    private _persons;
     private _filterBarContent;
     private _filterClearAllBtn;
     private _filterLabelSection;
@@ -125,6 +127,8 @@ export declare class DojoKanbanBoard extends HTMLElement {
     private _getColumnCounts;
     /** Resuelve los objetos Label para una tarea a partir del caché local (US-10). */
     private _getTaskLabels;
+    /** Resuelve los objetos Person para una tarea a partir del caché local (US-29). */
+    private _getTaskAssignees;
     /** Añade una etiqueta recién creada al caché local para que los chips se muestren sin recargar (US-10). */
     private _handleLabelCreated;
     private _filterTasks;

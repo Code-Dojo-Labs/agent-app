@@ -7,8 +7,8 @@
  * @author builder
  * @references US-30
  */
-export type SyncEventType = 'task:created' | 'task:updated' | 'task:deleted' | 'task:reordered' | 'column:created' | 'column:updated' | 'column:deleted' | 'label:created' | 'label:updated' | 'label:deleted' | 'board:created' | 'board:updated' | 'board:deleted' | 'project:created' | 'project:updated' | 'project:deleted';
-export interface SyncEvent<T = any> {
+export type SyncEventType = 'task:created' | 'task:updated' | 'task:deleted' | 'task:reordered' | 'column:created' | 'column:updated' | 'column:deleted' | 'label:created' | 'label:updated' | 'label:deleted' | 'board:created' | 'board:updated' | 'board:deleted' | 'project:created' | 'project:updated' | 'project:deleted' | 'person:created' | 'person:updated' | 'person:deleted';
+export interface SyncEvent<T = unknown> {
     /** Tipo de evento de sincronización. */
     type: SyncEventType;
     /** ID de la entidad afectada. */

@@ -30,6 +30,7 @@
 import { getColumnsByBoard, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
 import { getTasksByStatus, createTask, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
 import { getAllLabels } from '../../../db/label.repository.js';
+import { getAllPersons } from '../../../db/person.repository.js';
 import { getAllProjects, getNextTaskNumber, getProjectByPrefix } from '../../../db/project.repository.js';
 import { addActivityEvent, deleteActivitiesByTaskId } from '../../../db/activity.repository.js';
 import '../../molecules/dojo-kanban-column/dojo-kanban-column.js';
@@ -54,6 +55,8 @@ export class DojoKanbanBoard extends HTMLElement {
     _labels = [];
     /** Lista completa de proyectos (US-26) */
     _projects = [];
+    /** Lista completa de personas (US-29) */
+    _persons = [];
     // Referencias UI del toolbar de filtros (US-15)
     _filterBarContent = null;
     _filterClearAllBtn = null;
@@ -189,13 +192,15 @@ export class DojoKanbanBoard extends HTMLElement {
             // Recargar todas las entidades desde la base de datos
             const boardId = this.boardId || this._boardId;
             // Ejecutar recargas en paralelo para mejor rendimiento
-            const [columns, labels] = await Promise.all([
+            const [columns, labels, persons] = await Promise.all([
                 getColumnsByBoard(boardId),
-                getAllLabels()
+                getAllLabels(),
+                getAllPersons()
             ]);
             // Actualizar caches locales
             this._columns = columns;
             this._labels = labels;
+            this._persons = persons;
             // Recargar tareas por columna
             this._tasksByColumn.clear();
             for (const column of columns) {
@@ -807,13 +812,15 @@ export class DojoKanbanBoard extends HTMLElement {
         // Limpiar datos previos para evitar entradas stale ante reintentos o cambios de columnas
         this._tasksByColumn.clear();
         try {
-            const [columns, labels, projects] = await Promise.all([
+            const [columns, labels, projects, persons] = await Promise.all([
                 getColumnsByBoard(this._boardId),
                 getAllLabels(),
                 getAllProjects(),
+                getAllPersons(),
             ]);
             this._labels = labels;
             this._projects = projects;
+            this._persons = persons;
             this._rebuildLabelFilterChips(); // Poblar chips de etiquetas en el toolbar (US-15)
             this._rebuildProjectFilterSelect(); // Poblar selector de proyectos (US-26)
             // Cargar tareas de todas las columnas en paralelo
@@ -888,6 +895,7 @@ export class DojoKanbanBoard extends HTMLElement {
             if (task.dueDate)
                 card.setAttribute('task-due-date', task.dueDate);
             card.taskLabels = this._getTaskLabels(task);
+            card.taskAssignees = this._getTaskAssignees(task);
             const subs = task.subtasks ?? [];
             if (subs.length > 0) {
                 card.setSubtaskProgress(subs.filter(s => s.completed).length, subs.length);
@@ -918,6 +926,12 @@ export class DojoKanbanBoard extends HTMLElement {
         return (task.labelIds ?? [])
             .map(id => this._labels.find(l => l.id === id))
             .filter((l) => l !== undefined);
+    }
+    /** Resuelve los objetos Person para una tarea a partir del caché local (US-29). */
+    _getTaskAssignees(task) {
+        return (task.assignees ?? [])
+            .map(id => this._persons.find(p => p.id === id))
+            .filter((p) => p !== undefined);
     }
     /** Añade una etiqueta recién creada al caché local para que los chips se muestren sin recargar (US-10). */
     _handleLabelCreated(e) {
@@ -1206,6 +1220,7 @@ export class DojoKanbanBoard extends HTMLElement {
                 taskNumber,
                 priority: priority,
                 labelIds: labelIds ?? [],
+                assignees: [], // Sin personas asignadas inicialmente (US-29)
                 order: tasks.length,
                 dueDate: dueDate ?? null,
             });
@@ -1313,7 +1328,7 @@ export class DojoKanbanBoard extends HTMLElement {
                     // Etiquetas cambiaron y hay filtro activo — puede que la tarjeta deba desaparecer
                     this._refreshColumnCards(sourceColumnId);
                 }
-                else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined || changes.dueDate !== undefined || changes.subtasks !== undefined) {
+                else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined || changes.assignees !== undefined || changes.dueDate !== undefined || changes.subtasks !== undefined) {
                     const colEl = this._shadow.querySelector(`dojo-kanban-column[column-id="${CSS.escape(sourceColumnId)}"]`);
                     if (colEl) {
                         const cardEl = colEl.querySelector(`dojo-task-card[task-id="${CSS.escape(taskId)}"]`);
@@ -1324,6 +1339,8 @@ export class DojoKanbanBoard extends HTMLElement {
                                 cardEl.setAttribute('task-priority', updated.priority);
                             if (changes.labelIds !== undefined)
                                 cardEl.taskLabels = this._getTaskLabels(updated);
+                            if (changes.assignees !== undefined)
+                                cardEl.taskAssignees = this._getTaskAssignees(updated);
                             if (changes.dueDate !== undefined) {
                                 if (updated.dueDate) {
                                     cardEl.setAttribute('task-due-date', updated.dueDate);

@@ -14,9 +14,11 @@
 import '../dojo-kanban-board/dojo-kanban-board.js';
 import '../dojo-label-manager/dojo-label-manager.js';
 import '../dojo-project-manager/dojo-project-manager.js';
+import '../dojo-person-manager/dojo-person-manager.js';
 import '../dojo-command-palette/dojo-command-palette.js';
 import '../dojo-board-selector/dojo-board-selector.js';
 import '../../atoms/dojo-theme-toggle/dojo-theme-toggle.js';
+import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 export declare class DojoApp extends HTMLElement {
     static readonly TAG = "dojo-app";
     private _shadow;

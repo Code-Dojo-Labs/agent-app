@@ -27,15 +27,19 @@
  * --dojo-priority-low, --dojo-priority-medium,
  * --dojo-priority-high, --dojo-priority-urgent
  */
-import type { Label } from '../../../types/models.js';
+import type { Label, Person } from '../../../types/models.js';
 export declare class DojoTaskCard extends HTMLElement {
     static readonly TAG = "dojo-task-card";
     static get observedAttributes(): string[];
     private _shadow;
     /** Etiquetas asociadas a esta tarjeta (US-10) */
     private _labels;
+    /** Personas asignadas a esta tarjeta (US-29) */
+    private _assignees;
     get taskLabels(): Label[];
     set taskLabels(labels: Label[]);
+    get taskAssignees(): Person[];
+    set taskAssignees(assignees: Person[]);
     /** Progreso de subtareas (US-21): [completadas, total] */
     private _subtasksDone;
     private _subtasksTotal;
@@ -62,4 +66,9 @@ export declare class DojoTaskCard extends HTMLElement {
     /** Formatea una fecha ISO a "25 mar 2026" para uso en tarjetas. */
     private static readonly MONTHS_ES;
     private static _formatCardDate;
+    /**
+     * Detecta si un string contiene emojis.
+     * Regex simplificado que cubre la mayoría de emojis Unicode.
+     */
+    private _isEmoji;
 }

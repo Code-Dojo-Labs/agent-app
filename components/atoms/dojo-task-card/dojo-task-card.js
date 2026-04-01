@@ -37,9 +37,17 @@ export class DojoTaskCard extends HTMLElement {
     _shadow;
     /** Etiquetas asociadas a esta tarjeta (US-10) */
     _labels = [];
+    /** Personas asignadas a esta tarjeta (US-29) */
+    _assignees = [];
     get taskLabels() { return this._labels; }
     set taskLabels(labels) {
         this._labels = [...labels];
+        if (this.isConnected)
+            this._render();
+    }
+    get taskAssignees() { return this._assignees; }
+    set taskAssignees(assignees) {
+        this._assignees = [...assignees];
         if (this.isConnected)
             this._render();
     }
@@ -381,6 +389,42 @@ export class DojoTaskCard extends HTMLElement {
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+
+      /* Avatares de personas asignadas (US-29) */  
+      .assignees-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        align-items: center;
+        margin-top: 0.25rem;
+        margin-bottom: 0.25rem;
+      }
+      .assignee-avatar {
+        width: 20px;
+        height: 20px;
+        border-radius: var(--dojo-radius-sm, 4px);
+        background: var(--dojo-primary, #3B82F6);
+        color: #FFFFFF;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 9px;
+        line-height: 1;
+        border: 1px solid var(--dojo-border, #E5E7EB);
+        flex-shrink: 0;
+        cursor: default;
+      }
+      .assignee-avatar.emoji {
+        background: transparent;
+        color: inherit;
+        font-size: 11px;
+      }
+      .assignees-count {
+        font-size: 0.625rem;
+        color: var(--dojo-text-secondary, #6B7280);
+        margin-left: 0.125rem;
+      }
     `;
         this._shadow.appendChild(style);
         // ── Clase de alerta de vencimiento en el host (US-17) ─────────────────
@@ -458,6 +502,36 @@ export class DojoTaskCard extends HTMLElement {
             progressRow.appendChild(pBar);
             this._shadow.appendChild(progressRow);
         }
+        // ── Avatares de personas asignadas (US-29) ──────────────────────────────
+        if (this._assignees.length > 0) {
+            const assigneesRow = document.createElement('div');
+            assigneesRow.className = 'assignees-row';
+            assigneesRow.setAttribute('aria-label', 'Personas asignadas');
+            assigneesRow.setAttribute('role', 'list');
+            // Mostrar máximo 4 avatares, si hay más mostrar +N
+            const maxVisible = 4;
+            const visible = this._assignees.slice(0, maxVisible);
+            const remaining = this._assignees.length - maxVisible;
+            for (const person of visible) {
+                const avatar = document.createElement('span');
+                avatar.className = this._isEmoji(person.avatar)
+                    ? 'assignee-avatar emoji'
+                    : 'assignee-avatar';
+                avatar.setAttribute('role', 'listitem');
+                avatar.setAttribute('title', person.name);
+                avatar.textContent = person.avatar;
+                assigneesRow.appendChild(avatar);
+            }
+            // Si hay más personas, mostrar contador
+            if (remaining > 0) {
+                const countEl = document.createElement('span');
+                countEl.className = 'assignees-count';
+                countEl.textContent = `+${remaining}`;
+                countEl.setAttribute('title', `${remaining} persona${remaining === 1 ? '' : 's'} más`);
+                assigneesRow.appendChild(countEl);
+            }
+            this._shadow.appendChild(assigneesRow);
+        }
         // ── Identificador de proyecto (US-26) ──────────────────────────────────
         if (this.taskNumber) {
             const numEl = document.createElement('span');
@@ -526,6 +600,14 @@ export class DojoTaskCard extends HTMLElement {
         catch {
             return '';
         }
+    }
+    /**
+     * Detecta si un string contiene emojis.
+     * Regex simplificado que cubre la mayoría de emojis Unicode.
+     */
+    _isEmoji(str) {
+        const emojiRegex = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u;
+        return emojiRegex.test(str);
     }
 }
 customElements.define(DojoTaskCard.TAG, DojoTaskCard);

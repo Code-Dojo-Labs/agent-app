@@ -31,6 +31,8 @@ declare class UISyncManager {
     private handleLabelSync;
     /** Maneja eventos de sincronización de tableros. */
     private handleBoardSync;
+    /** Maneja eventos de sincronización de personas. */
+    private handlePersonSync;
     /**
      * Refresca componentes Web Components del DOM.
      * @param selectors Lista de selectores CSS de componentes a refrescar
