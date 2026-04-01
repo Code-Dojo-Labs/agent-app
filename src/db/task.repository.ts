@@ -7,6 +7,7 @@
 
 import { idbRequest, idbTransaction, getStore, openDatabase } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
+import { emitSync } from '../utils/broadcast-sync.js';
 import type { Task, Priority } from '../types/models.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
@@ -63,6 +64,10 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   const { store, tx } = await getStore('tasks', 'readwrite');
   store.add(task);
   await idbTransaction(tx);
+
+  // Emitir evento de sincronización (US-30)
+  emitSync('task:created', task.id, task);
+
   return task;
 }
 
@@ -85,6 +90,10 @@ export async function updateTask(id: string, changes: UpdateTaskInput): Promise<
   const { store, tx } = await getStore('tasks', 'readwrite');
   store.put(updated);
   await idbTransaction(tx);
+
+  // Emitir evento de sincronización (US-30)
+  emitSync('task:updated', updated.id, updated);
+
   return updated;
 }
 
@@ -93,6 +102,9 @@ export async function deleteTask(id: string): Promise<void> {
   const { store, tx } = await getStore('tasks', 'readwrite');
   store.delete(id);
   await idbTransaction(tx);
+
+  // Emitir evento de sincronización (US-30)
+  emitSync('task:deleted', id);
 }
 
 /**
@@ -118,6 +130,9 @@ export async function reorderTasks(statusId: string, orderedIds: string[]): Prom
   });
 
   await idbTransaction(tx);
+
+  // Emitir evento de sincronización (US-30)
+  emitSync('task:reordered', statusId, { orderedIds });
 }
 
 /**

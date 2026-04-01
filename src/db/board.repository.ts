@@ -7,6 +7,7 @@
 
 import { idbRequest, idbTransaction, getStore } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
+import { emitSync } from '../utils/broadcast-sync.js';
 import type { Board } from '../types/models.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
@@ -42,6 +43,10 @@ export async function createBoard(input: CreateBoardInput): Promise<Board> {
   const { store, tx } = await getStore('boards', 'readwrite');
   store.add(board);
   await idbTransaction(tx);
+
+  // Emitir evento de sincronización (US-30)
+  emitSync('board:created', board.id, board);
+
   return board;
 }
 
@@ -58,6 +63,10 @@ export async function updateBoard(id: string, changes: UpdateBoardInput): Promis
   const { store, tx } = await getStore('boards', 'readwrite');
   store.put(updated);
   await idbTransaction(tx);
+
+  // Emitir evento de sincronización (US-30)
+  emitSync('board:updated', updated.id, updated);
+
   return updated;
 }
 
@@ -69,4 +78,7 @@ export async function deleteBoard(id: string): Promise<void> {
   const { store, tx } = await getStore('boards', 'readwrite');
   store.delete(id);
   await idbTransaction(tx);
+
+  // Emitir evento de sincronización (US-30)
+  emitSync('board:deleted', id);
 }

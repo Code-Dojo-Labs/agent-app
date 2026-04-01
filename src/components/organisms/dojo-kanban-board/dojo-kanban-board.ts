@@ -208,6 +208,51 @@ export class DojoKanbanBoard extends HTMLElement {
     this._updateClearAllVisibility();
   }
 
+  /**
+   * Refresca completamente el tablero recargando datos desde IndexedDB.
+   * Utilizado para sincronización entre pestañas (US-30).
+   */
+  public async refresh(): Promise<void> {
+    try {
+      console.log('[Kanban Board] Refrescando datos desde IndexedDB (US-30)');
+      
+      // Recargar todas las entidades desde la base de datos
+      const boardId = this.boardId || this._boardId;
+      
+      // Ejecutar recargas en paralelo para mejor rendimiento
+      const [columns, labels] = await Promise.all([
+        getColumnsByBoard(boardId),
+        getAllLabels()
+      ]);
+
+      // Actualizar caches locales
+      this._columns = columns;
+      this._labels = labels;
+      
+      // Recargar tareas por columna
+      this._tasksByColumn.clear();
+      for (const column of columns) {
+        const tasks = await getTasksByStatus(column.id);
+        this._tasksByColumn.set(column.id, tasks.sort((a, b) => a.order - b.order));
+      }
+
+      // Re-renderizar columnas
+      this._renderColumns(columns);
+      
+      // Re-renderizar todas las tarjetas
+      for (const column of columns) {
+        this._refreshColumnCards(column.id);
+      }
+      
+      // Actualizar contadores
+      this._updateColumnCounts();
+      
+      console.log('[Kanban Board] Refresco completado correctamente');
+    } catch (error) {
+      console.error('[Kanban Board] Error al refrescar:', error);
+    }
+  }
+
   // ── Render inicial (estructura vacía con loading) ─────────────────────────
 
   private _render(): void {
