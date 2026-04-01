@@ -17,7 +17,7 @@ export type SyncEventType =
   | 'board:created'  | 'board:updated'  | 'board:deleted'
   | 'project:created'| 'project:updated'| 'project:deleted';
 
-export interface SyncEvent<T = any> {
+export interface SyncEvent<T = unknown> {
   /** Tipo de evento de sincronización. */
   type: SyncEventType;
   /** ID de la entidad afectada. */
@@ -83,16 +83,20 @@ class BroadcastSyncService {
    * @param entityId ID de la entidad afectada
    * @param payload Datos adicionales (opcional)
    */
-  public emit<T = any>(type: SyncEventType, entityId: string, payload?: T): void {
-    const syncEvent: SyncEvent<T> = {
-      type,
-      entityId,
-      payload,
-      timestamp: Date.now(),
-      tabId: this.tabId
-    };
+  public emit<T = unknown>(type: SyncEventType, entityId: string, payload?: T): void {
+    try {
+      const syncEvent: SyncEvent<T> = {
+        type,
+        entityId,
+        payload,
+        timestamp: Date.now(),
+        tabId: this.tabId
+      };
 
-    this.channel.postMessage(syncEvent);
+      this.channel.postMessage(syncEvent);
+    } catch (error) {
+      console.warn(`[BroadcastSync] Error emitiendo evento ${type}:`, error);
+    }
   }
 
   /**
@@ -159,7 +163,7 @@ export const broadcastSync = BroadcastSyncService.getInstance();
  * @param entityId ID de la entidad
  * @param payload Datos adicionales
  */
-export function emitSync<T = any>(type: SyncEventType, entityId: string, payload?: T): void {
+export function emitSync<T = unknown>(type: SyncEventType, entityId: string, payload?: T): void {
   broadcastSync.emit(type, entityId, payload);
 }
 
