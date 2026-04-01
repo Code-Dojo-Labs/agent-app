@@ -28,10 +28,11 @@
  * --dojo-shadow, --dojo-radius, --dojo-primary
  */
 
-import type { Column, Task, Label, Priority, Project } from '../../../types/models.js';
+import type { Column, Task, Label, Priority, Project, Person } from '../../../types/models.js';
 import { getColumnsByBoard, createColumn, updateColumn, deleteColumn } from '../../../db/column.repository.js';
 import { getTasksByStatus, createTask, updateTask, deleteTask, reorderTasks } from '../../../db/task.repository.js';
 import { getAllLabels } from '../../../db/label.repository.js';
+import { getAllPersons } from '../../../db/person.repository.js';
 import { getAllProjects, getNextTaskNumber, getProjectByPrefix } from '../../../db/project.repository.js';
 import { addActivityEvent, deleteActivitiesByTaskId } from '../../../db/activity.repository.js';
 import '../../molecules/dojo-kanban-column/dojo-kanban-column.js';
@@ -57,6 +58,7 @@ interface ActiveFilter {
 /** Contrato de la propiedad taskLabels expuesta por dojo-task-card (US-10). */
 interface TaskCardElement extends HTMLElement {
   taskLabels: Label[];
+  taskAssignees: Person[];
   setSubtaskProgress(done: number, total: number): void;
 }
 
@@ -77,6 +79,8 @@ export class DojoKanbanBoard extends HTMLElement {
   private _labels: Label[] = [];
   /** Lista completa de proyectos (US-26) */
   private _projects: Project[] = [];
+  /** Lista completa de personas (US-29) */
+  private _persons: Person[] = [];
   // Referencias UI del toolbar de filtros (US-15)
   private _filterBarContent: HTMLElement | null = null;
   private _filterClearAllBtn: HTMLButtonElement | null = null;
@@ -220,14 +224,16 @@ export class DojoKanbanBoard extends HTMLElement {
       const boardId = this.boardId || this._boardId;
       
       // Ejecutar recargas en paralelo para mejor rendimiento
-      const [columns, labels] = await Promise.all([
+      const [columns, labels, persons] = await Promise.all([
         getColumnsByBoard(boardId),
-        getAllLabels()
+        getAllLabels(),
+        getAllPersons()
       ]);
 
       // Actualizar caches locales
       this._columns = columns;
       this._labels = labels;
+      this._persons = persons;
       
       // Recargar tareas por columna
       this._tasksByColumn.clear();
@@ -893,13 +899,15 @@ export class DojoKanbanBoard extends HTMLElement {
     this._tasksByColumn.clear();
 
     try {
-      const [columns, labels, projects] = await Promise.all([
+      const [columns, labels, projects, persons] = await Promise.all([
         getColumnsByBoard(this._boardId),
         getAllLabels(),
         getAllProjects(),
+        getAllPersons(),
       ]);
       this._labels = labels;
       this._projects = projects;
+      this._persons = persons;
       this._rebuildLabelFilterChips(); // Poblar chips de etiquetas en el toolbar (US-15)
       this._rebuildProjectFilterSelect(); // Poblar selector de proyectos (US-26)
 
@@ -984,6 +992,7 @@ export class DojoKanbanBoard extends HTMLElement {
       if (task.taskNumber) card.setAttribute('task-number', task.taskNumber);
       if (task.dueDate) card.setAttribute('task-due-date', task.dueDate);
       (card as TaskCardElement).taskLabels = this._getTaskLabels(task);
+      (card as TaskCardElement).taskAssignees = this._getTaskAssignees(task);
       const subs = task.subtasks ?? [];
       if (subs.length > 0) {
         (card as TaskCardElement).setSubtaskProgress(
@@ -1022,6 +1031,13 @@ export class DojoKanbanBoard extends HTMLElement {
     return (task.labelIds ?? [])
       .map(id => this._labels.find(l => l.id === id))
       .filter((l): l is Label => l !== undefined);
+  }
+
+  /** Resuelve los objetos Person para una tarea a partir del caché local (US-29). */
+  private _getTaskAssignees(task: Task): Person[] {
+    return (task.assignees ?? [])
+      .map(id => this._persons.find(p => p.id === id))
+      .filter((p): p is Person => p !== undefined);
   }
 
   /** Añade una etiqueta recién creada al caché local para que los chips se muestren sin recargar (US-10). */
@@ -1355,6 +1371,7 @@ export class DojoKanbanBoard extends HTMLElement {
         taskNumber,
         priority:    priority as Task['priority'],
         labelIds:    labelIds ?? [],
+        assignees:   [], // Sin personas asignadas inicialmente (US-29)
         order:       tasks.length,
         dueDate:     dueDate ?? null,
       });
@@ -1465,7 +1482,7 @@ export class DojoKanbanBoard extends HTMLElement {
         } else if (changes.labelIds !== undefined && this._activeFilter.labelIds?.length) {
           // Etiquetas cambiaron y hay filtro activo — puede que la tarjeta deba desaparecer
           this._refreshColumnCards(sourceColumnId);
-        } else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined || changes.dueDate !== undefined || changes.subtasks !== undefined) {
+        } else if (changes.title !== undefined || changes.priority !== undefined || changes.labelIds !== undefined || changes.assignees !== undefined || changes.dueDate !== undefined || changes.subtasks !== undefined) {
           const colEl = this._shadow.querySelector(
             `dojo-kanban-column[column-id="${CSS.escape(sourceColumnId)}"]`
           );
@@ -1475,6 +1492,7 @@ export class DojoKanbanBoard extends HTMLElement {
               if (changes.title    !== undefined) cardEl.setAttribute('task-title',    updated.title);
               if (changes.priority !== undefined) cardEl.setAttribute('task-priority', updated.priority);
               if (changes.labelIds !== undefined) (cardEl as TaskCardElement).taskLabels = this._getTaskLabels(updated);
+              if (changes.assignees !== undefined) (cardEl as TaskCardElement).taskAssignees = this._getTaskAssignees(updated);
               if (changes.dueDate !== undefined) {
                 if (updated.dueDate) {
                   cardEl.setAttribute('task-due-date', updated.dueDate);

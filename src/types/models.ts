@@ -51,6 +51,8 @@ export interface Task {
   dueDate?: string | null;
   /** Lista de subtareas (checklist). Puede estar vacía (US-21). */
   subtasks?: Subtask[];
+  /** Lista de FK → Person.id asignadas a la tarea (US-29). */
+  assignees: string[];
   /** Posición dentro de la columna (para ordenamiento manual). */
   order: number;
 }
@@ -171,5 +173,19 @@ export interface ActivityEvent {
   /** Datos adicionales del evento (varían según el tipo). */
   payload: Record<string, unknown>;
   /** Fecha del evento en formato ISO 8601. */
+  createdAt: string;
+}
+
+// ── Person (US-29) ─────────────────────────────────────────────────────────
+
+/** Representa una persona del directorio local que puede asignarse a tareas. */
+export interface Person {
+  /** UUID v4. */
+  id: string;
+  /** Nombre completo de la persona. Máx. 60 caracteres. */
+  name: string;
+  /** Avatar: emoji seleccionado o inicial generada del nombre. */
+  avatar: string;
+  /** Fecha de creación en formato ISO 8601. */
   createdAt: string;
 }
