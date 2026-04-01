@@ -40,7 +40,8 @@
    - [Paso 26 — Vista previa Markdown por defecto (US-25 / Issue #43)](#paso-26--vista-previa-markdown-por-defecto-us-25--issue-43)
    - [Paso 27 — Agrupación de tareas por proyectos (US-26 / Issue #44)](#paso-27--agrupación-de-tareas-por-proyectos-us-26--issue-44)
    - [Paso 28 — Búsqueda global con paleta de comandos (US-28 / Issue #46)](#paso-28--búsqueda-global-con-paleta-de-comandos-us-28--issue-46)
-   - [Paso 29 — Sincronización entre pestañas (US-30)](#paso-29--sincronización-entre-pestañas-us-30)
+   - [Paso 29 — Sistema de asignación de personas a tareas (US-29)](#paso-29--sistema-de-asignación-de-personas-a-tareas-us-29)
+   - [Paso 30 — Sincronización entre pestañas (US-30)](#paso-30--sincronización-entre-pestañas-us-30)
 
 ---
 
@@ -2571,7 +2572,238 @@ Se introduce una **paleta de comandos** estilo VS Code / Linear que se activa co
 
 ---
 
-### Paso 29 — Sincronización entre pestañas (US-30)
+### Paso 29 — Sistema de asignación de personas a tareas (US-29)
+
+| Agente responsable | **Builder** |
+|---|---|
+| Issue original | `US-29` |
+| Rama | `feat/US-29-assignees` |
+| Commit | `148aaa4` feat(persons): implement person assignment system for tasks (US-29) |
+| Pull Request | [#63](https://github.com/Code-Dojo-Labs/agent-app/pull/63) |
+
+**Funcionalidad implementada**: Sistema completo de gestión de personas y asignación a tareas con avatares visuales, sincronización entre pestañas y persistencia en IndexedDB.
+
+### Componentes creados
+
+| Componente | Ubicación | Tipo | Responsabilidad |
+|---|---|---|---|
+| `<dojo-person-avatar>` | `src/components/atoms/dojo-person-avatar/` | Átomo | Visualización de avatares con emojis e iniciales |
+| `<dojo-person-manager>` | `src/components/organisms/dojo-person-manager/` | Organismo | Panel CRUD para gestión de directorio de personas |
+
+### Cambios en modelos y base de datos
+
+#### Modelo Person
+```typescript
+interface Person {
+  id: string;              // UUID v4 generado con crypto.randomUUID()
+  name: string;            // Nombre de la persona (mín. 1 carácter)
+  avatar: string;          // Emoji o iniciales auto-generadas
+  createdAt: number;       // Timestamp de creación
+}
+```
+
+#### Extensión del modelo Task
+```typescript
+interface Task {
+  // ... campos existentes
+  assignees: string[];     // Array de IDs de Person asignadas a la tarea
+}
+```
+
+#### Migración IndexedDB v4 → v5
+- Nueva object store `persons` con índice en `name`  
+- Migración automática de todas las tareas existentes añadiendo campo `assignees: []`
+- Mantenimiento de compatibilidad con versiones anteriores
+
+### Arquitectura del sistema de avatares
+
+#### 1. Detección automática de tipo de avatar
+```typescript
+const isEmoji = (str: string): boolean => {
+  // Regex para detectar secuencias Unicode de emojis
+  return /^[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(str);
+};
+```
+
+#### 2. Generación de iniciales
+```typescript
+const generateInitials = (name: string): string => {
+  return name.trim().split(/\s+/)
+    .slice(0, 2)                    // Máximo 2 palabras
+    .map(word => word.charAt(0).toUpperCase())
+    .join('');
+};
+```
+
+#### 3. Variantes de tamaño responsive
+- `--size-sm`: 24px × 24px (para tarjetas de tarea)
+- `--size-md`: 32px × 32px (por defecto)  
+- `--size-lg`: 48px × 48px (para gestión de personas)
+
+### API del PersonRepository
+
+```typescript
+class PersonRepository {
+  // CRUD básico
+  async getAllPersons(): Promise<Person[]>
+  async getPersonById(id: string): Promise<Person | undefined>
+  async createPerson(personData: Omit<Person, 'id' | 'createdAt'>): Promise<Person>
+  async updatePerson(id: string, updates: Partial<Omit<Person, 'id'>>): Promise<Person>
+  async deletePerson(id: string): Promise<void>
+  
+  // Gestión de asignaciones
+  async getPersonsAssignedToTask(taskId: string): Promise<Person[]>
+  async removePersonFromAllTasks(personId: string): Promise<void>
+}
+```
+
+### Integración con TaskCard
+
+#### Visualización compacta de asignados
+```typescript
+// En dojo-task-card.ts - renderizado de avatares
+private renderAssignees(assignees: Person[]): string {
+  const visibleAvatars = assignees.slice(0, 4);
+  const remainingCount = Math.max(0, assignees.length - 4);
+  
+  return `
+    <div class="task-assignees">
+      ${visibleAvatars.map(person => 
+        `<dojo-person-avatar 
+           name="${person.name}" 
+           avatar="${person.avatar}" 
+           size="sm">
+         </dojo-person-avatar>`
+      ).join('')}
+      ${remainingCount > 0 ? 
+        `<span class="assignee-overflow">+${remainingCount}</span>` : ''
+      }
+    </div>
+  `;
+}
+```
+
+### Eventos de sincronización BroadcastChannel
+
+Eventos añadidos al sistema de sincronización existente:
+
+```typescript
+// Eventos Person
+'person:created'  // { personId: string, person: Person }
+'person:updated'  // { personId: string, changes: Partial<Person> }
+'person:deleted'  // { personId: string }
+
+// Manejo en ui-sync.ts
+BroadcastSync.subscribe('person:created', (data) => {
+  PersonCache.add(data.person);
+  refreshTasksWithAssignee(data.personId);
+});
+```
+
+### Gestión automática de asignaciones
+
+#### Desasignación al eliminar persona
+```typescript
+// En PersonRepository.deletePerson()
+await this.removePersonFromAllTasks(personId);
+await store.delete(personId);
+
+// Broadcast del evento para sincronización
+BroadcastSync.emit('person:deleted', { personId });
+```
+
+#### Cache de personas en KanbanBoard
+```typescript
+class DojoKanbanBoard extends HTMLElement {
+  private personCache = new Map<string, Person>();
+  
+  private async refreshPersonCache(): Promise<void> {
+    const persons = await PersonRepository.getAllPersons();
+    this.personCache.clear();
+    persons.forEach(person => this.personCache.set(person.id, person));
+  }
+}
+```
+
+### Patrón de componente Avatar
+
+#### Estructura DOM encapsulada
+```html
+<!-- Shadow DOM de dojo-person-avatar -->
+<div class="avatar" 
+     role="img" 
+     aria-label="Avatar de [nombre]"
+     title="[nombre]">
+  <span class="avatar-content">[emoji o iniciales]</span>
+</div>
+```
+
+#### CSS responsive con Custom Properties
+```css
+:host {
+  --avatar-size: var(--size-md, 32px);
+  --avatar-bg: var(--color-surface-variant);
+  --avatar-color: var(--color-on-surface-variant);
+  --avatar-border: var(--border-subtle);
+}
+
+.avatar {
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  font-size: calc(var(--avatar-size) * 0.4);
+}
+```
+
+### Accesibilidad (WCAG 2.1)
+
+#### Avatar component
+- `role="img"` con `aria-label` descriptivo
+- `title` attribute para tooltip nativo
+- Contraste mínimo 4.5:1 para iniciales sobre fondo
+- Tamaño mínimo táctil 24×24px cumplido
+
+#### Person Manager
+- `role="dialog"` + `aria-modal="true"` para el modal
+- `role="list"` y `role="listitem"` para la lista de personas  
+- `aria-live="polite"` para notificaciones de creación/eliminación
+- Navegación por teclado completa (Tab, Enter, Escape)
+- Focus management al abrir/cerrar modal
+
+#### Task assignee selection
+- `role="listbox"` con `aria-multiselectable="true"`
+- `role="option"` + `aria-selected` en cada persona
+- Keyboard navigation (Arrow keys, Space, Enter)
+- `aria-label` descriptivo en controles de asignación
+
+### Consideraciones de rendimiento
+
+#### Cache estratégico
+- Person cache en KanbanBoard evita consultas repetidas a IndexedDB
+- Invalidación selectiva solo cuando personas cambian  
+- Reutilización de componentes Avatar mediante object pooling
+
+#### Lazy loading de avatares
+- Componentes Avatar se renderizan solo cuando son visibles
+- Batch updates para cambios múltiples de asignaciones
+- Throttling de eventos BroadcastChannel para evitar spam
+
+### Casos de uso cubiertos
+
+1. **Crear persona**: Nombre + emoji/auto-iniciales → Person en IndexedDB
+2. **Asignar a tarea**: Multi-select en TaskDialog → actualiza Task.assignees  
+3. **Visualizar asignados**: TaskCard muestra hasta 4 avatares + contador
+4. **Eliminar persona**: Confirmación → desasigna de todas las tareas + elimina
+5. **Sync entre pestañas**: Cambios se propagan automáticamente via BroadcastChannel
+6. **Navegación por teclado**: Componente completamente accesible
+
+---
+
+### Paso 30 — Sincronización entre pestañas (US-30)
 
 | Agente responsable | **Builder** |
 |---|---|

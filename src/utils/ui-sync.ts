@@ -54,6 +54,9 @@ class UISyncManager {
       'board:created':   (event) => this.handleBoardSync(event, 'created'),
       'board:updated':   (event) => this.handleBoardSync(event, 'updated'),
       'board:deleted':   (event) => this.handleBoardSync(event, 'deleted'),
+      'person:created':  (event) => this.handlePersonSync(event, 'created'),
+      'person:updated':  (event) => this.handlePersonSync(event, 'updated'),
+      'person:deleted':  (event) => this.handlePersonSync(event, 'deleted'),
     });
   }
 
@@ -124,6 +127,24 @@ class UISyncManager {
     }
   }
 
+  /** Maneja eventos de sincronización de personas. */
+  private handlePersonSync(event: SyncEvent, action: string): void {
+    console.log(`[UI-Sync] Person ${action}:`, event.entityId);
+
+    this.refreshComponents([
+      'dojo-task-card',         // Tarjetas (muestran avatares)
+      'dojo-task-detail',       // Panel de detalle  
+      'dojo-task-dialog',       // Diálogo de tareas (selector de assignees)
+      'dojo-person-manager',    // Gestor de personas (por crear)
+      'dojo-kanban-board',      // Tablero principal (filtros)
+    ]);
+
+    const config = this.componentRefreshMap.get('person');
+    if (config?.onSync) {
+      config.onSync(event);
+    }
+  }
+
   /**
    * Refresca componentes Web Components del DOM.
    * @param selectors Lista de selectores CSS de componentes a refrescar
@@ -173,6 +194,7 @@ class UISyncManager {
       'dojo-column-dialog',
       'dojo-label-manager',
       'dojo-board-selector',
+      'dojo-person-manager',    // Gestor de personas (US-29)
     ]);
   }
 

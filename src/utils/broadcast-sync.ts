@@ -15,9 +15,10 @@ export type SyncEventType =
   | 'column:created' | 'column:updated' | 'column:deleted'
   | 'label:created'  | 'label:updated'  | 'label:deleted'
   | 'board:created'  | 'board:updated'  | 'board:deleted'
-  | 'project:created'| 'project:updated'| 'project:deleted';
+  | 'project:created'| 'project:updated'| 'project:deleted'
+  | 'person:created' | 'person:updated' | 'person:deleted';
 
-export interface SyncEvent<T = any> {
+export interface SyncEvent<T = unknown> {
   /** Tipo de evento de sincronización. */
   type: SyncEventType;
   /** ID de la entidad afectada. */

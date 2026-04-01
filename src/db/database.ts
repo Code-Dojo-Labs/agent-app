@@ -5,15 +5,17 @@
  * Toda la asincronía basada en eventos (IDBRequest) se encapsula en Promesas.
  *
  * Object Stores:
- *   - tasks    : keyPath = 'id'  | índices: by-status, by-priority, by-created, by-board
+ *   - tasks    : keyPath = 'id'  | índices: by-status, by-priority, by-created, by-board, by-project
  *   - columns  : keyPath = 'id'  | índice: by-board
  *   - labels   : keyPath = 'id'  | índice: by-name (unique)
  *   - activity : keyPath = 'id'  | índice: by-taskId (US-20)
  *   - boards   : keyPath = 'id'  (US-22)
+ *   - projects : keyPath = 'id'  | índice: by-prefix (unique) (US-26)
+ *   - persons  : keyPath = 'id'  (US-29)
  */
 
 const DB_NAME    = 'kanban-app-db';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 /** Instancia singleton de la base de datos (se inicializa una sola vez). */
 let _db: IDBDatabase | null = null;
@@ -201,7 +203,29 @@ export function openDatabase(): Promise<IDBDatabase> {
         };
       }
 
-      // if (oldVersion < 5) { ... }
+      // v4 → v5: personas — directorio local de assignees (US-29)
+      if (oldVersion < 5) {
+        // Nuevo store 'persons' para el directorio local
+        db.createObjectStore('persons', { keyPath: 'id' });
+
+        // Asegurar que todas las tareas existentes tengan el campo assignees vacío
+        const tx = (event.target as IDBOpenDBRequest).transaction!;
+        const taskStore = tx.objectStore('tasks');
+        const taskReq = taskStore.openCursor();
+        taskReq.onsuccess = () => {
+          const cursor = taskReq.result;
+          if (cursor) {
+            const task = cursor.value;
+            if (!task.assignees) {
+              task.assignees = [];  // Inicializar como array vacío
+              cursor.update(task);
+            }
+            cursor.continue();
+          }
+        };
+      }
+
+      // if (oldVersion < 6) { ... }
     };
   });
 
