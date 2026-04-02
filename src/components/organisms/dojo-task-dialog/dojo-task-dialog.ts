@@ -24,9 +24,10 @@
  * --dojo-danger, --dojo-radius, --dojo-radius-sm, --dojo-shadow
  */
 
-import type { Priority, Label, Project } from '../../../types/models.js';
+import type { Priority, Label, Project, Person } from '../../../types/models.js';
 import { getAllLabels, createLabel } from '../../../db/label.repository.js';
 import { getAllProjects } from '../../../db/project.repository.js';
+import { getAllPersons } from '../../../db/person.repository.js';
 import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 
 const PRIORITIES: { value: Priority; label: string }[] = [
@@ -48,6 +49,9 @@ export class DojoTaskDialog extends HTMLElement {
   private _selectedLabelIds: Set<string> = new Set();
   // US-26: estado de proyectos
   private _allProjects: Project[] = [];
+  // US-29: estado de personas asignadas
+  private _allPersons: Person[] = [];
+  private _selectedAssigneeIds: Set<string> = new Set();
   // US-28: título prellenado desde la paleta de comandos
   private _prefillTitle = '';
 
@@ -76,13 +80,16 @@ export class DojoTaskDialog extends HTMLElement {
     this._columnName = columnName;
     this._prefillTitle = prefillTitle;
     this._selectedLabelIds = new Set();
-    // Cargar etiquetas (US-23) y proyectos (US-26), luego construir el formulario
+    this._selectedAssigneeIds = new Set();
+    // Cargar etiquetas (US-23), proyectos (US-26) y personas (US-29), luego construir el formulario
     Promise.all([
       getAllLabels().catch(() => [] as Label[]),
       getAllProjects().catch(() => [] as Project[]),
-    ]).then(([labels, projects]) => {
+      getAllPersons().catch(() => [] as Person[]),
+    ]).then(([labels, projects, persons]) => {
       this._allLabels = labels;
       this._allProjects = projects;
+      this._allPersons = persons;
       this._buildForm();
       this._open();
     });
@@ -137,6 +144,8 @@ export class DojoTaskDialog extends HTMLElement {
         box-shadow: var(--dojo-shadow);
         width: 100%;
         max-width: 560px;
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
         padding: 1.5rem;
         display: flex;
         flex-direction: column;
@@ -195,6 +204,9 @@ export class DojoTaskDialog extends HTMLElement {
         box-sizing: border-box;
         transition: border-color 0.15s;
         font-family: inherit;
+      }
+      .label-option input[type="checkbox"] {
+        width: auto;
       }
       .field input:focus,
       .field textarea:focus,
@@ -1085,6 +1097,98 @@ export class DojoTaskDialog extends HTMLElement {
     renderChips();
     dialog.appendChild(labelsField);
 
+    // ── Campo: Personas asignadas (US-29) ─────────────────────────────────
+    if (this._allPersons.length > 0) {
+      const assigneesField = document.createElement('div');
+      assigneesField.className = 'field';
+
+      const assigneesLbl = document.createElement('label');
+      assigneesLbl.textContent = 'Asignados (opcional)';
+      assigneesField.appendChild(assigneesLbl);
+
+      const assigneesChips = document.createElement('div');
+      assigneesChips.className = 'labels-chips';
+      assigneesChips.setAttribute('aria-label', 'Personas asignadas seleccionadas');
+
+      const renderAssigneeChips = (): void => {
+        assigneesChips.innerHTML = '';
+        for (const personId of this._selectedAssigneeIds) {
+          const person = this._allPersons.find(p => p.id === personId);
+          if (!person) continue;
+          const chip = document.createElement('span');
+          chip.className = 'label-chip';
+          chip.style.cssText = 'background: var(--dojo-bg); border: 1px solid var(--dojo-border); color: var(--dojo-text-primary); gap: 0.25rem;';
+          chip.textContent = `${person.avatar} ${person.name}`;
+
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'label-chip-remove';
+          removeBtn.setAttribute('aria-label', `Quitar ${person.name}`);
+          removeBtn.textContent = '×';
+          removeBtn.addEventListener('click', () => {
+            this._selectedAssigneeIds.delete(personId);
+            renderAssigneeChips();
+            updateAssigneePicker();
+          });
+          chip.appendChild(removeBtn);
+          assigneesChips.appendChild(chip);
+        }
+
+        const addBtn = document.createElement('button');
+        addBtn.className = 'add-label-btn';
+        addBtn.type = 'button';
+        addBtn.textContent = '+ Asignar';
+        addBtn.addEventListener('click', () => {
+          const picker = assigneesField.querySelector<HTMLElement>('.assignee-picker');
+          if (picker) picker.classList.toggle('open');
+        });
+        assigneesChips.appendChild(addBtn);
+      };
+
+      assigneesField.appendChild(assigneesChips);
+
+      // Picker de personas
+      const assigneePicker = document.createElement('div');
+      assigneePicker.className = 'labels-picker assignee-picker';
+      assigneePicker.setAttribute('aria-label', 'Seleccionar personas');
+
+      const updateAssigneePicker = (): void => {
+        assigneePicker.innerHTML = '';
+        for (const person of this._allPersons) {
+          const opt = document.createElement('label');
+          opt.className = 'label-option';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = this._selectedAssigneeIds.has(person.id);
+          cb.addEventListener('change', () => {
+            if (cb.checked) this._selectedAssigneeIds.add(person.id);
+            else this._selectedAssigneeIds.delete(person.id);
+            renderAssigneeChips();
+          });
+          const avatarSpan = document.createElement('span');
+          avatarSpan.textContent = person.avatar;
+          const nameSp = document.createElement('span');
+          nameSp.textContent = person.name;
+          opt.appendChild(cb);
+          opt.appendChild(avatarSpan);
+          opt.appendChild(nameSp);
+          assigneePicker.appendChild(opt);
+        }
+      };
+
+      assigneePicker.addEventListener('keydown', (ev: KeyboardEvent) => {
+        if (ev.key === 'Escape') {
+          ev.preventDefault();
+          assigneePicker.classList.remove('open');
+          assigneesChips.querySelector<HTMLElement>('.add-label-btn')?.focus();
+        }
+      });
+
+      updateAssigneePicker();
+      renderAssigneeChips();
+      assigneesField.appendChild(assigneePicker);
+      dialog.appendChild(assigneesField);
+    }
+
     // ── Acciones ───────────────────────────────────────────────────────────
     const actions = document.createElement('div');
     actions.className = 'actions';
@@ -1117,6 +1221,7 @@ export class DojoTaskDialog extends HTMLElement {
           description: descInput.value.trim(),
           priority:    priSelect.value as Priority,
           labelIds:    [...this._selectedLabelIds],
+          assignees:   [...this._selectedAssigneeIds],
           projectId:   projSelect.value || undefined,
           dueDate:     (() => {
             if (!dueInput.value) return null;

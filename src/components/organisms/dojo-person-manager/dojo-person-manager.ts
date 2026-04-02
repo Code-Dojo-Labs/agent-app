@@ -563,6 +563,7 @@ export class DojoPersonManager extends HTMLElement {
       </div>
     `;
     this._generateAvatarGrid();
+    this._setupEventListeners();
   }
 
   /** Configura los event listeners del panel. */
@@ -671,64 +672,175 @@ export class DojoPersonManager extends HTMLElement {
 
       const li = document.createElement('li');
       
-      if (isDeleting) {
-        // Mostrar confirmación de eliminación
-        li.innerHTML = 
-          '<div class="confirm-delete">' +
-            '<p><strong>¿Eliminar "' + person.name + '"?</strong></p>' +
-            (taskCount > 0 ? 
-              '<p>⚠️ Esta persona está asignada a ' + taskCount + ' tarea' + (taskCount === 1 ? '' : 's') + '. Se desasignará automáticamente.</p>' : 
-              '<p>Esta persona no tiene tareas asignadas.</p>'
-            ) +
-            '<div class="confirm-delete-actions">' +
-              '<button class="btn btn-danger btn-sm" id="confirm-delete-' + person.id + '">' +
-                '🗑️ Confirmar eliminación' +
-              '</button>' +
-              '<button class="btn btn-secondary btn-sm" id="cancel-delete-' + person.id + '">' +
-                'Cancelar' +
-              '</button>' +
-            '</div>' +
-          '</div>';
+      const isEditing = this._editingId === person.id;
 
-        // Event listeners para confirmación
-        li.querySelector('#confirm-delete-' + person.id)?.addEventListener('click', () => {
-          this._confirmDeletePerson();
+      if (isEditing) {
+        // ── Formulario de edición inline ────────────────────────────────
+        const isPersonEmoji = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(person.avatar);
+
+        const editForm = document.createElement('div');
+        editForm.className = 'create-form';
+        editForm.style.marginBottom = '8px';
+
+        const editTitle = document.createElement('h3');
+        editTitle.textContent = '✏️ Editar persona';
+        editForm.appendChild(editTitle);
+
+        // Nombre
+        const nameGroup = document.createElement('div');
+        nameGroup.className = 'form-group';
+        const nameLabel = document.createElement('label');
+        nameLabel.textContent = 'Nombre completo';
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'form-input';
+        nameInput.value = person.name;
+        nameInput.maxLength = 60;
+        nameGroup.appendChild(nameLabel);
+        nameGroup.appendChild(nameInput);
+        editForm.appendChild(nameGroup);
+
+        // Avatar grid
+        const avatarGroup = document.createElement('div');
+        avatarGroup.className = 'form-group';
+        const avatarLabel = document.createElement('label');
+        avatarLabel.textContent = 'Avatar';
+        avatarGroup.appendChild(avatarLabel);
+
+        const editAvatarGrid = document.createElement('div');
+        editAvatarGrid.className = 'avatar-grid';
+        PRESET_AVATARS.forEach(av => {
+          const opt = document.createElement('div');
+          opt.className = 'avatar-option' + (av === person.avatar ? ' selected' : '');
+          opt.textContent = av;
+          opt.addEventListener('click', () => {
+            editAvatarGrid.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('selected'));
+            opt.classList.add('selected');
+          });
+          editAvatarGrid.appendChild(opt);
+        });
+        avatarGroup.appendChild(editAvatarGrid);
+        editForm.appendChild(avatarGroup);
+
+        // Acciones
+        const actions = document.createElement('div');
+        actions.style.display = 'flex';
+        actions.style.gap = '8px';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'btn btn-primary';
+        saveBtn.textContent = '💾 Guardar';
+        saveBtn.addEventListener('click', async () => {
+          const newName = nameInput.value.trim();
+          if (!newName) { nameInput.focus(); return; }
+          const selectedAvatar = editAvatarGrid.querySelector<HTMLElement>('.avatar-option.selected')?.textContent || person.avatar;
+          await this._handleUpdatePerson(person.id, newName, selectedAvatar);
         });
 
-        li.querySelector('#cancel-delete-' + person.id)?.addEventListener('click', () => {
-          this._cancelDeletePerson();
+        const cancelEditBtn = document.createElement('button');
+        cancelEditBtn.className = 'btn btn-secondary';
+        cancelEditBtn.textContent = 'Cancelar';
+        cancelEditBtn.addEventListener('click', () => {
+          this._editingId = null;
+          this._renderPersonList();
         });
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(cancelEditBtn);
+        editForm.appendChild(actions);
+
+        li.appendChild(editForm);
+
+      } else if (isDeleting) {
+        // Mostrar confirmación de eliminación — construido con createElement (OWASP A3)
+        const confirmBox = document.createElement('div');
+        confirmBox.className = 'confirm-delete';
+
+        const titleP = document.createElement('p');
+        const strong = document.createElement('strong');
+        strong.textContent = `¿Eliminar "${person.name}"?`;
+        titleP.appendChild(strong);
+        confirmBox.appendChild(titleP);
+
+        const warnP = document.createElement('p');
+        warnP.textContent = taskCount > 0
+          ? `⚠️ Esta persona está asignada a ${taskCount} tarea${taskCount === 1 ? '' : 's'}. Se desasignará automáticamente.`
+          : 'Esta persona no tiene tareas asignadas.';
+        confirmBox.appendChild(warnP);
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'confirm-delete-actions';
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.className = 'btn btn-danger btn-sm';
+        confirmBtn.textContent = '🗑️ Confirmar eliminación';
+        confirmBtn.addEventListener('click', () => this._confirmDeletePerson());
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-secondary btn-sm';
+        cancelBtn.textContent = 'Cancelar';
+        cancelBtn.addEventListener('click', () => this._cancelDeletePerson());
+
+        actionsDiv.appendChild(confirmBtn);
+        actionsDiv.appendChild(cancelBtn);
+        confirmBox.appendChild(actionsDiv);
+
+        li.appendChild(confirmBox);
 
       } else {
-        // Mostrar persona normal
+        // Mostrar persona normal — construido con createElement (OWASP A3)
         const isEmoji = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(person.avatar);
-        
-        li.innerHTML = 
-          '<div class="person-item">' +
-            '<div class="person-avatar" style="' + (isEmoji ? 'background: transparent; color: inherit; border: 1px solid var(--dojo-border, #E5E7EB);' : '') + '">' + person.avatar + '</div>' +
-            '<div class="person-info">' +
-              '<div class="person-name">' + person.name + '</div>' +
-              '<div class="person-stats">' + taskCount + ' tarea' + (taskCount === 1 ? '' : 's') + ' asignada' + (taskCount === 1 ? '' : 's') + '</div>' +
-            '</div>' +
-            '<div class="person-actions">' +
-              '<button class="action-btn" id="edit-' + person.id + '" title="Editar persona">' +
-                '✏️' +
-              '</button>' +
-              '<button class="action-btn" id="delete-' + person.id + '" title="Eliminar persona">' +
-                '🗑️' +
-              '</button>' +
-            '</div>' +
-          '</div>';
 
-        // Event listeners para acciones
-        li.querySelector('#edit-' + person.id)?.addEventListener('click', () => {
-          // TODO: Implementar edición inline
-          console.log('Editar persona:', person.id);
+        const personItem = document.createElement('div');
+        personItem.className = 'person-item';
+
+        const avatarEl = document.createElement('div');
+        avatarEl.className = 'person-avatar';
+        if (isEmoji) avatarEl.style.cssText = 'background: transparent; color: inherit; border: 1px solid var(--dojo-border, #E5E7EB);';
+        avatarEl.textContent = person.avatar;
+
+        const infoEl = document.createElement('div');
+        infoEl.className = 'person-info';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'person-name';
+        nameEl.textContent = person.name;
+
+        const statsEl = document.createElement('div');
+        statsEl.className = 'person-stats';
+        statsEl.textContent = `${taskCount} tarea${taskCount === 1 ? '' : 's'} asignada${taskCount === 1 ? '' : 's'}`;
+
+        infoEl.appendChild(nameEl);
+        infoEl.appendChild(statsEl);
+
+        const actEl = document.createElement('div');
+        actEl.className = 'person-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'action-btn';
+        editBtn.title = 'Editar persona';
+        editBtn.setAttribute('aria-label', `Editar ${person.name}`);
+        editBtn.textContent = '✏️';
+        editBtn.addEventListener('click', () => {
+          this._editingId = person.id;
+          this._renderPersonList();
         });
 
-        li.querySelector('#delete-' + person.id)?.addEventListener('click', () => {
-          this._handleDeletePerson(person.id);
-        });
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'action-btn';
+        deleteBtn.title = 'Eliminar persona';
+        deleteBtn.setAttribute('aria-label', `Eliminar ${person.name}`);
+        deleteBtn.textContent = '🗑️';
+        deleteBtn.addEventListener('click', () => this._handleDeletePerson(person.id));
+
+        actEl.appendChild(editBtn);
+        actEl.appendChild(deleteBtn);
+
+        personItem.appendChild(avatarEl);
+        personItem.appendChild(infoEl);
+        personItem.appendChild(actEl);
+
+        li.appendChild(personItem);
       }
 
       listEl.appendChild(li);
