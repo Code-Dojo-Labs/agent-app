@@ -53,6 +53,7 @@ interface ActiveFilter {
   searchText?: string;
   sortBy?: SortMode;
   projectId?: string;
+  assigneeId?: string;
 }
 
 /** Contrato de la propiedad taskLabels expuesta por dojo-task-card (US-10). */
@@ -93,6 +94,8 @@ export class DojoKanbanBoard extends HTMLElement {
   private _filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   // US-26: referencia UI del filtro de proyecto
   private _filterProjectSelect: HTMLSelectElement | null = null;
+  // US-29: referencia UI del filtro de persona asignada
+  private _filterPersonSelect: HTMLSelectElement | null = null;
 
   constructor() {
     super();
@@ -123,9 +126,9 @@ export class DojoKanbanBoard extends HTMLElement {
     }
     if (!task) return;
     try {
-      const labels = await getAllLabels();
+      const [labels, persons] = await Promise.all([getAllLabels(), getAllPersons()]);
       const detail = this._getTaskDetail() as any;
-      if (detail?.openTask) detail.openTask(task, this._columns, labels);
+      if (detail?.openTask) detail.openTask(task, this._columns, labels, persons);
     } catch (err) {
       console.error('[dojo-kanban-board] Error al abrir detalle de tarea:', err);
     }
@@ -764,6 +767,29 @@ export class DojoKanbanBoard extends HTMLElement {
     this._updateClearAllVisibility();
   }
 
+  /** Reconstruye las opciones del selector de personas asignadas (US-29). */
+  private _rebuildPersonFilterSelect(): void {
+    if (!this._filterPersonSelect) return;
+    const currentValue = this._filterPersonSelect.value;
+    while (this._filterPersonSelect.options.length > 1) {
+      this._filterPersonSelect.remove(1);
+    }
+    for (const person of this._persons) {
+      const opt = document.createElement('option');
+      opt.value = person.id;
+      opt.textContent = `${person.avatar || '👤'} ${person.name}`;
+      this._filterPersonSelect.appendChild(opt);
+    }
+    if (this._persons.some(p => p.id === currentValue)) {
+      this._filterPersonSelect.value = currentValue;
+    } else {
+      this._filterPersonSelect.value = '';
+      if (this._activeFilter.assigneeId) {
+        this._activeFilter = { ...this._activeFilter, assigneeId: undefined };
+      }
+    }
+  }
+
   /** Reconstruye las opciones del selector de proyectos (US-26). */
   private _rebuildProjectFilterSelect(): void {
     if (!this._filterProjectSelect) return;
@@ -797,7 +823,8 @@ export class DojoKanbanBoard extends HTMLElement {
       (this._activeFilter.priorities?.length ?? 0) > 0 ||
       (this._activeFilter.labelIds?.length ?? 0) > 0 ||
       !!(this._activeFilter.searchText) ||
-      !!(this._activeFilter.projectId);
+      !!(this._activeFilter.projectId) ||
+      !!(this._activeFilter.assigneeId);
     this._filterClearAllBtn.style.display = hasActive ? '' : 'none';
     this._filterToggleBtn.classList.toggle('has-active', hasActive);
   }
@@ -813,6 +840,7 @@ export class DojoKanbanBoard extends HTMLElement {
     }
     if (this._filterSearchInput) this._filterSearchInput.value = '';
     if (this._filterProjectSelect) this._filterProjectSelect.value = '';
+    if (this._filterPersonSelect)  this._filterPersonSelect.value  = '';
     if (this._filterBarContent) {
       this._filterBarContent.querySelectorAll<HTMLButtonElement>('[data-priority]').forEach(b => {
         b.classList.remove('active');
@@ -908,8 +936,9 @@ export class DojoKanbanBoard extends HTMLElement {
       this._labels = labels;
       this._projects = projects;
       this._persons = persons;
-      this._rebuildLabelFilterChips(); // Poblar chips de etiquetas en el toolbar (US-15)
+      this._rebuildLabelFilterChips();    // Poblar chips de etiquetas en el toolbar (US-15)
       this._rebuildProjectFilterSelect(); // Poblar selector de proyectos (US-26)
+      this._rebuildPersonFilterSelect();  // Poblar selector de personas (US-29)
 
       // Cargar tareas de todas las columnas en paralelo
       const taskResults = await Promise.all(
@@ -1052,7 +1081,7 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private _filterTasks(tasks: Task[]): Task[] {
-    const { priorities, labelIds, searchText, projectId } = this._activeFilter;
+    const { priorities, labelIds, searchText, projectId, assigneeId } = this._activeFilter;
     const lowerSearch = searchText ? searchText.toLowerCase() : null;
     return tasks.filter(task => {
       if (priorities && priorities.length > 0 && !priorities.includes(task.priority)) return false;
@@ -1062,6 +1091,7 @@ export class DojoKanbanBoard extends HTMLElement {
         if (!hasLabel) return false;
       }
       if (projectId && task.projectId !== projectId) return false;
+      if (assigneeId && !(task.assignees ?? []).includes(assigneeId)) return false;
       if (lowerSearch) {
         const titleMatch = task.title.toLowerCase().includes(lowerSearch);
         const descMatch  = (task.description ?? '').toLowerCase().includes(lowerSearch);
@@ -1331,13 +1361,14 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private async _handleCreateTask(e: CustomEvent): Promise<void> {
-    const { statusId, title, description, priority, dueDate, labelIds, projectId } = e.detail as {
+    const { statusId, title, description, priority, dueDate, labelIds, assignees, projectId } = e.detail as {
       statusId:    string;
       title:       string;
       description: string;
       priority:    string;
       dueDate?:    string | null;
       labelIds?:   string[];
+      assignees?:  string[];
       projectId?:  string;
     };
     // Validar que la columna exista (puede haberse eliminado mientras el diálogo estaba abierto)
@@ -1371,7 +1402,7 @@ export class DojoKanbanBoard extends HTMLElement {
         taskNumber,
         priority:    priority as Task['priority'],
         labelIds:    labelIds ?? [],
-        assignees:   [], // Sin personas asignadas inicialmente (US-29)
+        assignees:   assignees ?? [],
         order:       tasks.length,
         dueDate:     dueDate ?? null,
       });
@@ -1399,9 +1430,9 @@ export class DojoKanbanBoard extends HTMLElement {
     }
     if (!task) return;
     try {
-      const labels = await getAllLabels();
+      const [labels, persons] = await Promise.all([getAllLabels(), getAllPersons()]);
       const detail = this._getTaskDetail() as any;
-      if (detail?.openTask) detail.openTask(task, this._columns, labels);
+      if (detail?.openTask) detail.openTask(task, this._columns, labels, persons);
     } catch (err) {
       console.error('[dojo-kanban-board] Error al abrir detalle de tarea:', err);
     }

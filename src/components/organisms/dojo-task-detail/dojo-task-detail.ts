@@ -26,7 +26,7 @@
  * --dojo-primary, --dojo-radius, --dojo-radius-sm, --dojo-shadow
  */
 
-import type { Task, Column, Label, Priority, ActivityEvent, Subtask } from '../../../types/models.js';
+import type { Task, Column, Label, Priority, ActivityEvent, Subtask, Person } from '../../../types/models.js';
 import { parseMarkdown } from '../../../utils/markdown.js';
 import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 import { createLabel } from '../../../db/label.repository.js';
@@ -55,6 +55,7 @@ export class DojoTaskDetail extends HTMLElement {
   private _task: Task | null = null;
   private _columns: Column[] = [];
   private _allLabels: Label[] = [];
+  private _allPersons: Person[] = [];
   private _labelsPickerOpen = false;
   /** Preserva el overflow del body antes de abrir el panel (se restaura al cerrar). Fix #5 */
   private _prevOverflow: string = '';
@@ -110,10 +111,11 @@ export class DojoTaskDetail extends HTMLElement {
     return this._task?.id ?? null;
   }
 
-  openTask(task: Task, columns: Column[], labels: Label[]): void {
-    this._task           = { ...task };
-    this._columns        = columns;
-    this._allLabels      = labels;
+  openTask(task: Task, columns: Column[], labels: Label[], persons: Person[] = []): void {
+    this._task             = { ...task };
+    this._columns          = columns;
+    this._allLabels        = labels;
+    this._allPersons       = persons;
     this._labelsPickerOpen = false;
     this._buildContent();
     this._openPanel();
@@ -476,6 +478,26 @@ export class DojoTaskDetail extends HTMLElement {
         margin-top: 0.25rem;
       }
       .labels-picker.open { display: block; }
+      .labels-picker-opt {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        width: 100%;
+        padding: 0.4375rem 0.75rem;
+        background: transparent;
+        border: none;
+        font-size: 0.875rem;
+        color: var(--dojo-text-primary);
+        cursor: pointer;
+        font-family: inherit;
+        text-align: left;
+        transition: background 0.1s;
+      }
+      .labels-picker-opt:hover { background: var(--dojo-bg); }
+      .labels-picker-opt:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: -2px;
+      }
       .label-option {
         display: flex;
         align-items: center;
@@ -899,6 +921,7 @@ export class DojoTaskDetail extends HTMLElement {
     body.appendChild(this._buildDueDateField(task));
     body.appendChild(this._buildDescriptionField(task));
     body.appendChild(this._buildLabelsField(task));
+    body.appendChild(this._buildAssigneesField(task));
     body.appendChild(this._buildSubtasksField(task));
     body.appendChild(this._buildMetadata(task));
 
@@ -1675,6 +1698,144 @@ export class DojoTaskDetail extends HTMLElement {
     row.appendChild(clearBtn);
     section.appendChild(lbl);
     section.appendChild(row);
+    return section;
+  }
+
+  // ── Sección de asignados (US-29) ──────────────────────────────────────────
+
+  private _buildAssigneesField(task: Task): HTMLElement {
+    const section = document.createElement('div');
+    section.className = 'section';
+
+    const sectionLbl = document.createElement('span');
+    sectionLbl.className = 'section-lbl';
+    sectionLbl.textContent = 'Asignados';
+
+    const chips = document.createElement('div');
+    chips.className = 'labels-chips';
+    chips.setAttribute('aria-label', 'Personas asignadas a la tarea');
+
+    const pickerWrapper = document.createElement('div');
+    pickerWrapper.style.cssText = 'position:relative;display:inline-block;';
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'add-label-btn';
+    addBtn.setAttribute('aria-label', 'Asignar persona');
+    addBtn.textContent = '+ Asignar';
+
+    const picker = document.createElement('div');
+    picker.className = 'labels-picker';
+    picker.style.display = 'none';
+    picker.setAttribute('role', 'listbox');
+    picker.setAttribute('aria-label', 'Seleccionar persona a asignar');
+
+    let pickerOpen = false;
+
+    const closePicker = (): void => {
+      pickerOpen = false;
+      picker.style.display = 'none';
+    };
+
+    const rebuildChips = (): void => {
+      chips.innerHTML = '';
+      const currentIds = this._task?.assignees ?? [];
+      const assigned = currentIds
+        .map(id => this._allPersons.find(p => p.id === id))
+        .filter((p): p is Person => p !== undefined);
+
+      for (const person of assigned) {
+        const chip = document.createElement('span');
+        chip.className = 'label-chip';
+        chip.style.cssText = 'display:inline-flex;align-items:center;gap:0.25rem;padding:0.2rem 0.5rem;background:var(--dojo-surface);border:1px solid var(--dojo-border);border-radius:999px;font-size:0.75rem;';
+        chip.textContent = `${person.avatar || '👤'} ${person.name}`;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'label-chip-remove';
+        removeBtn.setAttribute('aria-label', `Desasignar a ${person.name}`);
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          if (!this._task) return;
+          const newIds = (this._task.assignees ?? []).filter(id => id !== person.id);
+          this._save({ assignees: newIds });
+          rebuildChips();
+          rebuildPicker();
+        });
+
+        chip.appendChild(removeBtn);
+        chips.appendChild(chip);
+      }
+
+      chips.appendChild(pickerWrapper);
+    };
+
+    const rebuildPicker = (): void => {
+      picker.innerHTML = '';
+      const currentIds = new Set(this._task?.assignees ?? []);
+      const available = this._allPersons.filter(p => !currentIds.has(p.id));
+
+      if (available.length === 0) {
+        const empty = document.createElement('p');
+        empty.style.cssText = 'padding:0.5rem;font-size:0.8125rem;color:var(--dojo-text-secondary);margin:0;';
+        empty.textContent = 'No hay personas disponibles.';
+        picker.appendChild(empty);
+        return;
+      }
+
+      for (const person of available) {
+        const opt = document.createElement('button');
+        opt.type = 'button';
+        opt.className = 'labels-picker-opt';
+        opt.setAttribute('role', 'option');
+        opt.textContent = `${person.avatar || '👤'} ${person.name}`;
+        opt.addEventListener('click', () => {
+          if (!this._task) return;
+          const newIds = [...(this._task.assignees ?? []), person.id];
+          this._save({ assignees: newIds });
+          closePicker();
+          rebuildChips();
+        });
+        picker.appendChild(opt);
+      }
+    };
+
+    addBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pickerOpen = !pickerOpen;
+      if (pickerOpen) {
+        rebuildPicker();
+        picker.style.display = 'block';
+        requestAnimationFrame(() => picker.querySelector<HTMLElement>('button')?.focus());
+      } else {
+        closePicker();
+      }
+    });
+
+    picker.addEventListener('keydown', (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        closePicker();
+        addBtn.focus();
+      }
+    });
+
+    pickerWrapper.appendChild(addBtn);
+    pickerWrapper.appendChild(picker);
+
+    section.appendChild(sectionLbl);
+    section.appendChild(chips);
+
+    // Solo renderizar si hay personas en el directorio
+    if (this._allPersons.length > 0) {
+      rebuildChips();
+    } else {
+      const empty = document.createElement('p');
+      empty.style.cssText = 'font-size:0.8125rem;color:var(--dojo-text-secondary);margin:0.25rem 0;';
+      empty.textContent = 'No hay personas en el directorio. Crea personas desde el menú.';
+      section.appendChild(empty);
+    }
+
     return section;
   }
 
