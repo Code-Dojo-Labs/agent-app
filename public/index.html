@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dojo Kanban</title>
     <meta name="description" content="Tablero Kanban — Zero Dependencies, Web APIs nativas" />
+
+    <!-- PWA — manifest y tema (US-31) -->
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="theme-color" content="#1D4ED8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="DojoKanban" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.svg" />
     <!--
       Los estilos globales únicamente definen el reset base y las variables de tema.
       Cada componente Web encapsula sus propios estilos en Shadow DOM.
@@ -89,5 +98,20 @@
         3. Ejecución en strict mode por defecto.
     -->
     <script type="module" src="./main.js"></script>
+
+    <!--
+      Registro del Service Worker — PWA (US-31).
+      Se registra tras el evento 'load' para no bloquear el render inicial.
+      El SW vive en el scope raíz ('./' ) para interceptar todas las peticiones.
+    -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('./sw.js').catch(function (err) {
+            console.warn('[PWA] Service Worker registration failed:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>
