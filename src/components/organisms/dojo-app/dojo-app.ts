@@ -14,6 +14,7 @@
 
 import '../dojo-kanban-board/dojo-kanban-board.js';
 import '../dojo-label-manager/dojo-label-manager.js';
+import '../dojo-wiki/dojo-wiki.js';
 import '../dojo-project-manager/dojo-project-manager.js';
 import '../dojo-person-manager/dojo-person-manager.js';
 import '../dojo-command-palette/dojo-command-palette.js';
@@ -322,6 +323,32 @@ export class DojoApp extends HTMLElement {
       :host([view="board"]) .back-btn { display: inline-flex; }
       :host([view="board"]) .header-actions { display: flex; }
       :host(:not([view="board"])) .header-actions { display: none; }
+
+      /* Botón de ayuda — siempre visible (US-27) */
+      .help-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        background: transparent;
+        color: var(--dojo-text-secondary);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        flex-shrink: 0;
+      }
+      .help-btn:hover {
+        background: var(--dojo-bg);
+        color: var(--dojo-text-primary);
+        border-color: var(--dojo-primary, #1D4ED8);
+      }
+      .help-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
     `;
     this._shadow.appendChild(style);
 
@@ -457,7 +484,19 @@ export class DojoApp extends HTMLElement {
     backBtn.addEventListener('click', () => this._showBoardSelector());
     appHeader.appendChild(backBtn);
 
+    // ── Botón Ayuda (US-27) ─────────────────────────────────────────────────
+    const helpBtn = document.createElement('button');
+    helpBtn.className = 'help-btn';
+    helpBtn.type = 'button';
+    helpBtn.setAttribute('aria-label', 'Abrir guía de usuario');
+    helpBtn.setAttribute('title', 'Ayuda (también: ?)');
+    helpBtn.textContent = '?';
+    helpBtn.addEventListener('click', () => {
+      (wiki as any).show?.();
+    });
+
     appHeader.appendChild(headerActions);
+    appHeader.appendChild(helpBtn);
     appHeader.appendChild(themeToggle);
     this._shadow.appendChild(appHeader);
 
@@ -497,6 +536,10 @@ export class DojoApp extends HTMLElement {
     // ── Paleta de comandos (US-28) ───────────────────────────────────────────────────
     const palette = document.createElement('dojo-command-palette');
     this._shadow.appendChild(palette);
+
+    // ── Wiki / Guía de usuario (US-27) ───────────────────────────────────────────────
+    const wiki = document.createElement('dojo-wiki');
+    this._shadow.appendChild(wiki);
 
     // Seleccionar tarea desde la paleta
     this._shadow.addEventListener('dojo:palette-select-task', (e: Event) => {
