@@ -1,7 +1,7 @@
 # COOKBOOK — ToDo List con Web Components
 
-> **Versión:** 1.1.0  
-> **Última actualización:** 2026-04-01  
+> **Versión:** 1.2.0  
+> **Última actualización:** 2026-04-02  
 > **Mantenido por:** Agente `documentalista`
 
 ---
@@ -42,6 +42,7 @@
    - [Paso 28 — Búsqueda global con paleta de comandos (US-28 / Issue #46)](#paso-28--búsqueda-global-con-paleta-de-comandos-us-28--issue-46)
    - [Paso 29 — Sistema de asignación de personas a tareas (US-29)](#paso-29--sistema-de-asignación-de-personas-a-tareas-us-29)
    - [Paso 30 — Sincronización entre pestañas (US-30)](#paso-30--sincronización-entre-pestañas-us-30)
+   - [Paso 31 — Soporte PWA (US-31 / Issue #49)](#paso-31--soporte-pwa-us-31--issue-49)
 
 ---
 
@@ -2888,3 +2889,106 @@ dojoTaskCard.refresh() → Recarga desde IndexedDB → Re-renderiza
 - **Anti-loop protection**: Eventos originados en la misma pestaña se ignoran automáticamente usando `tabId`
 - **Batching implícito**: IndexedDB transactions naturalmente agrupa múltiples cambios, los eventos de sincronización respetan esta atomicidad
 - **Refresco selectivo**: Solo se refrescan componentes específicos según el tipo de entidad modificada, no toda la aplicación
+
+---
+
+## Paso 31 — Soporte PWA (US-31 / Issue #49)
+
+> **Issue:** #49 | **PR:** #65 | **Rama:** `feat/49-us31-pwa`  
+> **Área:** Infraestructura | **Prioridad:** Media
+
+### Objetivo
+
+Convertir Dojo Kanban en una **Progressive Web App** instalable en escritorio y dispositivo móvil, con funcionalidad offline completa usando la Cache API del Service Worker.
+
+### Archivos creados / modificados
+
+| Archivo | Acción | Propósito |
+|---------|--------|-----------|
+| `public/manifest.json` | Nuevo | Web App Manifest (nombre, iconos, tema, modo standalone) |
+| `public/sw.js` | Nuevo | Service Worker — estrategia Cache First |
+| `public/icons/icon-192.svg` | Nuevo | Ícono PWA vectorial 192×192 |
+| `public/icons/icon-512.svg` | Nuevo | Ícono PWA vectorial 512×512 (maskable) |
+| `public/index.html` | Modificado | Link al manifest, theme-color, apple-touch-icon, registro SW |
+| `package.json` | Modificado | Build copia PWA assets a `dist/` |
+| `.github/workflows/static.yml` | Modificado | Build step + deploy desde `dist/` |
+
+### Arquitectura de la solución
+
+#### Archivos a cachear (PRECACHE_URLS)
+
+```
+ ./              → Shell HTML para navegación raíz
+ ./index.html    → Punto de entrada principal
+ ./main.js       → Bundle de la aplicación (TypeScript compilado)
+ ./manifest.json → Metadatos de la PWA
+ ./icons/icon-192.svg
+ ./icons/icon-512.svg
+```
+
+#### Ciclo de vida del Service Worker
+
+```
+INSTALL
+  └─ caches.open(CACHE_NAME)
+  └─ cache.addAll(PRECACHE_URLS)   ← pre-cachea assets esenciales
+  └─ skipWaiting()                 ← activa sin esperar cierre de pestañas
+
+ACTIVATE
+  └─ caches.keys() → filtra 'dojo-kanban-*' ≠ CACHE_NAME
+  └─ caches.delete(staleCache)     ← limpia versiones anteriores
+  └─ clients.claim()               ← controla pestañas abiertas
+
+FETCH (solo GET del mismo origen)
+  └─ caches.match(request)
+       ├─ HIT  → return cachedResponse          ← offline-ready
+       └─ MISS → fetch(request)
+                   └─ cache.put(request, clone) ← cachea para futuras visitas
+                   └─ return networkResponse
+```
+
+#### Versionado de caché
+
+```js
+const CACHE_VERSION = 'v1';
+const CACHE_NAME = `dojo-kanban-${CACHE_VERSION}`;
+```
+
+Para publicar una nueva versión: incrementar `CACHE_VERSION` en `sw.js`. El ciclo `activate` eliminará la caché obsoleta automáticamente.
+
+### Decisión de diseño: SVG vs PNG para iconos
+
+**Alternativa evaluada:** Generar PNGs con Canvas API en un script de build.  
+**Decisión:** SVG nativo en el manifest (`type: "image/svg+xml"`).  
+**Razón:** Zero Dependencies en el pipeline de build. Todos los navegadores modernos soportan SVG en Web App Manifests (Chrome 80+, Edge 80+, Firefox 88+). Los SVGs son vectoriales, garantizando calidad óptima en cualquier densidad de pantalla. iOS Safari requiere `apple-touch-icon` meta tag (ya incluida).
+
+### Decisión de diseño: Scope del Service Worker
+
+El SW se registra en `'./sw.js'` desde `index.html`, lo que le otorga scope sobre todos los recursos de `./`. Esto cubre el 100% de los assets de la aplicación sin restricciones de ruta.
+
+### Integración con el pipeline CI/CD
+
+Antes de este paso, el workflow de GitHub Actions desplegaba el repositorio sin compilar (`dist/` estaba en `.gitignore`). Se corrigió esta inconsistencia:
+
+```yaml
+# Antes (roto): subía el repo source sin compilar
+path: '.'
+
+# Después (correcto): compila y sube solo el artefacto
+- run: npm ci
+- run: npm run build
+path: './dist'
+```
+
+### Criterios de aceptación verificados
+
+| Escenario | Estado |
+|-----------|--------|
+| Instalación en escritorio (Chrome/Edge) | ✅ manifest.json + HTTPS via GitHub Pages |
+| Instalación en móvil Android | ✅ manifest.json completo |
+| Instalación en iOS (Safari) | ✅ `apple-touch-icon` + `apple-mobile-web-app-capable` |
+| Funcionalidad offline completa | ✅ SW Cache First + datos en IndexedDB |
+| Carga offline en reapertura | ✅ Assets pre-cacheados en `install` |
+| Actualización del SW | ✅ `skipWaiting()` + nuevo `CACHE_VERSION` |
+| `manifest.json` con campos requeridos | ✅ name, short_name, start_url, display, icons |
+| Iconos 192×192 y 512×512 | ✅ SVG con width/height explícitos |

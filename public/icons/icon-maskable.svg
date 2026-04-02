@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    Ícono maskable: el fondo debe ser 100% sólido sin transparencia.
+    Se usa <rect> sin rx para cubrir toda el área incluyendo las esquinas,
+    garantizando compatibilidad con máscaras circulares y squircle en Android.
+    La zona segura (safe zone) ocupa el 80% central del canvas (102–410 px).
+  -->
+  <rect width="512" height="512" fill="#1D4ED8"/>
+
+  <!-- Header del tablero — posicionado en la safe zone -->
+  <rect x="56" y="72" width="400" height="48" rx="10" fill="rgba(255,255,255,0.20)"/>
+  <circle cx="88" cy="96" r="13" fill="rgba(255,255,255,0.70)"/>
+  <circle cx="120" cy="96" r="13" fill="rgba(255,255,255,0.50)"/>
+  <circle cx="152" cy="96" r="13" fill="rgba(255,255,255,0.30)"/>
+
+  <!-- Columna 1 — "Por hacer" -->
+  <rect x="56" y="138" width="118" height="302" rx="16" fill="rgba(255,255,255,0.12)"/>
+  <rect x="72" y="156" width="88" height="16" rx="6" fill="rgba(255,255,255,0.50)"/>
+  <rect x="72" y="184" width="88" height="48" rx="8" fill="rgba(255,255,255,0.90)"/>
+  <rect x="80" y="196" width="52" height="8" rx="4" fill="#1D4ED8"/>
+  <rect x="80" y="210" width="36" height="6" rx="3" fill="#94A3B8"/>
+  <rect x="72" y="242" width="88" height="48" rx="8" fill="rgba(255,255,255,0.90)"/>
+  <rect x="80" y="254" width="44" height="8" rx="4" fill="#1D4ED8"/>
+  <rect x="80" y="268" width="56" height="6" rx="3" fill="#94A3B8"/>
+  <rect x="72" y="302" width="88" height="48" rx="8" fill="rgba(255,255,255,0.60)"/>
+  <rect x="80" y="314" width="40" height="8" rx="4" fill="#1D4ED8"/>
+  <rect x="80" y="328" width="52" height="6" rx="3" fill="#94A3B8"/>
+
+  <!-- Columna 2 — "En progreso" -->
+  <rect x="197" y="138" width="118" height="302" rx="16" fill="rgba(255,255,255,0.12)"/>
+  <rect x="213" y="156" width="88" height="16" rx="6" fill="rgba(255,255,255,0.50)"/>
+  <rect x="213" y="184" width="88" height="48" rx="8" fill="rgba(255,255,255,0.90)"/>
+  <rect x="221" y="196" width="56" height="8" rx="4" fill="#1D4ED8"/>
+  <rect x="221" y="210" width="42" height="6" rx="3" fill="#94A3B8"/>
+  <rect x="213" y="242" width="88" height="48" rx="8" fill="rgba(255,255,255,0.60)"/>
+  <rect x="221" y="254" width="36" height="8" rx="4" fill="#1D4ED8"/>
+  <rect x="221" y="268" width="62" height="6" rx="3" fill="#94A3B8"/>
+
+  <!-- Columna 3 — "Hecho" -->
+  <rect x="338" y="138" width="118" height="302" rx="16" fill="rgba(255,255,255,0.12)"/>
+  <rect x="354" y="156" width="88" height="16" rx="6" fill="rgba(255,255,255,0.50)"/>
+  <rect x="354" y="184" width="88" height="48" rx="8" fill="rgba(255,255,255,0.90)"/>
+  <rect x="362" y="196" width="62" height="8" rx="4" fill="#16A34A"/>
+  <rect x="362" y="210" width="46" height="6" rx="3" fill="#94A3B8"/>
+  <!-- Checkmark -->
+  <path d="M400 200 l8 8 l16 -16" stroke="#16A34A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
