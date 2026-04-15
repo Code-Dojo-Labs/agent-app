@@ -1,5 +1,7 @@
 # User Stories — Kanban To-Do App
 
+> [← Volver al índice](../requirements/index.md)
+
 > Versión: 2.0  
 > Fecha: 2026-03-26  
 > Estado: Borrador
@@ -49,6 +51,12 @@
 | [US-29](./US-29-assignees.md) | Asignación de personas | Gestión de tareas | Opcional | MS-08 |
 | [US-30](./US-30-broadcast-sync.md) | Sincronización entre pestañas | Persistencia | Opcional | MS-09 |
 | [US-31](./US-31-pwa.md) | Soporte PWA | Infraestructura | Media | MS-10 |
+| [US-32](./US-32-wip-limits.md) | Límites WIP por columna | Tablero Kanban | Media | IMP-01 |
+| [US-33](./US-33-list-view.md) | Vista alternativa de lista / tabla | UI/UX | Media | IMP-02 |
+| [US-34](./US-34-notifications.md) | Notificaciones para fechas de vencimiento | PWA | Media | IMP-03 |
+| [US-35](./US-35-larger-edit-dialog.md) | Área de edición de tickets al 90% del viewport | UI/UX | Alta | IMP-04 |
+| [US-36](./US-36-task-templates.md) | Templates para la creación de tickets | Gestión de tareas | Media | IMP-05 |
+| [US-37](./US-37-default-columns.md) | Columnas por defecto estandarizadas | Tablero Kanban | Alta | IMP-06 |
 
 ---
 

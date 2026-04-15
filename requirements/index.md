@@ -21,6 +21,17 @@ Aplicación web de gestión de tareas tipo Trello con tablero Kanban, orientada 
 | [UI/UX](./ui-ux.md) | Especificaciones del tablero Kanban, componentes y guía de estilos |
 | [Mejoras Sugeridas](./improvements.md) | Propuestas de funcionalidades que potenciarían el proyecto |
 
+### Mejoras en seguimiento
+
+| ID | Archivo | Área | Descripción breve |
+|---|---|---|---|
+| IMP-01 | [improvements-01-wip-limits.md](./improvements-01-wip-limits.md) | Tablero Kanban | Límites WIP por columna con alertas visuales |
+| IMP-02 | [improvements-02-list-view.md](./improvements-02-list-view.md) | UI/UX | Vista alternativa de lista/tabla con ordenamiento |
+| IMP-03 | [improvements-03-notifications.md](./improvements-03-notifications.md) | PWA | Notificaciones del navegador para fechas de vencimiento |
+| IMP-04 | [improvements-04-larger-edit-dialog.md](./improvements-04-larger-edit-dialog.md) | UI/UX | Modal de edición de tickets al 90% del viewport |
+| IMP-05 | [improvements-05-task-templates.md](./improvements-05-task-templates.md) | Gestión de tareas | Templates reutilizables para la creación de tickets |
+| IMP-06 | [improvements-06-default-columns.md](./improvements-06-default-columns.md) | Tablero Kanban | Columnas estándar predefinidas en tableros nuevos |
+
 ---
 
 ## Resumen de funcionalidades
