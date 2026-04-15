@@ -57,7 +57,32 @@ export class DojoTaskDialog extends HTMLElement {
 
   // Referencia estable para poder eliminar el listener de teclado
   private _onDocKeydown = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' && this._isOpen()) this._close();
+    if (!this._isOpen()) return;
+    if (e.key === 'Escape') {
+      this._close();
+      return;
+    }
+    // Focus trap: mantener Tab dentro del diálogo (H4 — WCAG 2.1 SC 2.1.2)
+    if (e.key === 'Tab') {
+      const dialog = this._shadow.querySelector<HTMLElement>('.dialog');
+      if (!dialog) return;
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter(el => !el.hidden && el.offsetParent !== null);
+      if (focusable.length < 2) return;
+      const first  = focusable[0];
+      const last   = focusable[focusable.length - 1];
+      const active = this._shadow.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
   };
 
   constructor() {
@@ -143,7 +168,7 @@ export class DojoTaskDialog extends HTMLElement {
         border-radius: var(--dojo-radius);
         box-shadow: var(--dojo-shadow);
         width: 100%;
-        max-width: 560px;
+        max-width: 860px;
         max-height: calc(100vh - 2rem);
         overflow-y: auto;
         padding: 1.5rem;
@@ -151,6 +176,22 @@ export class DojoTaskDialog extends HTMLElement {
         flex-direction: column;
         gap: 1.125rem;
         animation: dlg-in 0.18s ease;
+      }
+
+      /* ── Layout dos columnas (formulario ampliado) ── */
+      .dialog-body {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.25rem;
+      }
+      .dialog-main,
+      .dialog-aside {
+        display: flex;
+        flex-direction: column;
+        gap: 1.125rem;
+      }
+      @media (max-width: 767px) {
+        .dialog-body { grid-template-columns: 1fr; }
       }
       @keyframes dlg-in {
         from { opacity: 0; transform: scale(0.96) translateY(-8px); }
@@ -222,7 +263,7 @@ export class DojoTaskDialog extends HTMLElement {
 
       .field textarea {
         resize: vertical;
-        min-height: 120px;
+        min-height: 180px;
         line-height: 1.5;
       }
 
@@ -534,6 +575,20 @@ export class DojoTaskDialog extends HTMLElement {
     subtitle.textContent = `En columna: ${this._columnName}`;
     dialog.appendChild(subtitle);
 
+    // ── Cuerpo: dos columnas ──────────────────────────────────────────────
+    const formBody = document.createElement('div');
+    formBody.className = 'dialog-body';
+
+    const formMain = document.createElement('div');
+    formMain.className = 'dialog-main';
+
+    const formAside = document.createElement('div');
+    formAside.className = 'dialog-aside';
+
+    formBody.appendChild(formMain);
+    formBody.appendChild(formAside);
+    dialog.appendChild(formBody);
+
     // ── Campo: Título (obligatorio, máx 120) ───────────────────────────────
     const MAX_TITLE = 120;
     const titleField = document.createElement('div');
@@ -581,7 +636,7 @@ export class DojoTaskDialog extends HTMLElement {
 
     titleField.appendChild(titleInput);
     titleField.appendChild(titleError);
-    dialog.appendChild(titleField);
+    formMain.appendChild(titleField);
 
     // ── Campo: Descripción (opcional) ─────────────────────────────────────
     const descField = document.createElement('div');
@@ -595,12 +650,12 @@ export class DojoTaskDialog extends HTMLElement {
     const descInput = document.createElement('textarea');
     descInput.id = 'task-desc-input';
     descInput.placeholder = 'Describe la tarea…';
-    descInput.rows = 5;
+    descInput.rows = 10;
     descInput.maxLength = MAX_DESC;
 
     descField.appendChild(descLabel);
     descField.appendChild(descInput);
-    dialog.appendChild(descField);
+    formMain.appendChild(descField);
 
     // ── Campo: Prioridad (default medium) ─────────────────────────────────
     const priField = document.createElement('div');
@@ -624,7 +679,7 @@ export class DojoTaskDialog extends HTMLElement {
 
     priField.appendChild(priLabel);
     priField.appendChild(priSelect);
-    dialog.appendChild(priField);
+    formAside.appendChild(priField);
 
     // ── Campo: Fecha de vencimiento (opcional, US-17) ─────────────────────
     const dueField = document.createElement('div');
@@ -641,7 +696,7 @@ export class DojoTaskDialog extends HTMLElement {
 
     dueField.appendChild(dueLabel);
     dueField.appendChild(dueInput);
-    dialog.appendChild(dueField);
+    formAside.appendChild(dueField);
 
     // ── Campo: Proyecto (US-26) ────────────────────────────────────────────
     const projField = document.createElement('div');
@@ -666,7 +721,7 @@ export class DojoTaskDialog extends HTMLElement {
 
     projField.appendChild(projLabel);
     projField.appendChild(projSelect);
-    dialog.appendChild(projField);
+    formAside.appendChild(projField);
 
     // ── Campo: Etiquetas (US-23) ──────────────────────────────────────────
     const labelsField = document.createElement('div');
@@ -1095,7 +1150,7 @@ export class DojoTaskDialog extends HTMLElement {
     };
 
     renderChips();
-    dialog.appendChild(labelsField);
+    formAside.appendChild(labelsField);
 
     // ── Campo: Personas asignadas (US-29) ─────────────────────────────────
     if (this._allPersons.length > 0) {
@@ -1186,7 +1241,7 @@ export class DojoTaskDialog extends HTMLElement {
       updateAssigneePicker();
       renderAssigneeChips();
       assigneesField.appendChild(assigneePicker);
-      dialog.appendChild(assigneesField);
+      formAside.appendChild(assigneesField);
     }
 
     // ── Acciones ───────────────────────────────────────────────────────────
