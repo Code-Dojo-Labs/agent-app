@@ -185,25 +185,44 @@ export class DojoTaskDetail extends HTMLElement {
         pointer-events: auto;
       }
 
-      /* ── Panel lateral ── */
+      /* ── Modal centrado (US-35) ── */
       .panel {
         position: fixed;
-        top: 0;
-        right: 0;
-        height: 100%;
-        width: 400px;
+        top: 50%;
+        left: 50%;
+        width: 90vw;
+        height: 90vh;
         max-width: 100vw;
+        max-height: 100vh;
         background: var(--dojo-surface);
-        border-left: 1px solid var(--dojo-border);
-        box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius, 8px);
+        box-shadow: 0 24px 64px rgba(0,0,0,0.22);
         z-index: 201;
         display: flex;
         flex-direction: column;
-        transform: translateX(100%);
-        transition: transform 0.22s ease;
+        transform: translate(-50%, -50%) scale(0.96);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.22s ease, opacity 0.22s ease;
         overflow: hidden;
       }
-      :host([open]) .panel { transform: translateX(0); }
+      :host([open]) .panel {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      /* ── Pantalla completa en móvil (< 768px) ── */
+      @media (max-width: 767px) {
+        .panel {
+          width: 100vw;
+          height: 100vh;
+          border-radius: 0;
+          top: 50%;
+          left: 50%;
+        }
+      }
 
       /* ── Encabezado fijo ── */
       .panel-header {
@@ -240,9 +259,17 @@ export class DojoTaskDetail extends HTMLElement {
         outline-offset: 2px;
       }
 
-      /* ── Cuerpo scrollable ── */
+      /* ── Cuerpo: dos columnas (US-35) ── */
       .panel-body {
         flex: 1;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 0;
+      }
+
+      .panel-main,
+      .panel-aside {
         overflow-y: auto;
         padding: 1.25rem;
         display: flex;
@@ -251,8 +278,30 @@ export class DojoTaskDetail extends HTMLElement {
         scrollbar-width: thin;
         scrollbar-color: var(--dojo-border) transparent;
       }
-      .panel-body::-webkit-scrollbar       { width: 4px; }
-      .panel-body::-webkit-scrollbar-thumb { background: var(--dojo-border); border-radius: 2px; }
+      .panel-main::-webkit-scrollbar,
+      .panel-aside::-webkit-scrollbar       { width: 4px; }
+      .panel-main::-webkit-scrollbar-thumb,
+      .panel-aside::-webkit-scrollbar-thumb { background: var(--dojo-border); border-radius: 2px; }
+
+      .panel-main {
+        border-right: 1px solid var(--dojo-border);
+      }
+
+      /* Colapso a columna única en móvil */
+      @media (max-width: 767px) {
+        .panel-body {
+          grid-template-columns: 1fr;
+          overflow-y: auto;
+        }
+        .panel-main {
+          border-right: none;
+          border-bottom: 1px solid var(--dojo-border);
+          overflow-y: visible;
+        }
+        .panel-aside {
+          overflow-y: visible;
+        }
+      }
 
       /* ── Sección genérica ── */
       .section { display: flex; flex-direction: column; gap: 0.375rem; }
@@ -881,8 +930,9 @@ export class DojoTaskDetail extends HTMLElement {
     // Panel (vacío hasta que se llame a openTask)
     const panel = document.createElement('div');
     panel.className = 'panel';
-    panel.setAttribute('role', 'complementary');
-    panel.setAttribute('aria-label', 'Detalle de tarea');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.setAttribute('aria-labelledby', 'detail-panel-title');
     this._shadow.appendChild(panel);
   }
 
@@ -900,6 +950,7 @@ export class DojoTaskDetail extends HTMLElement {
 
     const hdrTitle = document.createElement('span');
     hdrTitle.className = 'panel-hdr-title';
+    hdrTitle.id = 'detail-panel-title';
     hdrTitle.textContent = 'Detalle de tarea';
 
     const closeBtn = document.createElement('button');
@@ -912,25 +963,36 @@ export class DojoTaskDetail extends HTMLElement {
     header.appendChild(closeBtn);
     panel.appendChild(header);
 
-    // ── Body ────────────────────────────────────────────────────────────────
+    // ── Body — layout dos columnas (US-35) ──────────────────────────────────
     const body = document.createElement('div');
     body.className = 'panel-body';
 
-    body.appendChild(this._buildTitleField(task));
-    body.appendChild(this._buildStatusPriorityRow(task));
-    body.appendChild(this._buildDueDateField(task));
-    body.appendChild(this._buildDescriptionField(task));
-    body.appendChild(this._buildLabelsField(task));
-    body.appendChild(this._buildAssigneesField(task));
-    body.appendChild(this._buildSubtasksField(task));
-    body.appendChild(this._buildMetadata(task));
+    // Columna principal: título, descripción, subtareas, actividad
+    const main = document.createElement('div');
+    main.className = 'panel-main';
+
+    main.appendChild(this._buildTitleField(task));
+    main.appendChild(this._buildDescriptionField(task));
+    main.appendChild(this._buildSubtasksField(task));
 
     // US-20: Sección de actividad (se carga de forma asíncrona)
     const activityContainer = document.createElement('div');
     activityContainer.className = 'activity-section';
-    body.appendChild(activityContainer);
+    main.appendChild(activityContainer);
     this._loadActivitySection(task.id, activityContainer);
 
+    // Columna lateral: metadatos de control
+    const aside = document.createElement('div');
+    aside.className = 'panel-aside';
+
+    aside.appendChild(this._buildStatusPriorityRow(task));
+    aside.appendChild(this._buildDueDateField(task));
+    aside.appendChild(this._buildLabelsField(task));
+    aside.appendChild(this._buildAssigneesField(task));
+    aside.appendChild(this._buildMetadata(task));
+
+    body.appendChild(main);
+    body.appendChild(aside);
     panel.appendChild(body);
 
     // ── Footer de eliminación (US-06) ──────────────────────────────────────
