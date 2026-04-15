@@ -57,7 +57,32 @@ export class DojoTaskDialog extends HTMLElement {
 
   // Referencia estable para poder eliminar el listener de teclado
   private _onDocKeydown = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' && this._isOpen()) this._close();
+    if (!this._isOpen()) return;
+    if (e.key === 'Escape') {
+      this._close();
+      return;
+    }
+    // Focus trap: mantener Tab dentro del diálogo (H4 — WCAG 2.1 SC 2.1.2)
+    if (e.key === 'Tab') {
+      const dialog = this._shadow.querySelector<HTMLElement>('.dialog');
+      if (!dialog) return;
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter(el => !el.hidden && el.offsetParent !== null);
+      if (focusable.length < 2) return;
+      const first  = focusable[0];
+      const last   = focusable[focusable.length - 1];
+      const active = this._shadow.activeElement;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
   };
 
   constructor() {
@@ -165,7 +190,7 @@ export class DojoTaskDialog extends HTMLElement {
         flex-direction: column;
         gap: 1.125rem;
       }
-      @media (max-width: 640px) {
+      @media (max-width: 767px) {
         .dialog-body { grid-template-columns: 1fr; }
       }
       @keyframes dlg-in {

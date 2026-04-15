@@ -133,6 +133,7 @@ export class DojoTaskDetail extends HTMLElement {
 
   private _openPanel(): void {
     this.setAttribute('open', '');
+    this._shadow.querySelector('.panel')?.removeAttribute('aria-hidden'); // H1
     this._prevOverflow = document.body.style.overflow;  // Fix #5
     document.body.style.overflow = 'hidden';
     // Guarda de duplicados — igual que en dojo-task-dialog
@@ -146,6 +147,7 @@ export class DojoTaskDetail extends HTMLElement {
 
   private _closePanel(): void {
     this.removeAttribute('open');
+    this._shadow.querySelector('.panel')?.setAttribute('aria-hidden', 'true'); // H1
     document.body.style.overflow = this._prevOverflow;  // Fix #5
     document.removeEventListener('keydown', this._onDocKeydown);
   }
@@ -219,8 +221,6 @@ export class DojoTaskDetail extends HTMLElement {
           width: 100vw;
           height: 100vh;
           border-radius: 0;
-          top: 50%;
-          left: 50%;
         }
       }
 
@@ -933,6 +933,7 @@ export class DojoTaskDetail extends HTMLElement {
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-labelledby', 'detail-panel-title');
+    panel.setAttribute('aria-hidden', 'true'); // oculto por defecto — H1
     this._shadow.appendChild(panel);
   }
 
