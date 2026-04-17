@@ -19,6 +19,7 @@ import '../dojo-project-manager/dojo-project-manager.js';
 import '../dojo-person-manager/dojo-person-manager.js';
 import '../dojo-command-palette/dojo-command-palette.js';
 import '../dojo-board-selector/dojo-board-selector.js';
+import '../dojo-list-view/dojo-list-view.js';
 import '../../atoms/dojo-theme-toggle/dojo-theme-toggle.js';
 import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 
@@ -41,6 +42,8 @@ export class DojoApp extends HTMLElement {
   private _toastTimer: ReturnType<typeof setTimeout> | null = null;
   /** ID del tablero activo. Si es vacío, se muestra el selector de tableros (US-22). */
   private _activeBoardId = '';
+  /** Modo de vista activo para el tablero: 'kanban' o 'list'. Persiste en localStorage (US-33). */
+  private _boardViewMode: 'kanban' | 'list' = 'kanban';
 
   /** Referencia estable para poder eliminar el listener de teclado del diálogo de importación. */
   private _onImportKeydown = (e: KeyboardEvent): void => {
@@ -77,6 +80,7 @@ export class DojoApp extends HTMLElement {
   connectedCallback(): void {
     // Guarda de idempotencia: evita re-render al mover el elemento en el DOM
     if (this._shadow.childElementCount > 0) return;
+    this._boardViewMode = this._loadBoardViewPreference();
     this._render();
     this._autoSelectSingleBoard();
   }
@@ -291,6 +295,9 @@ export class DojoApp extends HTMLElement {
       dojo-kanban-board {
         height: 100%;
       }
+      dojo-list-view {
+        height: 100%;
+      }
       dojo-board-selector {
         height: 100%;
       }
@@ -323,6 +330,44 @@ export class DojoApp extends HTMLElement {
       :host([view="board"]) .back-btn { display: inline-flex; }
       :host([view="board"]) .header-actions { display: flex; }
       :host(:not([view="board"])) .header-actions { display: none; }
+
+      /* ── Toggle Tablero / Lista (US-33) ────────────────────────────── */
+      .view-toggle {
+        display: none;
+        align-items: center;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+      :host([view="board"]) .view-toggle { display: flex; }
+      .view-toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.3125rem 0.625rem;
+        background: transparent;
+        border: none;
+        color: var(--dojo-text-secondary);
+        font-size: 0.8125rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 0.14s, color 0.14s;
+        white-space: nowrap;
+      }
+      .view-toggle-btn.active {
+        background: var(--dojo-primary, #1D4ED8);
+        color: #fff;
+        font-weight: 600;
+      }
+      .view-toggle-btn:hover:not(.active) {
+        background: var(--dojo-bg);
+        color: var(--dojo-text-primary);
+      }
+      .view-toggle-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: -2px;
+      }
 
       /* Botón de ayuda — siempre visible (US-27) */
       .help-btn {
@@ -495,6 +540,35 @@ export class DojoApp extends HTMLElement {
       (wiki as any).show?.();
     });
 
+    // ── Toggle Tablero / Lista (US-33) ───────────────────────────────────
+    const viewToggle = document.createElement('div');
+    viewToggle.className = 'view-toggle';
+    viewToggle.setAttribute('role', 'group');
+    viewToggle.setAttribute('aria-label', 'Seleccionar modo de vista');
+
+    const kanbanViewBtn = document.createElement('button');
+    kanbanViewBtn.className = 'view-toggle-btn' + (this._boardViewMode === 'kanban' ? ' active' : '');
+    kanbanViewBtn.type = 'button';
+    kanbanViewBtn.dataset.mode = 'kanban';
+    kanbanViewBtn.setAttribute('aria-pressed', String(this._boardViewMode === 'kanban'));
+    kanbanViewBtn.setAttribute('aria-label', 'Vista tablero Kanban');
+    kanbanViewBtn.textContent = '📊 Tablero';
+
+    const listViewBtn = document.createElement('button');
+    listViewBtn.className = 'view-toggle-btn' + (this._boardViewMode === 'list' ? ' active' : '');
+    listViewBtn.type = 'button';
+    listViewBtn.dataset.mode = 'list';
+    listViewBtn.setAttribute('aria-pressed', String(this._boardViewMode === 'list'));
+    listViewBtn.setAttribute('aria-label', 'Vista lista de tareas');
+    listViewBtn.textContent = '📋 Lista';
+
+    kanbanViewBtn.addEventListener('click', () => this._setBoardViewMode('kanban'));
+    listViewBtn.addEventListener('click', () => this._setBoardViewMode('list'));
+
+    viewToggle.appendChild(kanbanViewBtn);
+    viewToggle.appendChild(listViewBtn);
+    appHeader.appendChild(viewToggle);
+
     appHeader.appendChild(headerActions);
     appHeader.appendChild(helpBtn);
     appHeader.appendChild(themeToggle);
@@ -513,6 +587,11 @@ export class DojoApp extends HTMLElement {
     const board = document.createElement('dojo-kanban-board');
     board.style.display = 'none';
     boardArea.appendChild(board);
+
+    // Vista lista (US-33)
+    const listView = document.createElement('dojo-list-view');
+    listView.style.display = 'none';
+    boardArea.appendChild(listView);
     this._shadow.appendChild(boardArea);
 
     // Escuchar selección de tablero (US-22)
@@ -645,13 +724,13 @@ export class DojoApp extends HTMLElement {
 
     const selector = this._shadow.querySelector('dojo-board-selector') as HTMLElement | null;
     const board    = this._shadow.querySelector('dojo-kanban-board') as HTMLElement | null;
+    const listView = this._shadow.querySelector('dojo-list-view') as HTMLElement | null;
     const palette  = this._shadow.querySelector('dojo-command-palette') as any;
+
     if (selector) selector.style.display = 'none';
-    if (board) {
-      board.style.display = '';
-      board.setAttribute('board-id', boardId);
-    }
     if (palette) palette.boardId = boardId;
+
+    this._applyBoardViewMode(boardId, board, listView);
   }
 
   private _showBoardSelector(): void {
@@ -660,7 +739,9 @@ export class DojoApp extends HTMLElement {
 
     const selector = this._shadow.querySelector('dojo-board-selector') as HTMLElement | null;
     const board    = this._shadow.querySelector('dojo-kanban-board') as HTMLElement | null;
-    if (board) board.style.display = 'none';
+    const listView = this._shadow.querySelector('dojo-list-view') as HTMLElement | null;
+    if (board)    board.style.display    = 'none';
+    if (listView) listView.style.display = 'none';
     if (selector) {
       selector.style.display = '';
       (selector as any).refresh?.();
@@ -740,6 +821,73 @@ export class DojoApp extends HTMLElement {
       const msg = err instanceof Error ? err.message : 'Error al importar';
       this._showToast(msg, true);
     }
+  }
+
+  // ── Vista Tablero / Lista (US-33) ──────────────────────────────────────
+
+  /** Carga la preferencia de vista desde localStorage. */
+  private _loadBoardViewPreference(): 'kanban' | 'list' {
+    try {
+      const stored = localStorage.getItem('dojo:board-view');
+      if (stored === 'list') return 'list';
+    } catch { /* sin acceso a localStorage */ }
+    return 'kanban';
+  }
+
+  /** Persiste la preferencia de vista en localStorage. */
+  private _saveBoardViewPreference(mode: 'kanban' | 'list'): void {
+    try {
+      localStorage.setItem('dojo:board-view', mode);
+    } catch { /* sin acceso a localStorage */ }
+  }
+
+  /** Actualiza el estado visual de los botones del toggle. */
+  private _updateViewToggleBtns(): void {
+    this._shadow.querySelectorAll<HTMLButtonElement>('.view-toggle-btn').forEach(btn => {
+      const isActive = btn.dataset.mode === this._boardViewMode;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+    });
+  }
+
+  /**
+   * Muestra la vista activa (kanban o lista) para el tablero dado.
+   * Oculta la vista inactiva.
+   */
+  private _applyBoardViewMode(
+    boardId: string,
+    board: HTMLElement | null,
+    listView: HTMLElement | null,
+  ): void {
+    if (this._boardViewMode === 'list') {
+      if (board)    board.style.display    = 'none';
+      if (listView) {
+        listView.style.display = '';
+        listView.setAttribute('board-id', boardId);
+      }
+    } else {
+      if (listView) listView.style.display = 'none';
+      if (board) {
+        board.style.display = '';
+        board.setAttribute('board-id', boardId);
+      }
+    }
+  }
+
+  /**
+   * Cambia el modo de vista del tablero y actualiza la UI.
+   * Persiste la preferencia en localStorage.
+   */
+  private _setBoardViewMode(mode: 'kanban' | 'list'): void {
+    if (this._boardViewMode === mode) return;
+    this._boardViewMode = mode;
+    this._saveBoardViewPreference(mode);
+    this._updateViewToggleBtns();
+
+    if (!this._activeBoardId) return; // sin tablero activo, nada que cambiar
+    const board    = this._shadow.querySelector('dojo-kanban-board') as HTMLElement | null;
+    const listView = this._shadow.querySelector('dojo-list-view') as HTMLElement | null;
+    this._applyBoardViewMode(this._activeBoardId, board, listView);
   }
 
   private _showToast(message: string, isError = false): void {
