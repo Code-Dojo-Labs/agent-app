@@ -11,7 +11,7 @@
  */
 
 import { openDatabase, idbRequest, idbTransaction } from './database.js';
-import type { Column, Task, Label, ActivityEvent, Board, Project } from '../types/models.js';
+import type { Column, Task, Label, ActivityEvent, Board, Project, Person } from '../types/models.js';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +31,7 @@ export interface BoardExport {
   activity?: ActivityEvent[];
   boards?: Board[];
   projects?: Project[];
+  persons?: Person[];
 }
 
 /** Resultado de la validación de un archivo importado. */
@@ -61,11 +62,13 @@ export async function exportBoardData(): Promise<BoardExport> {
   const hasActivity = allNames.contains('activity');
   const hasBoards   = allNames.contains('boards');
   const hasProjects = allNames.contains('projects');
+  const hasPersons  = allNames.contains('persons');
   const txStores = [
     ...storeNames,
     ...(hasActivity ? ['activity'] : []),
     ...(hasBoards   ? ['boards']   : []),
     ...(hasProjects ? ['projects'] : []),
+    ...(hasPersons  ? ['persons']  : []),
   ];
   const tx = db.transaction(txStores, 'readonly');
   const columns  = await idbRequest<Column[]>(tx.objectStore('columns').getAll());
@@ -80,6 +83,9 @@ export async function exportBoardData(): Promise<BoardExport> {
   const projects = hasProjects
     ? await idbRequest<Project[]>(tx.objectStore('projects').getAll())
     : [];
+  const persons = hasPersons
+    ? await idbRequest<Person[]>(tx.objectStore('persons').getAll())
+    : [];
 
   return {
     version:    CURRENT_VERSION,
@@ -90,6 +96,7 @@ export async function exportBoardData(): Promise<BoardExport> {
     activity:   activity.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     boards:     boards.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     projects:   projects.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    persons:    persons.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
   };
 }
 
@@ -179,6 +186,62 @@ export function validateImportData(raw: unknown): ValidateResult {
     }
   }
 
+  // activity (opcional)
+  let activity: ActivityEvent[] | undefined = undefined;
+  if (obj.activity !== undefined) {
+    if (!Array.isArray(obj.activity)) {
+      return { ok: false, message: 'La colección opcional "activity" tiene un formato inválido.' };
+    }
+    for (const evt of obj.activity) {
+      if (!_isValidActivityEvent(evt)) {
+        return { ok: false, message: 'Uno o más eventos de actividad tienen un formato inválido.' };
+      }
+    }
+    activity = obj.activity as ActivityEvent[];
+  }
+
+  // boards (opcional)
+  let boards: Board[] | undefined = undefined;
+  if (obj.boards !== undefined) {
+    if (!Array.isArray(obj.boards)) {
+      return { ok: false, message: 'La colección opcional "boards" tiene un formato inválido.' };
+    }
+    for (const board of obj.boards) {
+      if (!_isValidBoard(board)) {
+        return { ok: false, message: 'Uno o más tableros tienen un formato inválido.' };
+      }
+    }
+    boards = obj.boards as Board[];
+  }
+
+  // projects (opcional)
+  let projects: Project[] | undefined = undefined;
+  if (obj.projects !== undefined) {
+    if (!Array.isArray(obj.projects)) {
+      return { ok: false, message: 'La colección opcional "projects" tiene un formato inválido.' };
+    }
+    for (const project of obj.projects) {
+      if (!_isValidProject(project)) {
+        return { ok: false, message: 'Uno o más proyectos tienen un formato inválido.' };
+      }
+    }
+    projects = obj.projects as Project[];
+  }
+
+  // persons (opcional, US-29)
+  let persons: Person[] | undefined = undefined;
+  if (obj.persons !== undefined) {
+    if (!Array.isArray(obj.persons)) {
+      return { ok: false, message: 'La colección opcional "persons" tiene un formato inválido.' };
+    }
+    for (const person of obj.persons) {
+      if (!_isValidPerson(person)) {
+        return { ok: false, message: 'Una o más personas tienen un formato inválido.' };
+      }
+    }
+    persons = obj.persons as Person[];
+  }
+
   return {
     ok: true,
     data: {
@@ -187,6 +250,10 @@ export function validateImportData(raw: unknown): ValidateResult {
       columns:    obj.columns as Column[],
       tasks:      obj.tasks as Task[],
       labels:     obj.labels as Label[],
+      activity,
+      boards,
+      projects,
+      persons,
     },
   };
 }
@@ -202,54 +269,68 @@ export async function importBoardData(data: BoardExport): Promise<void> {
   const hasActivity = allNames.contains('activity');
   const hasBoards   = allNames.contains('boards');
   const hasProjects = allNames.contains('projects');
+  const hasPersons  = allNames.contains('persons');
   const storeNames = [
     'columns', 'tasks', 'labels',
     ...(hasActivity ? ['activity'] : []),
     ...(hasBoards   ? ['boards']   : []),
     ...(hasProjects ? ['projects'] : []),
+    ...(hasPersons  ? ['persons']  : []),
   ];
   const tx = db.transaction(storeNames, 'readwrite');
 
   const colStore   = tx.objectStore('columns');
   const taskStore  = tx.objectStore('tasks');
   const labelStore = tx.objectStore('labels');
+  let requestError: string | null = null;
+  const queueRequest = (req: IDBRequest<any>, context: string): void => {
+    req.onerror = () => {
+      if (requestError) return;
+      requestError = req.error?.message
+        ? `${context}: ${req.error.message}`
+        : context;
+    };
+  };
 
   // 1. Limpiar stores existentes
-  colStore.clear();
-  taskStore.clear();
-  labelStore.clear();
+  queueRequest(colStore.clear(), 'No se pudo limpiar columns');
+  queueRequest(taskStore.clear(), 'No se pudo limpiar tasks');
+  queueRequest(labelStore.clear(), 'No se pudo limpiar labels');
 
   // 2. Insertar datos importados
-  for (const col of data.columns)   colStore.add(col);
-  for (const task of data.tasks)    taskStore.add(task);
-  for (const label of data.labels)  labelStore.add(label);
+  for (const col of data.columns)   queueRequest(colStore.put(col), 'No se pudo insertar una columna');
+  for (const task of data.tasks)    queueRequest(taskStore.put(task), 'No se pudo insertar una tarea');
+  for (const label of data.labels)  queueRequest(labelStore.put(label), 'No se pudo insertar una etiqueta');
 
   // 3. Importar actividad si existe en el archivo y el store está disponible
   if (hasActivity) {
     const activityStore = tx.objectStore('activity');
-    activityStore.clear();
+    queueRequest(activityStore.clear(), 'No se pudo limpiar activity');
     if (data.activity) {
-      for (const evt of data.activity) activityStore.add(evt);
+      for (const evt of data.activity) queueRequest(activityStore.put(evt), 'No se pudo insertar un evento de actividad');
     }
   }
 
   // 4. Importar tableros si existen en el archivo y el store está disponible (US-22)
   if (hasBoards) {
     const boardStore = tx.objectStore('boards');
-    boardStore.clear();
+    queueRequest(boardStore.clear(), 'No se pudo limpiar boards');
     if (data.boards && data.boards.length > 0) {
-      for (const board of data.boards) boardStore.add(board);
+      for (const board of data.boards) queueRequest(boardStore.put(board), 'No se pudo insertar un tablero');
     } else {
       // Si no hay boards en los datos importados (export antiguo),
       // crear un tablero por defecto para las columnas/tareas importadas.
       const defaultId = crypto.randomUUID();
-      boardStore.add({ id: defaultId, name: 'Mi tablero', emoji: '🥋', createdAt: new Date().toISOString() });
+      queueRequest(
+        boardStore.put({ id: defaultId, name: 'Mi tablero', emoji: '🥋', createdAt: new Date().toISOString() }),
+        'No se pudo crear el tablero por defecto',
+      );
       // Asignar boardId a columnas y tareas que no lo tienen
       for (const col of data.columns) {
-        if (!col.boardId) colStore.put({ ...col, boardId: defaultId });
+        if (!col.boardId) queueRequest(colStore.put({ ...col, boardId: defaultId }), 'No se pudo actualizar boardId de una columna');
       }
       for (const task of data.tasks) {
-        if (!task.boardId) taskStore.put({ ...task, boardId: defaultId });
+        if (!task.boardId) queueRequest(taskStore.put({ ...task, boardId: defaultId }), 'No se pudo actualizar boardId de una tarea');
       }
     }
   }
@@ -257,25 +338,39 @@ export async function importBoardData(data: BoardExport): Promise<void> {
   // 5. Importar proyectos si existen en el archivo y el store está disponible (US-26)
   if (hasProjects) {
     const projectStore = tx.objectStore('projects');
-    projectStore.clear();
+    queueRequest(projectStore.clear(), 'No se pudo limpiar projects');
     if (data.projects && data.projects.length > 0) {
-      for (const project of data.projects) projectStore.add(project);
+      for (const project of data.projects) queueRequest(projectStore.put(project), 'No se pudo insertar un proyecto');
     } else {
       // Si no hay projects en los datos importados (export antiguo),
       // crear un proyecto General por defecto.
       const defaultProjId = crypto.randomUUID();
-      projectStore.add({
+      queueRequest(projectStore.put({
         id: defaultProjId,
         name: 'General',
         prefix: 'GEN',
         description: 'Proyecto por defecto para tareas sin proyecto asignado.',
         nextTaskNumber: 1,
         createdAt: new Date().toISOString(),
-      });
+      }), 'No se pudo crear el proyecto por defecto');
     }
   }
 
-  await idbTransaction(tx);
+  // 6. Importar personas solo si el campo está explícitamente en el archivo (US-29).
+  // Si `data.persons` es undefined (export antiguo sin ese campo), no tocar el store
+  // para preservar las personas existentes y evitar referencias rotas en las tareas.
+  if (hasPersons && data.persons !== undefined) {
+    const personStore = tx.objectStore('persons');
+    queueRequest(personStore.clear(), 'No se pudo limpiar persons');
+    for (const person of data.persons) queueRequest(personStore.put(person), 'No se pudo insertar una persona');
+  }
+
+  try {
+    await idbTransaction(tx);
+  } catch (err) {
+    const txMessage = err instanceof Error ? err.message : 'Error desconocido de transacción.';
+    throw new Error(`Error al importar datos: ${requestError ?? txMessage}`);
+  }
 }
 
 // ── Helpers privados ───────────────────────────────────────────────────────
@@ -320,5 +415,53 @@ function _isValidLabel(obj: unknown): obj is Label {
     typeof l.id    === 'string' &&
     typeof l.name  === 'string' &&
     typeof l.color === 'string'
+  );
+}
+
+function _isValidActivityEvent(obj: unknown): obj is ActivityEvent {
+  if (obj === null || typeof obj !== 'object') return false;
+  const e = obj as Record<string, unknown>;
+  return (
+    typeof e.id        === 'string' &&
+    typeof e.taskId    === 'string' &&
+    typeof e.type      === 'string' &&
+    e.payload !== null &&
+    typeof e.payload   === 'object' &&
+    !Array.isArray(e.payload) &&
+    typeof e.createdAt === 'string'
+  );
+}
+
+function _isValidBoard(obj: unknown): obj is Board {
+  if (obj === null || typeof obj !== 'object') return false;
+  const b = obj as Record<string, unknown>;
+  return (
+    typeof b.id        === 'string' &&
+    typeof b.name      === 'string' &&
+    typeof b.createdAt === 'string'
+  );
+}
+
+function _isValidProject(obj: unknown): obj is Project {
+  if (obj === null || typeof obj !== 'object') return false;
+  const p = obj as Record<string, unknown>;
+  return (
+    typeof p.id             === 'string' &&
+    typeof p.name           === 'string' &&
+    typeof p.prefix         === 'string' &&
+    typeof p.description    === 'string' &&
+    typeof p.nextTaskNumber === 'number' &&
+    typeof p.createdAt      === 'string'
+  );
+}
+
+function _isValidPerson(obj: unknown): obj is Person {
+  if (obj === null || typeof obj !== 'object') return false;
+  const p = obj as Record<string, unknown>;
+  return (
+    typeof p.id        === 'string' &&
+    typeof p.name      === 'string' &&
+    typeof p.avatar    === 'string' &&
+    typeof p.createdAt === 'string'
   );
 }

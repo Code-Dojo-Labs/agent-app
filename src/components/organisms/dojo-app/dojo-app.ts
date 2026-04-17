@@ -728,8 +728,9 @@ export class DojoApp extends HTMLElement {
     try {
       await importBoardData(this._pendingImport);
       this._hideImportConfirm();
-      // Recargar el tablero completo para reflejar los nuevos datos
-      (board as any)._loadBoard?.();
+      // Navegar al selector para que el usuario vea todos los tableros importados
+      // y el board-selector se refresque correctamente con los nuevos datos.
+      this._showBoardSelector();
       // Invalidar caché de la paleta tras importar datos
       const palette = this._shadow.querySelector('dojo-command-palette') as any;
       palette?.invalidateCache?.();

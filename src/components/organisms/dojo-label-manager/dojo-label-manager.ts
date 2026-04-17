@@ -803,8 +803,6 @@ export class DojoLabelManager extends HTMLElement {
       saveBtn.disabled = true;
     };
 
-    // Ejecutar validación inicial (por si el color actual no cumple WCAG)
-    updateContrastWarning(pendingColor);
 
     // Mensaje de error
     const errorEl = document.createElement('p');
@@ -862,6 +860,8 @@ export class DojoLabelManager extends HTMLElement {
     actions.appendChild(cancelBtn);
     actions.appendChild(saveBtn);
     form.appendChild(actions);
+    // Ejecutar validación inicial (por si el color actual no cumple WCAG)
+    updateContrastWarning(pendingColor);
 
     return form;
   }
