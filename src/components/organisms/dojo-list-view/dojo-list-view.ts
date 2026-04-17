@@ -31,6 +31,7 @@ import { getAllLabels } from '../../../db/label.repository.js';
 import { getAllPersons } from '../../../db/person.repository.js';
 import { deleteActivitiesByTaskId } from '../../../db/activity.repository.js';
 import { getDueStatus, formatRelativeDate } from '../../../utils/date.js';
+import { pickTextColor } from '../../../utils/contrast.js';
 import '../dojo-task-detail/dojo-task-detail.js';
 import '../dojo-delete-confirm-dialog/dojo-delete-confirm-dialog.js';
 
@@ -98,9 +99,22 @@ export class DojoListView extends HTMLElement {
   }
 
   connectedCallback(): void {
+    // Guarda de idempotencia: evita re-render al mover el elemento en el DOM
+    if (this._shadow.childElementCount > 0) {
+      this._boardId = this.getAttribute('board-id') ?? '';
+      if (this._boardId) this._loadData();
+      return;
+    }
     this._boardId = this.getAttribute('board-id') ?? '';
     this._render();
     if (this._boardId) this._loadData();
+  }
+
+  disconnectedCallback(): void {
+    if (this._filterDebounceTimer !== null) {
+      clearTimeout(this._filterDebounceTimer);
+      this._filterDebounceTimer = null;
+    }
   }
 
   attributeChangedCallback(name: string, _old: string | null, newVal: string | null): void {
@@ -459,7 +473,6 @@ export class DojoListView extends HTMLElement {
         border-radius: 50%;
         background: var(--dojo-border);
         font-size: 0.8rem;
-        title: attr(title);
         border: 1px solid var(--dojo-surface);
         overflow: hidden;
       }
@@ -567,6 +580,19 @@ export class DojoListView extends HTMLElement {
         }
         .task-title-btn { max-width: 180px; }
       }
+
+      /* ── Accesibilidad: contenido solo para lectores de pantalla ── */
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
     `;
     this._shadow.appendChild(style);
 
@@ -583,6 +609,13 @@ export class DojoListView extends HTMLElement {
     // Diálogo de confirmación de eliminación (US-06)
     const deleteDialog = document.createElement('dojo-delete-confirm-dialog');
     this._shadow.appendChild(deleteDialog);
+
+    // Región aria-live para anunciar cambios de tabla a lectores de pantalla (WCAG 2.1 SC 4.1.3)
+    const liveRegion = document.createElement('div');
+    liveRegion.setAttribute('aria-live', 'polite');
+    liveRegion.setAttribute('aria-atomic', 'true');
+    liveRegion.className = 'sr-only';
+    this._shadow.appendChild(liveRegion);
 
     // Escuchar evento de campo actualizado (desde dojo-task-detail)
     this._shadow.addEventListener('dojo:task-field-updated', async (e: Event) => {
@@ -906,6 +939,7 @@ export class DojoListView extends HTMLElement {
       empty.appendChild(msg);
       container.appendChild(empty);
       this._insertMainContent(container);
+      this._updateLiveRegion(0);
       return;
     }
 
@@ -990,6 +1024,7 @@ export class DojoListView extends HTMLElement {
     table.appendChild(tbody);
     container.appendChild(table);
     this._insertMainContent(container);
+    this._updateLiveRegion(tasks.length);
   }
 
   private _buildTaskRow(task: Task): HTMLTableRowElement {
@@ -1103,7 +1138,7 @@ export class DojoListView extends HTMLElement {
       chip.className = 'label-chip';
       chip.textContent = lbl.name;
       chip.style.background = lbl.color ?? '#e5e7eb';
-      chip.style.color = this._pickTextColor(lbl.color ?? '#e5e7eb');
+      chip.style.color = pickTextColor(lbl.color ?? '#e5e7eb');
       labelsCell.appendChild(chip);
     }
 
@@ -1126,7 +1161,7 @@ export class DojoListView extends HTMLElement {
       avatar.className = 'assignee-avatar';
       avatar.setAttribute('title', person.name);
       avatar.setAttribute('aria-label', person.name);
-      avatar.textContent = (person as any).avatar ?? person.name.charAt(0).toUpperCase();
+      avatar.textContent = person.avatar ?? person.name.charAt(0).toUpperCase();
       assigneesCell.appendChild(avatar);
     }
 
@@ -1194,6 +1229,15 @@ export class DojoListView extends HTMLElement {
     }
   }
 
+  /** Actualiza la región aria-live con el conteo de tareas visibles. */
+  private _updateLiveRegion(count: number): void {
+    const live = this._shadow.querySelector<HTMLElement>('.sr-only[aria-live]');
+    if (!live) return;
+    live.textContent = count === 0
+      ? 'Sin resultados'
+      : `Mostrando ${count} tarea${count !== 1 ? 's' : ''}`;
+  }
+
   private _showLoading(): void {
     const container = document.createElement('div');
     container.className = 'state-container';
@@ -1233,17 +1277,8 @@ export class DojoListView extends HTMLElement {
     this._insertMainContent(box);
   }
 
-  // ── Utilidades ────────────────────────────────────────────────────────────
-
-  /** Devuelve #fff o #000 para maximizar contraste sobre el color dado. */
-  private _pickTextColor(hex: string): string {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return luminance > 0.5 ? '#000' : '#fff';
-  }
 }
+
 
 // ── Registro ──────────────────────────────────────────────────────────────
 
