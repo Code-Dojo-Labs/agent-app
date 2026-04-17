@@ -2,11 +2,12 @@
  * main.ts — Entry point de la aplicación Dojo Kanban.
  *
  * Responsabilidades:
- *   1. Inicializar la base de datos IndexedDB.
- *   2. Insertar columnas por defecto si es la primera ejecución.
- *   3. Insertar etiquetas por defecto si es la primera ejecución.
- *   4. Registrar todos los Web Components (Custom Elements).
- *   5. Montar el componente raíz <dojo-app> en el DOM.
+ *   1. Aplicar el tema (light/dark/system).
+ *   2. Abrir (o crear) la base de datos IndexedDB.
+ *   3. Seeds iniciales: etiquetas, proyecto y columnas por defecto (US-37).
+ *   4. Inicializar sincronización multi-pestaña (US-30).
+ *   5. Registrar todos los Web Components (Custom Elements).
+ *   6. Montar el componente raíz <dojo-app> en el DOM.
  *
  * Este archivo es el único módulo referenciado desde public/index.html:
  *   <script type="module" src="./main.js"></script>

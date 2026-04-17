@@ -80,9 +80,9 @@ export interface Column {
 /** Columnas por defecto que se insertan al inicializar la base de datos (US-37). */
 export const DEFAULT_COLUMNS: Omit<Column, 'id' | 'boardId'>[] = [
   { name: 'Backlog',      icon: '📋', order: 0, isDefault: true },
-  { name: 'Por hacer',    icon: '🔲', order: 1, isDefault: true },
-  { name: 'En progreso',  icon: '🔄', order: 2, isDefault: true },
-  { name: 'En revisión',  icon: '🔍', order: 3, isDefault: true },
+  { name: 'Por Hacer',    icon: '🔲', order: 1, isDefault: true },
+  { name: 'En Progreso',  icon: '🔄', order: 2, isDefault: true },
+  { name: 'En Revisión',  icon: '🔍', order: 3, isDefault: true },
   { name: 'Hecho',        icon: '✅', order: 4, isDefault: true },
   { name: 'Bloqueado',    icon: '🚫', order: 5, isDefault: true },
 ];
