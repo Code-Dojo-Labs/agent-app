@@ -15,6 +15,8 @@
 import { openDatabase } from './db/database.js';
 import { seedDefaultLabels } from './db/label.repository.js';
 import { seedDefaultProject } from './db/project.repository.js';
+import { getAllBoards } from './db/board.repository.js';
+import { seedDefaultColumns } from './db/column.repository.js';
 import { initTheme } from './utils/theme.js';
 import { initializeUISync } from './utils/ui-sync.js';
 
@@ -34,7 +36,12 @@ async function bootstrap(): Promise<void> {
     // 3b. Seed de proyecto por defecto "General" (US-26)
     await seedDefaultProject();
 
-    // 3c. Inicializar sincronización entre pestañas (US-30)
+    // 3c. Seed de columnas por defecto para tableros sin columnas (US-37)
+    //     Cubre: primer arranque y usuarios migrados que aún no tienen columnas.
+    const boards = await getAllBoards();
+    await Promise.all(boards.map(b => seedDefaultColumns(b.id)));
+
+    // 3d. Inicializar sincronización entre pestañas (US-30)
     initializeUISync();
 
     // 4. Registrar Web Components — US-01 Visualización del tablero Kanban

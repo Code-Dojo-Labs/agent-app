@@ -90,10 +90,14 @@ export async function deleteColumn(id: string): Promise<void> {
 }
 
 /**
- * Inserta las columnas por defecto para un tablero dado.
+ * Inserta las columnas por defecto para un tablero dado (US-37).
+ * Es idempotente: no inserta nada si el tablero ya tiene columnas.
  * @param boardId - ID del tablero al que pertenecerán las columnas.
  */
 export async function seedDefaultColumns(boardId: string): Promise<void> {
+  const existing = await getColumnsByBoard(boardId);
+  if (existing.length > 0) return;
+
   const { store, tx } = await getStore('columns', 'readwrite');
   for (const col of DEFAULT_COLUMNS) {
     store.add({ ...col, id: generateUUID(), boardId });
