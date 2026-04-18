@@ -43,6 +43,7 @@ export class DojoColumnDialog extends HTMLElement {
   private _mode: DialogMode = 'create';
   private _columnId = '';
   private _currentName = '';
+  private _currentWipLimit: number | null = null;
   private _otherColumns: Column[] = [];
 
   // B-1: referencia estable para poder añadir y quitar el listener
@@ -70,15 +71,17 @@ export class DojoColumnDialog extends HTMLElement {
     this._mode = 'create';
     this._columnId = '';
     this._currentName = '';
+    this._currentWipLimit = null;
     this._otherColumns = [];
     this._buildContent();
     this._open();
   }
 
-  openRename(columnId: string, currentName: string): void {
+  openRename(columnId: string, currentName: string, currentWipLimit?: number | null): void {
     this._mode = 'rename';
     this._columnId = columnId;
     this._currentName = currentName;
+    this._currentWipLimit = currentWipLimit ?? null;
     this._otherColumns = [];
     this._buildContent();
     this._open();
@@ -332,6 +335,10 @@ export class DojoColumnDialog extends HTMLElement {
     iconField.appendChild(iconGrid);
     container.appendChild(iconField);
 
+    // Campo límite WIP (US-32)
+    const wipField = this._buildWipField(null);
+    container.appendChild(wipField.container);
+
     // Acciones
     const actions = document.createElement('div');
     actions.className = 'actions';
@@ -347,9 +354,10 @@ export class DojoColumnDialog extends HTMLElement {
     confirmBtn.addEventListener('click', () => {
       const name = nameInput.value.trim();
       if (!name) { nameInput.focus(); return; }
+      const wipValue = wipField.getValue();
       this.dispatchEvent(new CustomEvent('dojo:dialog-create-column', {
         bubbles: true, composed: true,
-        detail: { name, icon: selectedIcon },
+        detail: { name, icon: selectedIcon, wipLimit: wipValue },
       }));
       this._close();
     });
@@ -385,6 +393,10 @@ export class DojoColumnDialog extends HTMLElement {
     nameField.appendChild(nameInput);
     container.appendChild(nameField);
 
+    // Campo límite WIP (US-32)
+    const wipField = this._buildWipField(this._currentWipLimit);
+    container.appendChild(wipField.container);
+
     const actions = document.createElement('div');
     actions.className = 'actions';
 
@@ -399,9 +411,10 @@ export class DojoColumnDialog extends HTMLElement {
     confirmBtn.addEventListener('click', () => {
       const name = nameInput.value.trim();
       if (!name) { nameInput.focus(); return; }
+      const wipValue = wipField.getValue();
       this.dispatchEvent(new CustomEvent('dojo:dialog-rename-column', {
         bubbles: true, composed: true,
-        detail: { columnId: this._columnId, name },
+        detail: { columnId: this._columnId, name, wipLimit: wipValue },
       }));
       this._close();
     });
@@ -550,6 +563,43 @@ export class DojoColumnDialog extends HTMLElement {
   private _isOpen(): boolean {
     const backdrop = this._shadow.querySelector<HTMLElement>('.backdrop');
     return backdrop?.getAttribute('aria-hidden') === 'false';
+  }
+
+  // ── Campo reutilizable: Límite WIP (US-32) ────────────────────────────────
+
+  private _buildWipField(currentValue: number | null): { container: HTMLElement; getValue: () => number | null } {
+    const field = document.createElement('div');
+    field.className = 'field';
+    const lbl = document.createElement('label');
+    lbl.textContent = 'Límite WIP';
+    const inputId = `col-wip-input-${this._mode}`;
+    const hintId = `wip-hint-${this._mode}`;
+    lbl.setAttribute('for', inputId);
+    const input = document.createElement('input');
+    input.id = inputId;
+    input.type = 'number';
+    input.min = '1';
+    input.placeholder = 'Sin límite';
+    input.setAttribute('aria-describedby', hintId);
+    if (currentValue !== null && currentValue !== undefined) {
+      input.value = String(currentValue);
+    }
+    const hint = document.createElement('span');
+    hint.id = hintId;
+    hint.style.cssText = 'font-size:0.75rem;color:var(--dojo-text-secondary);';
+    hint.textContent = 'Máximo de tareas permitidas. Vacío = sin límite.';
+    field.appendChild(lbl);
+    field.appendChild(input);
+    field.appendChild(hint);
+    return {
+      container: field,
+      getValue: (): number | null => {
+        const v = input.value.trim();
+        if (!v) return null;
+        const n = parseInt(v, 10);
+        return Number.isFinite(n) && n >= 1 ? n : null;
+      },
+    };
   }
 }
 
