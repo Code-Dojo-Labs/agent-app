@@ -1675,14 +1675,20 @@ export class DojoKanbanBoard extends HTMLElement {
       `;
       continueBtn.textContent = 'Continuar';
 
-      const close = (result: boolean): void => {
-        backdrop.remove();
-        resolve(result);
-      };
-
       cancelBtn.addEventListener('click', () => close(false));
       continueBtn.addEventListener('click', () => close(true));
       backdrop.addEventListener('click', (ev) => { if (ev.target === backdrop) close(false); });
+
+      const onKeydown = (e: KeyboardEvent): void => {
+        if (e.key === 'Escape') close(false);
+      };
+      document.addEventListener('keydown', onKeydown);
+
+      const close = (result: boolean): void => {
+        document.removeEventListener('keydown', onKeydown);
+        backdrop.remove();
+        resolve(result);
+      };
 
       actions.appendChild(cancelBtn);
       actions.appendChild(continueBtn);

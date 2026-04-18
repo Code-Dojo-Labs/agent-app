@@ -572,18 +572,20 @@ export class DojoColumnDialog extends HTMLElement {
     field.className = 'field';
     const lbl = document.createElement('label');
     lbl.textContent = 'Límite WIP';
-    lbl.setAttribute('for', 'col-wip-input');
+    const inputId = `col-wip-input-${this._mode}`;
+    const hintId = `wip-hint-${this._mode}`;
+    lbl.setAttribute('for', inputId);
     const input = document.createElement('input');
-    input.id = 'col-wip-input';
+    input.id = inputId;
     input.type = 'number';
     input.min = '1';
     input.placeholder = 'Sin límite';
-    input.setAttribute('aria-describedby', 'wip-hint');
+    input.setAttribute('aria-describedby', hintId);
     if (currentValue !== null && currentValue !== undefined) {
       input.value = String(currentValue);
     }
     const hint = document.createElement('span');
-    hint.id = 'wip-hint';
+    hint.id = hintId;
     hint.style.cssText = 'font-size:0.75rem;color:var(--dojo-text-secondary);';
     hint.textContent = 'Máximo de tareas permitidas. Vacío = sin límite.';
     field.appendChild(lbl);
