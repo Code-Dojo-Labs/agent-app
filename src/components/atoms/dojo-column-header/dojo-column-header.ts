@@ -14,20 +14,21 @@
  * | count         | number | Número de tareas visibles                           |
  * | total-count   | number | Total de tareas (sin filtro). Si omitido = count    |
  * | accent-color  | string | Color hex de acento opcional (borde superior)       |
+ * | wip-limit     | number | Límite WIP de la columna (US-32). Omitido = sin lím |
  *
  * ## Eventos despachados
  * Ninguno en esta versión.
  *
  * ## CSS Custom Properties heredadas
  * --dojo-text-primary, --dojo-text-secondary, --dojo-surface, --dojo-border,
- * --dojo-radius, --dojo-bg
+ * --dojo-radius, --dojo-bg, --dojo-warning, --dojo-danger
  */
 
 export class DojoColumnHeader extends HTMLElement {
   static readonly TAG = 'dojo-column-header';
 
   static get observedAttributes(): string[] {
-    return ['icon', 'column-name', 'count', 'total-count', 'accent-color'];
+    return ['icon', 'column-name', 'count', 'total-count', 'accent-color', 'wip-limit'];
   }
 
   private _shadow: ShadowRoot;
@@ -55,11 +56,28 @@ export class DojoColumnHeader extends HTMLElement {
     return t !== null ? Number(t) : this._count;
   }
   private get _accentColor(): string | null { return this.getAttribute('accent-color'); }
+  private get _wipLimit(): number | null {
+    const v = this.getAttribute('wip-limit');
+    if (v === null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 1 ? n : null;
+  }
 
   // ── Render ───────────────────────────────────────────────────────────────
 
   private _render(): void {
     const hasFilter  = this._count !== this._totalCount;
+    const wipLimit   = this._wipLimit;
+    const totalTasks = this._totalCount;
+
+    // US-32: determinar estado WIP
+    let wipState: 'none' | 'normal' | 'warning' | 'exceeded' = 'none';
+    if (wipLimit !== null) {
+      if (totalTasks >= wipLimit)            wipState = 'exceeded';
+      else if (totalTasks >= wipLimit * 0.8) wipState = 'warning';
+      else                                    wipState = 'normal';
+    }
+
     const countLabel = hasFilter
       ? `${this._count} / ${this._totalCount}`
       : `${this._count}`;
@@ -116,6 +134,23 @@ export class DojoColumnHeader extends HTMLElement {
         color: var(--dojo-primary, #1D4ED8);
         border-color: var(--dojo-primary, #1D4ED8);
       }
+      /* US-32: estados WIP */
+      .badge[data-wip="warning"] {
+        color: var(--dojo-warning, #D97706);
+        border-color: var(--dojo-warning, #D97706);
+        background: color-mix(in srgb, var(--dojo-warning, #D97706) 10%, var(--dojo-bg));
+      }
+      .badge[data-wip="exceeded"] {
+        color: var(--dojo-danger, #DC2626);
+        border-color: var(--dojo-danger, #DC2626);
+        background: color-mix(in srgb, var(--dojo-danger, #DC2626) 10%, var(--dojo-bg));
+        font-weight: 700;
+      }
+      .wip-indicator {
+        font-size: 0.8125rem;
+        flex-shrink: 0;
+        cursor: default;
+      }
     `;
     this._shadow.appendChild(style);
 
@@ -137,15 +172,38 @@ export class DojoColumnHeader extends HTMLElement {
     const badge = document.createElement('span');
     badge.className = 'badge';
     badge.dataset.filtered = String(hasFilter);
-    badge.textContent = countLabel;
+    if (wipState !== 'none') badge.dataset.wip = wipState;
+    badge.textContent = wipLimit !== null
+      ? `${totalTasks} / ${wipLimit}`
+      : countLabel;
     badge.setAttribute('aria-label',
-      hasFilter
-        ? `${this._count} tareas visibles de ${this._totalCount} totales`
-        : `${this._count} tareas`
+      wipLimit !== null
+        ? `${totalTasks} de ${wipLimit} tareas (límite WIP)`
+        : hasFilter
+          ? `${this._count} tareas visibles de ${this._totalCount} totales`
+          : `${this._count} tareas`
     );
 
     header.appendChild(iconSpan);
     header.appendChild(nameSpan);
+
+    // US-32: indicador visual WIP
+    if (wipState === 'warning') {
+      const indicator = document.createElement('span');
+      indicator.className = 'wip-indicator';
+      indicator.textContent = '⚠️';
+      indicator.title = `Próximo al límite WIP (${totalTasks}/${wipLimit})`;
+      indicator.setAttribute('aria-label', `Advertencia: próximo al límite WIP`);
+      header.appendChild(indicator);
+    } else if (wipState === 'exceeded') {
+      const indicator = document.createElement('span');
+      indicator.className = 'wip-indicator';
+      indicator.textContent = '🔴';
+      indicator.title = `Límite WIP superado (${totalTasks}/${wipLimit})`;
+      indicator.setAttribute('aria-label', `Límite WIP superado`);
+      header.appendChild(indicator);
+    }
+
     header.appendChild(badge);
     this._shadow.appendChild(header);
   }

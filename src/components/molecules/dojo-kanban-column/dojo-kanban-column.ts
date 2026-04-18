@@ -41,7 +41,7 @@ export class DojoKanbanColumn extends HTMLElement {
   static readonly TAG = 'dojo-kanban-column';
 
   static get observedAttributes(): string[] {
-    return ['column-id', 'column-name', 'icon', 'count', 'total-count', 'accent-color'];
+    return ['column-id', 'column-name', 'icon', 'count', 'total-count', 'accent-color', 'wip-limit'];
   }
 
   private _shadow: ShadowRoot;
@@ -80,6 +80,7 @@ export class DojoKanbanColumn extends HTMLElement {
   private get _count(): string      { return this.getAttribute('count') ?? '0'; }
   private get _totalCount(): string { return this.getAttribute('total-count') ?? this._count; }
   private get _accentColor(): string | null { return this.getAttribute('accent-color'); }
+  private get _wipLimit(): string | null { return this.getAttribute('wip-limit'); }
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -182,6 +183,7 @@ export class DojoKanbanColumn extends HTMLElement {
     header.setAttribute('count', this._count);
     header.setAttribute('total-count', this._totalCount);
     if (this._accentColor) header.setAttribute('accent-color', this._accentColor);
+    if (this._wipLimit) header.setAttribute('wip-limit', this._wipLimit);
     headerRow.appendChild(header);
 
     const menu = document.createElement('dojo-column-menu');
@@ -249,6 +251,8 @@ export class DojoKanbanColumn extends HTMLElement {
     header.setAttribute('total-count', this._totalCount);
     if (this._accentColor) header.setAttribute('accent-color', this._accentColor);
     else header.removeAttribute('accent-color');
+    if (this._wipLimit) header.setAttribute('wip-limit', this._wipLimit);
+    else header.removeAttribute('wip-limit');
   }
 
   // ── Drag & Drop de columnas (reorder) ────────────────────────────────────

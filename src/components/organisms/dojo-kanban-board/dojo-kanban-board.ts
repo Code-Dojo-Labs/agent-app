@@ -980,6 +980,7 @@ export class DojoKanbanBoard extends HTMLElement {
       colEl.setAttribute('count', String(visible));
       colEl.setAttribute('total-count', String(total));
       if (col.color) colEl.setAttribute('accent-color', col.color);
+      if (col.wipLimit != null) colEl.setAttribute('wip-limit', String(col.wipLimit));
 
       // US-03: Renderizar tarjetas de tarea en la columna
       const tasks = this._tasksByColumn.get(col.id) ?? [];
@@ -1147,9 +1148,16 @@ export class DojoKanbanBoard extends HTMLElement {
           orderedIds.map((id, order) => ({ ...taskMap.get(id)!, order })),
         );
       } else {
+        // US-32: advertencia de límite WIP al mover entre columnas (bloqueo suave)
+        const targetCol = this._columns.find(c => c.id === targetColumnId);
+        const targetTasks = this._tasksByColumn.get(targetColumnId) ?? [];
+        if (targetCol?.wipLimit != null && targetTasks.length >= targetCol.wipLimit) {
+          const proceed = await this._showWipWarning(targetCol.name, targetTasks.length, targetCol.wipLimit);
+          if (!proceed) return;
+        }
+
         // ── Movimiento entre columnas ──────────────────────────────────────
         const sourceTasks = this._tasksByColumn.get(sourceColumnId) ?? [];
-        const targetTasks = this._tasksByColumn.get(targetColumnId) ?? [];
         const movedTask   = sourceTasks.find(t => t.id === taskId);
         if (!movedTask) return;
 
@@ -1248,7 +1256,7 @@ export class DojoKanbanBoard extends HTMLElement {
     const col = this._columns.find(c => c.id === columnId);
     if (!col) return;
     const dialog = this._getDialog() as any;
-    if (dialog?.openRename) dialog.openRename(col.id, col.name);
+    if (dialog?.openRename) dialog.openRename(col.id, col.name, col.wipLimit ?? null);
   }
 
   private _onColumnDeleteRequest(e: CustomEvent): void {
@@ -1261,12 +1269,12 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private async _handleCreate(e: CustomEvent): Promise<void> {
-    const { name, icon } = e.detail as { name: string; icon: string };
+    const { name, icon, wipLimit } = e.detail as { name: string; icon: string; wipLimit?: number | null };
     const nextOrder = this._columns.length > 0
       ? Math.max(...this._columns.map(c => c.order)) + 1
       : 0;
     try {
-      const newCol = await createColumn({ name, icon, order: nextOrder, boardId: this._boardId });
+      const newCol = await createColumn({ name, icon, order: nextOrder, boardId: this._boardId, wipLimit: wipLimit ?? undefined });
       this._columns.push(newCol);
       this._tasksByColumn.set(newCol.id, []);
       this._renderColumns(this._columns);
@@ -1276,14 +1284,18 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private async _handleRename(e: CustomEvent): Promise<void> {
-    const { columnId, name } = e.detail as { columnId: string; name: string };
+    const { columnId, name, wipLimit } = e.detail as { columnId: string; name: string; wipLimit?: number | null };
     try {
-      const updated = await updateColumn(columnId, { name });
+      const updated = await updateColumn(columnId, { name, wipLimit: wipLimit !== undefined ? wipLimit : undefined });
       const idx = this._columns.findIndex(c => c.id === columnId);
       if (idx !== -1) this._columns[idx] = updated;
-      // Actualizar solo el atributo del elemento del DOM
+      // Actualizar atributos del elemento del DOM
       const colEl = this._shadow.querySelector(`dojo-kanban-column[column-id="${columnId}"]`);
-      if (colEl) colEl.setAttribute('column-name', name);
+      if (colEl) {
+        colEl.setAttribute('column-name', name);
+        if (updated.wipLimit != null) colEl.setAttribute('wip-limit', String(updated.wipLimit));
+        else colEl.removeAttribute('wip-limit');
+      }
     } catch (err) {
       console.error('[dojo-kanban-board] Error al renombrar columna:', err);
     }
@@ -1377,6 +1389,14 @@ export class DojoKanbanBoard extends HTMLElement {
       return;
     }
     const tasks = this._tasksByColumn.get(statusId) ?? [];
+
+    // US-32: advertencia de límite WIP al crear tarea (bloqueo suave)
+    const targetCol = this._columns.find(c => c.id === statusId);
+    if (targetCol?.wipLimit != null && tasks.length >= targetCol.wipLimit) {
+      const proceed = await this._showWipWarning(targetCol.name, tasks.length, targetCol.wipLimit);
+      if (!proceed) return;
+    }
+
     try {
       // US-26: resolver proyecto y obtener taskNumber
       let resolvedProjectId = projectId || '';
@@ -1457,6 +1477,16 @@ export class DojoKanbanBoard extends HTMLElement {
     if (changes.statusId && !this._columns.some(c => c.id === changes.statusId)) {
       console.warn('[dojo-kanban-board] Intento de mover tarea a columna inexistente:', changes.statusId);
       return;
+    }
+
+    // US-32: advertencia de límite WIP al cambiar estado desde el panel de detalle
+    if (changes.statusId && changes.statusId !== sourceColumnId) {
+      const targetCol = this._columns.find(c => c.id === changes.statusId);
+      const targetTasks = this._tasksByColumn.get(changes.statusId) ?? [];
+      if (targetCol?.wipLimit != null && targetTasks.length >= targetCol.wipLimit) {
+        const proceed = await this._showWipWarning(targetCol.name, targetTasks.length, targetCol.wipLimit);
+        if (!proceed) return;
+      }
     }
 
     try {
@@ -1588,6 +1618,81 @@ export class DojoKanbanBoard extends HTMLElement {
     } catch (err) {
       console.error('[dojo-kanban-board] Error al eliminar tarea:', err);
     }
+  }
+
+  // ── Advertencia WIP (US-32) ─────────────────────────────────────────────
+
+  /**
+   * Muestra una advertencia de bloqueo suave cuando se supera el límite WIP.
+   * Retorna `true` si el usuario decide continuar, `false` para cancelar.
+   */
+  private _showWipWarning(columnName: string, currentCount: number, wipLimit: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.style.cssText = `
+        position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;
+        display:flex;align-items:center;justify-content:center;padding:1rem;
+      `;
+
+      const dialog = document.createElement('div');
+      dialog.style.cssText = `
+        background:var(--dojo-surface);border:1px solid var(--dojo-border);
+        border-radius:var(--dojo-radius);box-shadow:var(--dojo-shadow);
+        width:100%;max-width:380px;padding:1.25rem;display:flex;
+        flex-direction:column;gap:1rem;animation:dlg-in 0.18s ease;
+      `;
+      dialog.setAttribute('role', 'alertdialog');
+      dialog.setAttribute('aria-label', 'Límite WIP superado');
+
+      const warning = document.createElement('div');
+      warning.style.cssText = `
+        display:flex;align-items:flex-start;gap:0.5rem;padding:0.75rem;
+        background:color-mix(in srgb, var(--dojo-warning, #D97706) 10%, transparent);
+        border:1px solid color-mix(in srgb, var(--dojo-warning, #D97706) 30%, transparent);
+        border-radius:var(--dojo-radius-sm, 4px);font-size:0.875rem;
+        color:var(--dojo-text-primary);
+      `;
+      warning.textContent = `⚠️ La columna "${columnName}" ya tiene ${currentCount} tareas (límite: ${wipLimit}). ¿Deseas continuar de todos modos?`;
+
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex;justify-content:flex-end;gap:0.625rem;';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.style.cssText = `
+        padding:0.4375rem 1rem;border-radius:var(--dojo-radius-sm, 4px);
+        font-size:0.875rem;font-weight:500;cursor:pointer;
+        background:transparent;border:1px solid var(--dojo-border);
+        color:var(--dojo-text-secondary);font-family:inherit;
+      `;
+      cancelBtn.textContent = 'Cancelar';
+
+      const continueBtn = document.createElement('button');
+      continueBtn.style.cssText = `
+        padding:0.4375rem 1rem;border-radius:var(--dojo-radius-sm, 4px);
+        font-size:0.875rem;font-weight:500;cursor:pointer;
+        background:var(--dojo-warning, #D97706);border:1px solid transparent;
+        color:#fff;font-family:inherit;
+      `;
+      continueBtn.textContent = 'Continuar';
+
+      const close = (result: boolean): void => {
+        backdrop.remove();
+        resolve(result);
+      };
+
+      cancelBtn.addEventListener('click', () => close(false));
+      continueBtn.addEventListener('click', () => close(true));
+      backdrop.addEventListener('click', (ev) => { if (ev.target === backdrop) close(false); });
+
+      actions.appendChild(cancelBtn);
+      actions.appendChild(continueBtn);
+      dialog.appendChild(warning);
+      dialog.appendChild(actions);
+      backdrop.appendChild(dialog);
+      this._shadow.appendChild(backdrop);
+
+      setTimeout(() => continueBtn.focus(), 50);
+    });
   }
 }
 

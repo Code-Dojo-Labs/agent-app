@@ -75,6 +75,8 @@ export interface Column {
   color?: string;
   /** Indica que la columna fue creada por el seed inicial (US-37). No bloquea edición ni eliminación. */
   isDefault?: boolean;
+  /** Límite máximo de tareas (WIP). undefined/null = sin límite (US-32). */
+  wipLimit?: number | null;
 }
 
 /** Columnas por defecto que se insertan al inicializar la base de datos (US-37). */
