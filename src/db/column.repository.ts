@@ -90,15 +90,38 @@ export async function deleteColumn(id: string): Promise<void> {
 }
 
 /**
- * Inserta las columnas por defecto para un tablero dado.
+ * Inserta las columnas por defecto para un tablero dado (US-37).
+ * Es idempotente: la comprobación y la escritura ocurren en la misma
+ * transacción `readwrite` para evitar race conditions entre pestañas.
+ * Emite `column:created` por cada columna insertada (US-30).
  * @param boardId - ID del tablero al que pertenecerán las columnas.
  */
 export async function seedDefaultColumns(boardId: string): Promise<void> {
   const { store, tx } = await getStore('columns', 'readwrite');
-  for (const col of DEFAULT_COLUMNS) {
-    store.add({ ...col, id: generateUUID(), boardId });
+
+  // Comprobar existencia dentro de la misma transacción para evitar TOCTOU
+  const index    = store.index('by-board');
+  const existing = await idbRequest<Column[]>(index.getAll(boardId));
+  if (existing.length > 0) {
+    tx.abort();
+    return;
+  }
+
+  const newColumns: Column[] = DEFAULT_COLUMNS.map(col => ({
+    ...col,
+    id: generateUUID(),
+    boardId,
+  }));
+
+  for (const col of newColumns) {
+    store.add(col);
   }
   await idbTransaction(tx);
+
+  // Notificar a otras pestañas (US-30)
+  for (const col of newColumns) {
+    emitSync('column:created', col.id, col);
+  }
 }
 
 /**

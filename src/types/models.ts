@@ -73,16 +73,18 @@ export interface Column {
   order: number;
   /** Color de acento opcional en formato hexadecimal (ej. "#1D4ED8"). */
   color?: string;
+  /** Indica que la columna fue creada por el seed inicial (US-37). No bloquea edición ni eliminación. */
+  isDefault?: boolean;
 }
 
-/** Columnas por defecto que se insertan al inicializar la base de datos. */
+/** Columnas por defecto que se insertan al inicializar la base de datos (US-37). */
 export const DEFAULT_COLUMNS: Omit<Column, 'id' | 'boardId'>[] = [
-  { name: 'Backlog',      icon: '📋', order: 0 },
-  { name: 'Por hacer',    icon: '🔲', order: 1 },
-  { name: 'En progreso',  icon: '🔄', order: 2 },
-  { name: 'En revisión',  icon: '🔍', order: 3 },
-  { name: 'Hecho',        icon: '✅', order: 4 },
-  { name: 'Bloqueado',    icon: '🚫', order: 5 },
+  { name: 'Backlog',      icon: '📋', order: 0, isDefault: true },
+  { name: 'Por Hacer',    icon: '🔲', order: 1, isDefault: true },
+  { name: 'En Progreso',  icon: '🔄', order: 2, isDefault: true },
+  { name: 'En Revisión',  icon: '🔍', order: 3, isDefault: true },
+  { name: 'Hecho',        icon: '✅', order: 4, isDefault: true },
+  { name: 'Bloqueado',    icon: '🚫', order: 5, isDefault: true },
 ];
 
 // ── Board (US-22) ──────────────────────────────────────────────────────────
