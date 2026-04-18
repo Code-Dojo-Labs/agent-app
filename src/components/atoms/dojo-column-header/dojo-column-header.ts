@@ -188,19 +188,17 @@ export class DojoColumnHeader extends HTMLElement {
     header.appendChild(nameSpan);
 
     // US-32: indicador visual WIP
-    if (wipState === 'warning') {
+    const wipIndicators: Record<string, { icon: string; label: string; tooltip: string }> = {
+      warning:  { icon: '⚠️', label: 'Advertencia: próximo al límite WIP', tooltip: `Próximo al límite WIP (${totalTasks}/${wipLimit})` },
+      exceeded: { icon: '🔴', label: 'Límite WIP superado',                tooltip: `Límite WIP superado (${totalTasks}/${wipLimit})` },
+    };
+    const wipCfg = wipIndicators[wipState];
+    if (wipCfg) {
       const indicator = document.createElement('span');
       indicator.className = 'wip-indicator';
-      indicator.textContent = '⚠️';
-      indicator.title = `Próximo al límite WIP (${totalTasks}/${wipLimit})`;
-      indicator.setAttribute('aria-label', `Advertencia: próximo al límite WIP`);
-      header.appendChild(indicator);
-    } else if (wipState === 'exceeded') {
-      const indicator = document.createElement('span');
-      indicator.className = 'wip-indicator';
-      indicator.textContent = '🔴';
-      indicator.title = `Límite WIP superado (${totalTasks}/${wipLimit})`;
-      indicator.setAttribute('aria-label', `Límite WIP superado`);
+      indicator.textContent = wipCfg.icon;
+      indicator.title = wipCfg.tooltip;
+      indicator.setAttribute('aria-label', wipCfg.label);
       header.appendChild(indicator);
     }
 
