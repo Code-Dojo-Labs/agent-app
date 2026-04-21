@@ -49,6 +49,8 @@ export interface Task {
   updatedAt: string;
   /** Fecha de vencimiento en formato ISO 8601. Null/undefined = sin vencimiento (US-17). */
   dueDate?: string | null;
+  /** Indica si la tarea puede generar recordatorios de vencimiento (US-34). */
+  notifications?: boolean;
   /** Lista de subtareas (checklist). Puede estar vacía (US-21). */
   subtasks?: Subtask[];
   /** Lista de FK → Person.id asignadas a la tarea (US-29). */
