@@ -5,17 +5,18 @@
  * Toda la asincronía basada en eventos (IDBRequest) se encapsula en Promesas.
  *
  * Object Stores:
- *   - tasks    : keyPath = 'id'  | índices: by-status, by-priority, by-created, by-board, by-project
- *   - columns  : keyPath = 'id'  | índice: by-board
- *   - labels   : keyPath = 'id'  | índice: by-name (unique)
- *   - activity : keyPath = 'id'  | índice: by-taskId (US-20)
- *   - boards   : keyPath = 'id'  (US-22)
- *   - projects : keyPath = 'id'  | índice: by-prefix (unique) (US-26)
- *   - persons  : keyPath = 'id'  (US-29)
+ *   - tasks         : keyPath = 'id'  | índices: by-status, by-priority, by-created, by-board, by-project
+ *   - columns       : keyPath = 'id'  | índice: by-board
+ *   - labels        : keyPath = 'id'  | índice: by-name (unique)
+ *   - activity      : keyPath = 'id'  | índice: by-taskId (US-20)
+ *   - boards        : keyPath = 'id'  (US-22)
+ *   - projects      : keyPath = 'id'  | índice: by-prefix (unique) (US-26)
+ *   - persons       : keyPath = 'id'  (US-29)
+ *   - taskTemplates : keyPath = 'id'  (US-36)
  */
 
 const DB_NAME    = 'kanban-app-db';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 /** Instancia singleton de la base de datos (se inicializa una sola vez). */
 let _db: IDBDatabase | null = null;
@@ -225,7 +226,10 @@ export function openDatabase(): Promise<IDBDatabase> {
         };
       }
 
-      // if (oldVersion < 6) { ... }
+      // v5 → v6: templates de tareas (US-36)
+      if (oldVersion < 6) {
+        db.createObjectStore('taskTemplates', { keyPath: 'id' });
+      }
     };
   });
 

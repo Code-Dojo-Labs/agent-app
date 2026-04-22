@@ -1726,6 +1726,25 @@ export class DojoTaskDetail extends HTMLElement {
       } catch { /* ignorar fecha inválida */ }
     }
 
+    const notificationsRow = document.createElement('label');
+    notificationsRow.className = 'check-item';
+    notificationsRow.style.marginTop = '0.75rem';
+
+    const notificationsToggle = document.createElement('input');
+    notificationsToggle.type = 'checkbox';
+    notificationsToggle.checked = Boolean(task.dueDate && task.notifications !== false);
+    notificationsToggle.disabled = !task.dueDate;
+    notificationsToggle.setAttribute('aria-label', 'Activar recordatorios de vencimiento');
+    notificationsToggle.addEventListener('change', () => {
+      this._save({ notifications: notificationsToggle.checked });
+    });
+
+    const notificationsText = document.createElement('span');
+    notificationsText.textContent = 'Notificaciones de vencimiento';
+
+    notificationsRow.appendChild(notificationsToggle);
+    notificationsRow.appendChild(notificationsText);
+
     input.addEventListener('change', () => {
       let isoValue: string | null = null;
       if (input.value) {
@@ -1743,7 +1762,20 @@ export class DojoTaskDetail extends HTMLElement {
           }
         }
       }
-      this._save({ dueDate: isoValue });
+
+      if (isoValue) {
+        const shouldEnableNotifications = this._task?.dueDate
+          ? this._task.notifications !== false
+          : true;
+        notificationsToggle.disabled = false;
+        notificationsToggle.checked = shouldEnableNotifications;
+        this._save({ dueDate: isoValue, notifications: shouldEnableNotifications });
+        return;
+      }
+
+      notificationsToggle.checked = false;
+      notificationsToggle.disabled = true;
+      this._save({ dueDate: null, notifications: false });
     });
 
     const clearBtn = document.createElement('button');
@@ -1754,13 +1786,16 @@ export class DojoTaskDetail extends HTMLElement {
     clearBtn.style.flexShrink = '0';
     clearBtn.addEventListener('click', () => {
       input.value = '';
-      this._save({ dueDate: null });
+      notificationsToggle.checked = false;
+      notificationsToggle.disabled = true;
+      this._save({ dueDate: null, notifications: false });
     });
 
     row.appendChild(input);
     row.appendChild(clearBtn);
     section.appendChild(lbl);
     section.appendChild(row);
+    section.appendChild(notificationsRow);
     return section;
   }
 

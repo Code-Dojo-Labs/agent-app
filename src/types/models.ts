@@ -49,6 +49,8 @@ export interface Task {
   updatedAt: string;
   /** Fecha de vencimiento en formato ISO 8601. Null/undefined = sin vencimiento (US-17). */
   dueDate?: string | null;
+  /** Indica si la tarea puede generar recordatorios de vencimiento (US-34). */
+  notifications?: boolean;
   /** Lista de subtareas (checklist). Puede estar vacía (US-21). */
   subtasks?: Subtask[];
   /** Lista de FK → Person.id asignadas a la tarea (US-29). */
@@ -177,6 +179,26 @@ export interface ActivityEvent {
   /** Datos adicionales del evento (varían según el tipo). */
   payload: Record<string, unknown>;
   /** Fecha del evento en formato ISO 8601. */
+  createdAt: string;
+}
+
+// ── TaskTemplate (US-36) ──────────────────────────────────────────────────
+
+/** Plantilla reutilizable para pre-rellenar el formulario de creación de tareas. */
+export interface TaskTemplate {
+  /** UUID v4. */
+  id: string;
+  /** Nombre del template. Obligatorio. Máx. 60 caracteres. */
+  name: string;
+  /** Descripción en formato Markdown. Puede estar vacía. */
+  description?: string;
+  /** Prioridad por defecto. */
+  priority?: Priority;
+  /** Lista de FK → Label.id por defecto. */
+  labelIds?: string[];
+  /** Lista de FK → Person.id asignados por defecto. */
+  personIds?: string[];
+  /** Fecha de creación en formato ISO 8601. */
   createdAt: string;
 }
 

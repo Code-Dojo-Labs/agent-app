@@ -20,6 +20,7 @@ import { getAllBoards } from './db/board.repository.js';
 import { seedDefaultColumns } from './db/column.repository.js';
 import { initTheme } from './utils/theme.js';
 import { initializeUISync } from './utils/ui-sync.js';
+import { initializeTaskNotifications } from './utils/task-notifications.js';
 
 // ── Inicialización ─────────────────────────────────────────────────────────
 
@@ -44,6 +45,12 @@ async function bootstrap(): Promise<void> {
 
     // 3d. Inicializar sincronización entre pestañas (US-30)
     initializeUISync();
+
+    // 3e. Sincronizar recordatorios de vencimiento con el Service Worker (US-34)
+    //     No debe bloquear el arranque: el Service Worker puede registrarse más tarde.
+    void initializeTaskNotifications().catch((error) => {
+      console.error('[Dojo Kanban] Error al inicializar notificaciones de tareas:', error);
+    });
 
     // 4. Registrar Web Components — US-01 Visualización del tablero Kanban
     await import('./components/organisms/dojo-app/dojo-app.js');
