@@ -800,8 +800,14 @@ export class DojoTemplateManager extends HTMLElement {
     addBtn.type        = 'button';
     addBtn.textContent = '+ Persona';
     addBtn.addEventListener('click', () => {
-      const picker = this._shadow.querySelector<HTMLElement>('.persons-picker');
-      picker?.classList.toggle('open');
+      const picker = this._shadow.querySelector('.persons-picker') as (HTMLElement & { _closeOutside?: (e: MouseEvent) => void }) | null;
+      if (!picker) return;
+      const isOpen = picker.classList.toggle('open');
+      if (isOpen && picker._closeOutside) {
+        document.addEventListener('click', picker._closeOutside, { capture: true });
+      } else if (!isOpen && picker._closeOutside) {
+        document.removeEventListener('click', picker._closeOutside, { capture: true });
+      }
     });
     chips.appendChild(addBtn);
   }
@@ -809,6 +815,13 @@ export class DojoTemplateManager extends HTMLElement {
   private _buildPersonsPicker(chips: HTMLElement): HTMLElement {
     const picker = document.createElement('div');
     picker.className = 'persons-picker';
+    const closeOutside = (e: MouseEvent): void => {
+      if (!this._shadow.contains(e.target as Node)) {
+        picker.classList.remove('open');
+        document.removeEventListener('click', closeOutside, { capture: true });
+      }
+    };
+    (picker as unknown as { _closeOutside: (e: MouseEvent) => void })._closeOutside = closeOutside;
     for (const person of this._allPersons) {
       const opt = document.createElement('label');
       opt.className = 'person-option';
