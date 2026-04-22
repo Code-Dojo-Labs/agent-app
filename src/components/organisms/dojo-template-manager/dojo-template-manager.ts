@@ -324,6 +324,7 @@ export class DojoTemplateManager extends HTMLElement {
         cursor: pointer; font-family: inherit;
       }
       .add-person-btn:hover { border-color: var(--dojo-primary, #1D4ED8); color: var(--dojo-primary, #1D4ED8); }
+      .add-person-btn:focus-visible { outline: 2px solid var(--dojo-primary, #1D4ED8); outline-offset: 2px; }
       .persons-picker {
         border: 1px solid var(--dojo-border); border-radius: var(--dojo-radius-sm, 4px);
         background: var(--dojo-surface); box-shadow: var(--dojo-shadow);
@@ -476,11 +477,12 @@ export class DojoTemplateManager extends HTMLElement {
     // Confirm delete inline
     const confirmEl = document.createElement('div');
     confirmEl.className = 'delete-confirm';
-    confirmEl.setAttribute('role', 'status');
+    confirmEl.setAttribute('role', 'alert');
+    confirmEl.setAttribute('aria-atomic', 'true');
 
     const confirmText = document.createElement('span');
     confirmText.className   = 'delete-confirm-text';
-    confirmText.textContent = `¿Eliminar "${tpl.name}"?`;
+    // El texto se asigna en _showDeleteConfirm para que la live region lo anuncie
 
     const cancelDelBtn = document.createElement('button');
     cancelDelBtn.className  = 'btn btn-ghost';
@@ -516,8 +518,12 @@ export class DojoTemplateManager extends HTMLElement {
   private _showDeleteConfirm(tpl: TaskTemplate, item: HTMLElement): void {
     item.querySelector<HTMLElement>('.template-item-info')!.hidden = true;
     item.querySelector<HTMLElement>('.template-item-actions')!.hidden = true;
-    item.querySelector<HTMLElement>('.delete-confirm')!.classList.add('visible');
-    item.querySelector<HTMLElement>('.btn-danger')?.focus();
+    const confirmEl = item.querySelector<HTMLElement>('.delete-confirm')!;
+    // Inyectar el texto aquí para que role="alert" lo detecte como cambio y lo anuncie
+    confirmEl.querySelector<HTMLElement>('.delete-confirm-text')!.textContent =
+      `¿Eliminar "${tpl.name}"?`;
+    confirmEl.classList.add('visible');
+    confirmEl.querySelector<HTMLElement>('.btn-danger')?.focus();
   }
 
   private async _handleDelete(id: string): Promise<void> {
@@ -624,7 +630,7 @@ export class DojoTemplateManager extends HTMLElement {
     // Campo: etiquetas
     const labelsField = document.createElement('div');
     labelsField.className = 'field';
-    const labelsLbl = document.createElement('label');
+    const labelsLbl = document.createElement('span');
     labelsLbl.textContent = 'Etiquetas por defecto';
     labelsField.appendChild(labelsLbl);
     const labelsChips = this._buildLabelsChips();
@@ -635,7 +641,7 @@ export class DojoTemplateManager extends HTMLElement {
     // Campo: personas
     const personsField = document.createElement('div');
     personsField.className = 'field';
-    const personsLbl = document.createElement('label');
+    const personsLbl = document.createElement('span');
     personsLbl.textContent = 'Asignados por defecto';
     personsField.appendChild(personsLbl);
     const personsChips = this._buildPersonsChips();
