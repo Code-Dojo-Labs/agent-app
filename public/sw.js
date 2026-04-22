@@ -4,7 +4,7 @@
 
 const CACHE_VERSION = 'v2';
 const CACHE_NAME = `dojo-kanban-${CACHE_VERSION}`;
-const NOTIFICATION_CACHE_NAME = 'dojo-task-notifications-v1';
+const NOTIFICATION_CACHE_NAME = `dojo-task-notifications-${CACHE_VERSION}`;
 const NOTIFICATION_TASKS_URL = new URL('./__dojo_notification_tasks__', self.location.origin).toString();
 const NOTIFICATION_STATE_URL = new URL('./__dojo_notification_state__', self.location.origin).toString();
 
