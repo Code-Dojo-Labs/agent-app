@@ -4,7 +4,7 @@
   "description": "Kanban To-Do List — Zero Dependencies, Web APIs nativas",
   "type": "module",
   "scripts": {
-    "build": "tsc && cp public/index.html dist/index.html && cp public/manifest.json dist/manifest.json && cp public/sw.js dist/sw.js && mkdir -p dist/icons && cp -r public/icons/. dist/icons/",
+    "build": "tsc && cp public/index.html dist/index.html && cp public/manifest.json dist/manifest.json && mkdir -p dist/icons && cp -r public/icons/. dist/icons/ && sed \"s/CACHE_VERSION = 'v[^']*'/CACHE_VERSION = 'v$(date +%Y%m%d%H%M%S)'/\" public/sw.js > dist/sw.js",
     "watch": "tsc --watch",
     "serve": "python3 -m http.server 3000 --directory dist",
     "dev": "tsc --watch & python3 -m http.server 3000 --directory dist"

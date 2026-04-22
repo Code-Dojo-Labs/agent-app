@@ -2,7 +2,7 @@
 // Estrategia: Cache First con Network Fallback (US-31 PWA)
 // https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `dojo-kanban-${CACHE_VERSION}`;
 const NOTIFICATION_CACHE_NAME = 'dojo-task-notifications-v1';
 const NOTIFICATION_TASKS_URL = new URL('./__dojo_notification_tasks__', self.location.origin).toString();
