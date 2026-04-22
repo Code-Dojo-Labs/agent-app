@@ -3283,3 +3283,12 @@ interface PersonManagerState {
 | PR creado y reviewed | ✅ #67 con Copilot review |
 
 **Conclusión:** US-29 representa un caso exitoso de desarrollo colaborativo entre IA especializada y validación humana, demostrando la efectividad del modelo "Trinidad de Agentes" para entregar funcionalidad cobpleja y robusta en iteraciones cortas.
+
+##  Agregando un diseñador 
+
+### regla para builder 
+6. **Designer:** Antes de crear cualquier interfaz, lee el archivo DESIGN.md. No inventes colores ni espaciados; usa exclusivamente los definidos por el @Designer."
+
+### Posible prompt
+
+"@Builder y @Designer, actualicen toda la UI para seguir el nuevo DESIGN.md".
