@@ -186,6 +186,8 @@ export class DojoApp extends HTMLElement {
         align-items: center;
         gap: 0.5rem;
         margin-left: auto;
+        flex-shrink: 0;
+        overflow-x: auto;
       }
       .import-input { display: none; }
 
@@ -551,7 +553,13 @@ export class DojoApp extends HTMLElement {
     manageTemplateBtn.type = 'button';
     manageTemplateBtn.setAttribute('aria-label', 'Gestionar templates de tareas');
     manageTemplateBtn.setAttribute('title', 'Templates de tareas');
-    manageTemplateBtn.textContent = '📋';
+    const templateBtnIcon = document.createElement('span');
+    templateBtnIcon.setAttribute('aria-hidden', 'true');
+    templateBtnIcon.textContent = '📋';
+    const templateBtnText = document.createElement('span');
+    templateBtnText.textContent = 'Templates';
+    manageTemplateBtn.appendChild(templateBtnIcon);
+    manageTemplateBtn.appendChild(templateBtnText);
     manageTemplateBtn.addEventListener('click', () => {
       (templateMgr as any).open();
     });
