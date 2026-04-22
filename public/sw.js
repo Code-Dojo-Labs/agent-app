@@ -62,7 +62,8 @@ async function getStoredNotificationState() {
 }
 
 function getNotificationStageKeys(task) {
-  return [`${task.id}:24h`, `${task.id}:due`];
+  const duePart = task.dueDate ? `:${task.dueDate}` : '';
+  return [`${task.id}${duePart}:24h`, `${task.id}${duePart}:due`];
 }
 
 function pruneNotificationState(tasks, state) {
@@ -84,8 +85,7 @@ function getPendingNotificationTriggers(tasks, state, now) {
     if (Number.isNaN(dueAt)) continue;
 
     const reminderAt = dueAt - (24 * 60 * 60 * 1000);
-    const reminderKey = `${task.id}:24h`;
-    const dueKey = `${task.id}:due`;
+    const [reminderKey, dueKey] = getNotificationStageKeys(task);
 
     if (!state.sent[reminderKey] && reminderAt > now) {
       pending.push(reminderAt);
@@ -113,7 +113,8 @@ async function scheduleNotificationCheck() {
   if (pendingTriggers.length === 0) return;
 
   const nextTrigger = Math.min(...pendingTriggers);
-  const delay = Math.max(nextTrigger - Date.now(), 0);
+  const MAX_TIMEOUT_MS = 60 * 60 * 1000; // 1 hora máx para evitar overflow en setTimeout
+  const delay = Math.min(Math.max(nextTrigger - Date.now(), 0), MAX_TIMEOUT_MS);
 
   notificationTimer = setTimeout(() => {
     notificationTimer = null;
@@ -150,6 +151,8 @@ function buildNotificationPayload(task, stage) {
 }
 
 async function checkDueNotifications() {
+  if (Notification.permission !== 'granted') return;
+
   const [tasks, rawState] = await Promise.all([
     getStoredNotificationTasks(),
     getStoredNotificationState(),
@@ -163,8 +166,7 @@ async function checkDueNotifications() {
     if (Number.isNaN(dueAt)) continue;
 
     const reminderAt = dueAt - (24 * 60 * 60 * 1000);
-    const reminderKey = `${task.id}:24h`;
-    const dueKey = `${task.id}:due`;
+    const [reminderKey, dueKey] = getNotificationStageKeys(task);
 
     if (now < dueAt && now >= reminderAt && !state.sent[reminderKey]) {
       const payload = buildNotificationPayload(task, '24h');

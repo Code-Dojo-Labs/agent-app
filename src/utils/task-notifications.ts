@@ -17,7 +17,17 @@ export interface NotificationTaskSummary {
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function canUseSessionStorage(): boolean {
-  return typeof sessionStorage !== 'undefined';
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const storage = window.sessionStorage;
+    const testKey = `${SESSION_PROMPT_DISMISSED_KEY}:probe`;
+    storage.setItem(testKey, '1');
+    storage.removeItem(testKey);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isNotifiableTask(task: Task): task is Task & { dueDate: string } {

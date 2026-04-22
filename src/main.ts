@@ -47,7 +47,10 @@ async function bootstrap(): Promise<void> {
     initializeUISync();
 
     // 3e. Sincronizar recordatorios de vencimiento con el Service Worker (US-34)
-    await initializeTaskNotifications();
+    //     No debe bloquear el arranque: el Service Worker puede registrarse más tarde.
+    void initializeTaskNotifications().catch((error) => {
+      console.error('[Dojo Kanban] Error al inicializar notificaciones de tareas:', error);
+    });
 
     // 4. Registrar Web Components — US-01 Visualización del tablero Kanban
     await import('./components/organisms/dojo-app/dojo-app.js');
