@@ -550,13 +550,8 @@ export class DojoApp extends HTMLElement {
     manageTemplateBtn.className = 'header-btn';
     manageTemplateBtn.type = 'button';
     manageTemplateBtn.setAttribute('aria-label', 'Gestionar templates de tareas');
-    const templateBtnIcon = document.createElement('span');
-    templateBtnIcon.setAttribute('aria-hidden', 'true');
-    templateBtnIcon.textContent = '📋';
-    const templateBtnText = document.createElement('span');
-    templateBtnText.textContent = 'Templates';
-    manageTemplateBtn.appendChild(templateBtnIcon);
-    manageTemplateBtn.appendChild(templateBtnText);
+    manageTemplateBtn.setAttribute('title', 'Templates de tareas');
+    manageTemplateBtn.textContent = '📋';
     manageTemplateBtn.addEventListener('click', () => {
       (templateMgr as any).open();
     });

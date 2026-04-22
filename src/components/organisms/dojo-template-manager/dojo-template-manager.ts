@@ -130,18 +130,19 @@ export class DojoTemplateManager extends HTMLElement {
   private _render(): void {
     const style = document.createElement('style');
     style.textContent = `
-      :host { display: contents; }
+      :host { display: block; }
 
       .backdrop {
         position: fixed; inset: 0;
         background: rgba(0,0,0,0.45);
         z-index: 400;
         display: none;
+        pointer-events: none;
         align-items: center;
         justify-content: center;
         padding: 1rem;
       }
-      .backdrop[aria-hidden="false"] { display: flex; }
+      .backdrop[aria-hidden="false"] { display: flex; pointer-events: auto; }
 
       .panel {
         background: var(--dojo-surface);
