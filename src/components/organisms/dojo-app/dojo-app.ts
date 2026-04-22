@@ -561,7 +561,7 @@ export class DojoApp extends HTMLElement {
     manageTemplateBtn.appendChild(templateBtnIcon);
     manageTemplateBtn.appendChild(templateBtnText);
     manageTemplateBtn.addEventListener('click', () => {
-      (templateMgr as any).open();
+      (templateMgr as HTMLElement & { open(): void }).open();
     });
 
     // ── Botón Exportar (US-19) ──────────────────────────────────────────────
@@ -680,6 +680,9 @@ export class DojoApp extends HTMLElement {
     const notificationBanner = document.createElement('section');
     notificationBanner.className = 'notification-banner';
     notificationBanner.setAttribute('aria-label', 'Permiso de notificaciones');
+    notificationBanner.setAttribute('role', 'status');
+    notificationBanner.setAttribute('aria-live', 'polite');
+    notificationBanner.setAttribute('aria-atomic', 'true');
 
     const notificationCopy = document.createElement('div');
     notificationCopy.className = 'notification-banner-copy';

@@ -365,12 +365,13 @@ export class DojoTemplateManager extends HTMLElement {
     panel.className = 'panel';
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
-    panel.setAttribute('aria-label', 'Gestión de templates');
+    panel.setAttribute('aria-labelledby', 'tpl-manager-title');
 
     const header = document.createElement('div');
     header.className = 'panel-header';
 
     const title = document.createElement('h2');
+    title.id          = 'tpl-manager-title';
     title.className   = 'panel-title';
     title.textContent = 'Templates de tareas';
 
@@ -533,7 +534,7 @@ export class DojoTemplateManager extends HTMLElement {
   // ── Vista: formulario ────────────────────────────────────────────────────
 
   private _openForm(tpl?: TaskTemplate): void {
-    this._view      = tpl ? 'form' : 'form';
+    this._view      = 'form';
     this._editingId = tpl?.id ?? null;
     this._selectedLabelIds  = new Set(tpl?.labelIds ?? []);
     this._selectedPersonIds = new Set(tpl?.personIds ?? []);
@@ -710,8 +711,14 @@ export class DojoTemplateManager extends HTMLElement {
     addBtn.type        = 'button';
     addBtn.textContent = '+ Etiqueta';
     addBtn.addEventListener('click', () => {
-      const picker = this._shadow.querySelector<HTMLElement>('.labels-picker');
-      picker?.classList.toggle('open');
+      const picker = this._shadow.querySelector('.labels-picker') as (HTMLElement & { _closeOutside?: (e: MouseEvent) => void }) | null;
+      if (!picker) return;
+      const isOpen = picker.classList.toggle('open');
+      if (isOpen && picker._closeOutside) {
+        document.addEventListener('click', picker._closeOutside, { capture: true });
+      } else if (!isOpen && picker._closeOutside) {
+        document.removeEventListener('click', picker._closeOutside, { capture: true });
+      }
     });
     chips.appendChild(addBtn);
   }
@@ -745,9 +752,15 @@ export class DojoTemplateManager extends HTMLElement {
       empty.textContent   = 'No hay etiquetas disponibles.';
       picker.appendChild(empty);
     }
-    document.addEventListener('click', (e) => {
-      if (!this._shadow.contains(e.target as Node)) picker.classList.remove('open');
-    }, { capture: true });
+    // Almacenar el handler en el elemento para que el botón "+ Etiqueta" pueda
+    // registrarlo/desregistrarlo en cada toggle — evita acumular listeners en document.
+    const closeOutside = (e: MouseEvent): void => {
+      if (!this._shadow.contains(e.target as Node)) {
+        picker.classList.remove('open');
+        document.removeEventListener('click', closeOutside, { capture: true });
+      }
+    };
+    (picker as unknown as { _closeOutside: (e: MouseEvent) => void })._closeOutside = closeOutside;
     return picker;
   }
 
