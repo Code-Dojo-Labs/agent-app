@@ -539,7 +539,7 @@ export class DojoTemplateManager extends HTMLElement {
     this._selectedLabelIds  = new Set(tpl?.labelIds ?? []);
     this._selectedPersonIds = new Set(tpl?.personIds ?? []);
     this._buildContent();
-    this._shadow.querySelector<HTMLInputElement>('.field-name input')?.focus();
+    // El foco lo gestiona _buildForm mediante requestAnimationFrame
   }
 
   private _buildForm(body: HTMLElement): void {
@@ -575,6 +575,7 @@ export class DojoTemplateManager extends HTMLElement {
     const nameInput = document.createElement('input');
     nameInput.type        = 'text';
     nameInput.id          = 'tpl-name';
+    nameInput.setAttribute('aria-describedby', 'tpl-name-error');
     nameInput.maxLength   = 60;
     nameInput.placeholder = 'Ej. Bug Report, Feature Request…';
     nameInput.value       = editing?.name ?? '';
