@@ -182,6 +182,26 @@ export interface ActivityEvent {
   createdAt: string;
 }
 
+// ── TaskTemplate (US-36) ──────────────────────────────────────────────────
+
+/** Plantilla reutilizable para pre-rellenar el formulario de creación de tareas. */
+export interface TaskTemplate {
+  /** UUID v4. */
+  id: string;
+  /** Nombre del template. Obligatorio. Máx. 60 caracteres. */
+  name: string;
+  /** Descripción en formato Markdown. Puede estar vacía. */
+  description?: string;
+  /** Prioridad por defecto. */
+  priority?: Priority;
+  /** Lista de FK → Label.id por defecto. */
+  labelIds?: string[];
+  /** Lista de FK → Person.id asignados por defecto. */
+  personIds?: string[];
+  /** Fecha de creación en formato ISO 8601. */
+  createdAt: string;
+}
+
 // ── Person (US-29) ─────────────────────────────────────────────────────────
 
 /** Representa una persona del directorio local que puede asignarse a tareas. */
