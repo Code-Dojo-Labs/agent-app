@@ -25,6 +25,12 @@ import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 
 import type { Label } from '../../../types/models.js';
 import { getAllBoards } from '../../../db/board.repository.js';
+import { onMultipleSync } from '../../../utils/broadcast-sync.js';
+import {
+  dismissTaskNotificationPromptForSession,
+  requestTaskNotificationPermission,
+  shouldPromptForTaskNotifications,
+} from '../../../utils/task-notifications.js';
 import {
   exportBoardData,
   downloadBoardExport,
@@ -40,10 +46,12 @@ export class DojoApp extends HTMLElement {
   /** Datos pendientes de importación (tras validación, previo a confirmación). */
   private _pendingImport: import('../../../db/export-import.js').BoardExport | null = null;
   private _toastTimer: ReturnType<typeof setTimeout> | null = null;
+  private _notificationPromptCleanup: (() => void) | null = null;
   /** ID del tablero activo. Si es vacío, se muestra el selector de tableros (US-22). */
   private _activeBoardId = '';
   /** Modo de vista activo para el tablero: 'kanban' o 'list'. Persiste en localStorage (US-33). */
   private _boardViewMode: 'kanban' | 'list' = 'kanban';
+  private _pendingTaskLink: { boardId: string; taskId: string } | null = null;
 
   /** Referencia estable para poder eliminar el listener de teclado del diálogo de importación. */
   private _onImportKeydown = (e: KeyboardEvent): void => {
@@ -81,12 +89,23 @@ export class DojoApp extends HTMLElement {
     // Guarda de idempotencia: evita re-render al mover el elemento en el DOM
     if (this._shadow.childElementCount > 0) return;
     this._boardViewMode = this._loadBoardViewPreference();
+    this._pendingTaskLink = this._readPendingTaskLink();
+    if (this._pendingTaskLink) this._boardViewMode = 'kanban';
     this._render();
     this._autoSelectSingleBoard();
+    void this._refreshNotificationPrompt();
+    this._notificationPromptCleanup = onMultipleSync({
+      'task:created': () => void this._refreshNotificationPrompt(),
+      'task:updated': () => void this._refreshNotificationPrompt(),
+      'task:deleted': () => void this._refreshNotificationPrompt(),
+      'board:deleted': () => void this._refreshNotificationPrompt(),
+    });
   }
 
   disconnectedCallback(): void {
     document.removeEventListener('keydown', this._onImportKeydown);
+    this._notificationPromptCleanup?.();
+    this._notificationPromptCleanup = null;
   }
 
   private _render(): void {
@@ -168,6 +187,58 @@ export class DojoApp extends HTMLElement {
         margin-left: auto;
       }
       .import-input { display: none; }
+
+      .notification-banner {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.75rem 1.25rem;
+        background: color-mix(in srgb, var(--dojo-warning, #D97706) 14%, var(--dojo-surface));
+        border-bottom: 1px solid color-mix(in srgb, var(--dojo-warning, #D97706) 35%, var(--dojo-border));
+      }
+      .notification-banner.visible {
+        display: flex;
+      }
+      .notification-banner-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+      }
+      .notification-banner-title {
+        font-size: 0.875rem;
+        font-weight: 700;
+        color: var(--dojo-text-primary);
+      }
+      .notification-banner-text {
+        font-size: 0.8125rem;
+        color: var(--dojo-text-secondary);
+      }
+      .notification-banner-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-shrink: 0;
+      }
+      .notification-banner-btn {
+        padding: 0.4375rem 0.8rem;
+        border-radius: var(--dojo-radius-sm, 4px);
+        border: 1px solid var(--dojo-border);
+        background: transparent;
+        color: var(--dojo-text-primary);
+        font: inherit;
+        cursor: pointer;
+      }
+      .notification-banner-btn.primary {
+        background: var(--dojo-warning, #D97706);
+        border-color: transparent;
+        color: #fff;
+        font-weight: 700;
+      }
+      .notification-banner-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
 
       /* ── Diálogo de confirmación de importación ───────────────── */
       .import-backdrop {
@@ -394,6 +465,17 @@ export class DojoApp extends HTMLElement {
         outline: 2px solid var(--dojo-primary, #1D4ED8);
         outline-offset: 2px;
       }
+
+      @media (max-width: 767px) {
+        .notification-banner {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .notification-banner-actions {
+          width: 100%;
+          justify-content: flex-end;
+        }
+      }
     `;
     this._shadow.appendChild(style);
 
@@ -574,6 +656,46 @@ export class DojoApp extends HTMLElement {
     appHeader.appendChild(themeToggle);
     this._shadow.appendChild(appHeader);
 
+    const notificationBanner = document.createElement('section');
+    notificationBanner.className = 'notification-banner';
+    notificationBanner.setAttribute('aria-label', 'Permiso de notificaciones');
+
+    const notificationCopy = document.createElement('div');
+    notificationCopy.className = 'notification-banner-copy';
+    const notificationTitle = document.createElement('strong');
+    notificationTitle.className = 'notification-banner-title';
+    notificationTitle.textContent = 'Activa recordatorios de vencimiento';
+    const notificationText = document.createElement('span');
+    notificationText.className = 'notification-banner-text';
+    notificationText.textContent = 'La app puede avisarte 24 horas antes y al vencer una tarea, incluso si no tienes el tablero en primer plano.';
+    notificationCopy.appendChild(notificationTitle);
+    notificationCopy.appendChild(notificationText);
+
+    const notificationActions = document.createElement('div');
+    notificationActions.className = 'notification-banner-actions';
+    const dismissNotificationsBtn = document.createElement('button');
+    dismissNotificationsBtn.type = 'button';
+    dismissNotificationsBtn.className = 'notification-banner-btn';
+    dismissNotificationsBtn.textContent = 'Ahora no';
+    dismissNotificationsBtn.addEventListener('click', () => {
+      dismissTaskNotificationPromptForSession();
+      void this._refreshNotificationPrompt();
+    });
+
+    const allowNotificationsBtn = document.createElement('button');
+    allowNotificationsBtn.type = 'button';
+    allowNotificationsBtn.className = 'notification-banner-btn primary';
+    allowNotificationsBtn.textContent = 'Permitir';
+    allowNotificationsBtn.addEventListener('click', () => {
+      void this._handleNotificationPermissionRequest();
+    });
+
+    notificationActions.appendChild(dismissNotificationsBtn);
+    notificationActions.appendChild(allowNotificationsBtn);
+    notificationBanner.appendChild(notificationCopy);
+    notificationBanner.appendChild(notificationActions);
+    this._shadow.appendChild(notificationBanner);
+
     // ── Área del tablero ────────────────────────────────────────────────────────────────────
     const boardArea = document.createElement('main');
     boardArea.className = 'board-area';
@@ -638,7 +760,10 @@ export class DojoApp extends HTMLElement {
     };
     this._shadow.addEventListener('dojo:task-field-updated',   invalidatePalette);
     this._shadow.addEventListener('dojo:task-delete-confirm',  invalidatePalette);
-    this._shadow.addEventListener('dojo:board-ready',          invalidatePalette);
+    this._shadow.addEventListener('dojo:board-ready', () => {
+      invalidatePalette();
+      void this._openPendingTaskLink();
+    });
 
     // Cuando se crea/actualiza/elimina un proyecto, refrescar el tablero
     this._shadow.addEventListener('dojo:project-created', () => {
@@ -709,6 +834,11 @@ export class DojoApp extends HTMLElement {
    */
   private async _autoSelectSingleBoard(): Promise<void> {
     try {
+      if (this._pendingTaskLink?.boardId) {
+        this._navigateToBoard(this._pendingTaskLink.boardId);
+        return;
+      }
+
       const boards = await getAllBoards();
       if (boards.length === 1) {
         this._navigateToBoard(boards[0].id);
@@ -888,6 +1018,60 @@ export class DojoApp extends HTMLElement {
     const board    = this._shadow.querySelector('dojo-kanban-board') as HTMLElement | null;
     const listView = this._shadow.querySelector('dojo-list-view') as HTMLElement | null;
     this._applyBoardViewMode(this._activeBoardId, board, listView);
+  }
+
+  private _readPendingTaskLink(): { boardId: string; taskId: string } | null {
+    try {
+      const url = new URL(window.location.href);
+      const boardId = url.searchParams.get('boardId');
+      const taskId = url.searchParams.get('taskId');
+      if (!boardId || !taskId) return null;
+      return { boardId, taskId };
+    } catch {
+      return null;
+    }
+  }
+
+  private _clearPendingTaskLink(): void {
+    this._pendingTaskLink = null;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('boardId');
+      url.searchParams.delete('taskId');
+      window.history.replaceState({}, '', url);
+    } catch {
+      // Ignorar si el navegador no soporta URL/history como se espera.
+    }
+  }
+
+  private async _openPendingTaskLink(): Promise<void> {
+    if (!this._pendingTaskLink || this._activeBoardId !== this._pendingTaskLink.boardId) return;
+
+    const board = this._shadow.querySelector('dojo-kanban-board') as any;
+    if (!board?.openTaskById) return;
+
+    await board.openTaskById(this._pendingTaskLink.taskId);
+    this._clearPendingTaskLink();
+  }
+
+  private async _refreshNotificationPrompt(): Promise<void> {
+    const banner = this._shadow.querySelector<HTMLElement>('.notification-banner');
+    if (!banner) return;
+
+    const shouldPrompt = await shouldPromptForTaskNotifications();
+    banner.classList.toggle('visible', shouldPrompt);
+  }
+
+  private async _handleNotificationPermissionRequest(): Promise<void> {
+    const permission = await requestTaskNotificationPermission();
+
+    if (permission === 'granted') {
+      this._showToast('Notificaciones activadas para vencimientos.');
+    } else if (permission === 'denied') {
+      this._showToast('El navegador bloqueó las notificaciones para esta sesión.', true);
+    }
+
+    await this._refreshNotificationPrompt();
   }
 
   private _showToast(message: string, isError = false): void {

@@ -15,6 +15,18 @@ import type { Task, Priority } from '../types/models.js';
 type CreateTaskInput = Omit<Task, 'id' | 'createdAt' | 'updatedAt'>;
 type UpdateTaskInput = Partial<Omit<Task, 'id' | 'createdAt'>>;
 
+function normalizeTaskNotifications<T extends Pick<Task, 'dueDate' | 'notifications'>>(task: T): T {
+  if (!task.dueDate) {
+    return { ...task, notifications: false };
+  }
+
+  if (task.notifications === undefined) {
+    return { ...task, notifications: true };
+  }
+
+  return task;
+}
+
 // ── Implementación ─────────────────────────────────────────────────────────
 
 /** Devuelve todas las tareas almacenadas. */
@@ -55,7 +67,7 @@ export async function getTasksByPriority(priority: Priority): Promise<Task[]> {
 export async function createTask(input: CreateTaskInput): Promise<Task> {
   const now  = new Date().toISOString();
   const task: Task = {
-    ...input,
+    ...normalizeTaskNotifications(input),
     id:        generateUUID(),
     createdAt: now,
     updatedAt: now,
@@ -79,13 +91,13 @@ export async function updateTask(id: string, changes: UpdateTaskInput): Promise<
   const existing = await getTaskById(id);
   if (!existing) throw new Error(`Task not found: ${id}`);
 
-  const updated: Task = {
+  const updated: Task = normalizeTaskNotifications({
     ...existing,
     ...changes,
     id,                              // id nunca puede cambiar
     createdAt: existing.createdAt,   // createdAt nunca puede cambiar
     updatedAt: new Date().toISOString(),
-  };
+  });
 
   const { store, tx } = await getStore('tasks', 'readwrite');
   store.put(updated);
