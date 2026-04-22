@@ -1075,11 +1075,15 @@ export class DojoApp extends HTMLElement {
   private async _openPendingTaskLink(): Promise<void> {
     if (!this._pendingTaskLink || this._activeBoardId !== this._pendingTaskLink.boardId) return;
 
-    const board = this._shadow.querySelector('dojo-kanban-board') as any;
+    const board = this._shadow.querySelector('dojo-kanban-board') as
+      (HTMLElement & { openTaskById(id: string): Promise<void> }) | null;
     if (!board?.openTaskById) return;
 
-    await board.openTaskById(this._pendingTaskLink.taskId);
-    this._clearPendingTaskLink();
+    try {
+      await board.openTaskById(this._pendingTaskLink.taskId);
+    } finally {
+      this._clearPendingTaskLink();
+    }
   }
 
   private async _refreshNotificationPrompt(): Promise<void> {
@@ -1096,7 +1100,7 @@ export class DojoApp extends HTMLElement {
     if (permission === 'granted') {
       this._showToast('Notificaciones activadas para vencimientos.');
     } else if (permission === 'denied') {
-      this._showToast('El navegador bloqueó las notificaciones para esta sesión.', true);
+      this._showToast('El navegador bloqueó las notificaciones. Debes habilitarlas desde la configuración del navegador.', true);
     }
 
     await this._refreshNotificationPrompt();
