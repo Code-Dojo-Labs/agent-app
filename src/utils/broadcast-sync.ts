@@ -11,12 +11,13 @@
 // ── Tipos de eventos de sincronización ────────────────────────────────────
 
 export type SyncEventType =
-  | 'task:created'   | 'task:updated'   | 'task:deleted'   | 'task:reordered'
-  | 'column:created' | 'column:updated' | 'column:deleted'
-  | 'label:created'  | 'label:updated'  | 'label:deleted'
-  | 'board:created'  | 'board:updated'  | 'board:deleted'
-  | 'project:created'| 'project:updated'| 'project:deleted'
-  | 'person:created' | 'person:updated' | 'person:deleted';
+  | 'task:created'     | 'task:updated'     | 'task:deleted'     | 'task:reordered'
+  | 'column:created'   | 'column:updated'   | 'column:deleted'
+  | 'label:created'    | 'label:updated'    | 'label:deleted'
+  | 'board:created'    | 'board:updated'    | 'board:deleted'
+  | 'project:created'  | 'project:updated'  | 'project:deleted'
+  | 'person:created'   | 'person:updated'   | 'person:deleted'
+  | 'template:created' | 'template:updated' | 'template:deleted';
 
 export interface SyncEvent<T = unknown> {
   /** Tipo de evento de sincronización. */

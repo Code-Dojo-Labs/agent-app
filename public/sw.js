@@ -262,12 +262,12 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil((async () => {
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const client of clients) {
-      if ('focus' in client) {
-        await client.navigate(targetUrl.toString());
-        await client.focus();
-        return;
-      }
+    // Preferir tabs que ya muestran la app (mismo origen) sobre cualquier otra ventana
+    const appClients = clients.filter(c => c.url.startsWith(self.location.origin));
+    if (appClients.length > 0) {
+      await appClients[0].navigate(targetUrl.toString());
+      await appClients[0].focus();
+      return;
     }
 
     if (self.clients.openWindow) {

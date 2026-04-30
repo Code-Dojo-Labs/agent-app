@@ -20,6 +20,7 @@ import '../dojo-person-manager/dojo-person-manager.js';
 import '../dojo-command-palette/dojo-command-palette.js';
 import '../dojo-board-selector/dojo-board-selector.js';
 import '../dojo-list-view/dojo-list-view.js';
+import '../dojo-template-manager/dojo-template-manager.js';
 import '../../atoms/dojo-theme-toggle/dojo-theme-toggle.js';
 import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 
@@ -185,6 +186,8 @@ export class DojoApp extends HTMLElement {
         align-items: center;
         gap: 0.5rem;
         margin-left: auto;
+        flex-shrink: 0;
+        overflow-x: auto;
       }
       .import-input { display: none; }
 
@@ -544,6 +547,23 @@ export class DojoApp extends HTMLElement {
       (personMgr as any).show();
     });
 
+    // ── Botón Gestionar templates (US-36) ───────────────────────────────────
+    const manageTemplateBtn = document.createElement('button');
+    manageTemplateBtn.className = 'header-btn';
+    manageTemplateBtn.type = 'button';
+    manageTemplateBtn.setAttribute('aria-label', 'Gestionar templates de tareas');
+    manageTemplateBtn.setAttribute('title', 'Templates de tareas');
+    const templateBtnIcon = document.createElement('span');
+    templateBtnIcon.setAttribute('aria-hidden', 'true');
+    templateBtnIcon.textContent = '📋';
+    const templateBtnText = document.createElement('span');
+    templateBtnText.textContent = 'Templates';
+    manageTemplateBtn.appendChild(templateBtnIcon);
+    manageTemplateBtn.appendChild(templateBtnText);
+    manageTemplateBtn.addEventListener('click', () => {
+      (templateMgr as HTMLElement & { open(): void }).open();
+    });
+
     // ── Botón Exportar (US-19) ──────────────────────────────────────────────
     const exportBtn = document.createElement('button');
     exportBtn.className = 'header-btn';
@@ -589,6 +609,7 @@ export class DojoApp extends HTMLElement {
     headerActions.appendChild(manageLabelBtn);
     headerActions.appendChild(manageProjectBtn);
     headerActions.appendChild(managePersonBtn);
+    headerActions.appendChild(manageTemplateBtn);
     headerActions.appendChild(exportBtn);
     headerActions.appendChild(importBtn);
     headerActions.appendChild(importInput);
@@ -659,6 +680,9 @@ export class DojoApp extends HTMLElement {
     const notificationBanner = document.createElement('section');
     notificationBanner.className = 'notification-banner';
     notificationBanner.setAttribute('aria-label', 'Permiso de notificaciones');
+    notificationBanner.setAttribute('role', 'status');
+    notificationBanner.setAttribute('aria-live', 'polite');
+    notificationBanner.setAttribute('aria-atomic', 'true');
 
     const notificationCopy = document.createElement('div');
     notificationCopy.className = 'notification-banner-copy';
@@ -733,6 +757,10 @@ export class DojoApp extends HTMLElement {
     // ── Panel de gestión de personas (US-29) ─────────────────────────────────────────
     const personMgr = document.createElement('dojo-person-manager');
     this._shadow.appendChild(personMgr);
+
+    // ── Gestor de templates (US-36) ───────────────────────────────────────────────────
+    const templateMgr = document.createElement('dojo-template-manager');
+    this._shadow.appendChild(templateMgr);
 
     // ── Paleta de comandos (US-28) ───────────────────────────────────────────────────
     const palette = document.createElement('dojo-command-palette');
@@ -1047,11 +1075,15 @@ export class DojoApp extends HTMLElement {
   private async _openPendingTaskLink(): Promise<void> {
     if (!this._pendingTaskLink || this._activeBoardId !== this._pendingTaskLink.boardId) return;
 
-    const board = this._shadow.querySelector('dojo-kanban-board') as any;
+    const board = this._shadow.querySelector('dojo-kanban-board') as
+      (HTMLElement & { openTaskById(id: string): Promise<void> }) | null;
     if (!board?.openTaskById) return;
 
-    await board.openTaskById(this._pendingTaskLink.taskId);
-    this._clearPendingTaskLink();
+    try {
+      await board.openTaskById(this._pendingTaskLink.taskId);
+    } finally {
+      this._clearPendingTaskLink();
+    }
   }
 
   private async _refreshNotificationPrompt(): Promise<void> {
@@ -1068,7 +1100,7 @@ export class DojoApp extends HTMLElement {
     if (permission === 'granted') {
       this._showToast('Notificaciones activadas para vencimientos.');
     } else if (permission === 'denied') {
-      this._showToast('El navegador bloqueó las notificaciones para esta sesión.', true);
+      this._showToast('El navegador bloqueó las notificaciones. Debes habilitarlas desde la configuración del navegador.', true);
     }
 
     await this._refreshNotificationPrompt();

@@ -25,9 +25,11 @@
  */
 
 import type { Priority, Label, Project, Person } from '../../../types/models.js';
+import type { TaskTemplate } from '../../../types/models.js';
 import { getAllLabels, createLabel } from '../../../db/label.repository.js';
 import { getAllProjects } from '../../../db/project.repository.js';
 import { getAllPersons } from '../../../db/person.repository.js';
+import { getAllTemplates } from '../../../db/template.repository.js';
 import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 
 const PRIORITIES: { value: Priority; label: string }[] = [
@@ -52,6 +54,11 @@ export class DojoTaskDialog extends HTMLElement {
   // US-29: estado de personas asignadas
   private _allPersons: Person[] = [];
   private _selectedAssigneeIds: Set<string> = new Set();
+  // US-36: templates disponibles
+  private _allTemplates: TaskTemplate[] = [];
+  // Referencias a los re-render locales de chips (enlazadas en _buildForm, US-36)
+  private _rebuildLabelChips: () => void = () => { /* no-op hasta que _buildForm asigne */ };
+  private _rebuildAssigneeChips: () => void = () => { /* no-op hasta que _buildForm asigne */ };
   // US-28: título prellenado desde la paleta de comandos
   private _prefillTitle = '';
 
@@ -106,15 +113,17 @@ export class DojoTaskDialog extends HTMLElement {
     this._prefillTitle = prefillTitle;
     this._selectedLabelIds = new Set();
     this._selectedAssigneeIds = new Set();
-    // Cargar etiquetas (US-23), proyectos (US-26) y personas (US-29), luego construir el formulario
+    // Cargar etiquetas (US-23), proyectos (US-26), personas (US-29) y templates (US-36)
     Promise.all([
       getAllLabels().catch(() => [] as Label[]),
       getAllProjects().catch(() => [] as Project[]),
       getAllPersons().catch(() => [] as Person[]),
-    ]).then(([labels, projects, persons]) => {
-      this._allLabels = labels;
+      getAllTemplates().catch(() => [] as TaskTemplate[]),
+    ]).then(([labels, projects, persons, templates]) => {
+      this._allLabels   = labels;
       this._allProjects = projects;
-      this._allPersons = persons;
+      this._allPersons  = persons;
+      this._allTemplates = templates;
       this._buildForm();
       this._open();
     });
@@ -534,6 +543,39 @@ export class DojoTaskDialog extends HTMLElement {
         line-height: 1.4;
         margin: 0;
       }
+
+      /* ── Selector de template — US-36 ── */
+      .template-selector {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        padding: 0.625rem 0.875rem;
+        background: color-mix(in srgb, var(--dojo-primary, #1D4ED8) 6%, var(--dojo-surface));
+        border: 1px solid color-mix(in srgb, var(--dojo-primary, #1D4ED8) 20%, var(--dojo-border));
+        border-radius: var(--dojo-radius-sm, 4px);
+      }
+      .template-selector label {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--dojo-text-secondary);
+        white-space: nowrap;
+      }
+      .template-selector select {
+        flex: 1;
+        padding: 0.375rem 0.625rem;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.875rem;
+        color: var(--dojo-text-primary);
+        background: var(--dojo-bg);
+        font-family: inherit;
+        cursor: pointer;
+      }
+      .template-selector select:focus {
+        outline: none;
+        border-color: var(--dojo-primary, #1D4ED8);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dojo-primary, #1D4ED8) 20%, transparent);
+      }
     `;
     this._shadow.appendChild(style);
 
@@ -574,6 +616,61 @@ export class DojoTaskDialog extends HTMLElement {
     // textContent es seguro (no hay input del usuario aquí)
     subtitle.textContent = `En columna: ${this._columnName}`;
     dialog.appendChild(subtitle);
+
+    // ── Selector de template (US-36) — solo visible si hay templates ──────
+    if (this._allTemplates.length > 0) {
+      const tplSelector = document.createElement('div');
+      tplSelector.className = 'template-selector';
+
+      const tplLabel = document.createElement('label');
+      tplLabel.setAttribute('for', 'task-template-select');
+      tplLabel.textContent = '📋 Usar template:';
+
+      const tplSelect = document.createElement('select');
+      tplSelect.id = 'task-template-select';
+      tplSelect.setAttribute('aria-label', 'Seleccionar template para pre-rellenar el formulario');
+
+      const optNone = document.createElement('option');
+      optNone.value = '';
+      optNone.textContent = '— Sin template —';
+      tplSelect.appendChild(optNone);
+
+      for (const tpl of this._allTemplates) {
+        const opt = document.createElement('option');
+        opt.value       = tpl.id;
+        opt.textContent = tpl.name;
+        tplSelect.appendChild(opt);
+      }
+
+      tplSelect.addEventListener('change', () => {
+        const tpl = this._allTemplates.find(t => t.id === tplSelect.value);
+        if (!tpl) return;
+
+        // Pre-rellenar descripción
+        const descEl = this._shadow.querySelector<HTMLTextAreaElement>('#task-desc-input');
+        if (descEl && tpl.description) descEl.value = tpl.description;
+
+        // Pre-rellenar prioridad
+        const priEl = this._shadow.querySelector<HTMLSelectElement>('#task-priority-select');
+        if (priEl && tpl.priority) priEl.value = tpl.priority;
+
+        // Pre-rellenar etiquetas
+        if (tpl.labelIds?.length) {
+          this._selectedLabelIds = new Set(tpl.labelIds);
+          this._rebuildLabelChips();
+        }
+
+        // Pre-rellenar asignados
+        if (tpl.personIds?.length) {
+          this._selectedAssigneeIds = new Set(tpl.personIds);
+          this._rebuildAssigneeChips();
+        }
+      });
+
+      tplSelector.appendChild(tplLabel);
+      tplSelector.appendChild(tplSelect);
+      dialog.appendChild(tplSelector);
+    }
 
     // ── Cuerpo: dos columnas ──────────────────────────────────────────────
     const formBody = document.createElement('div');
@@ -852,6 +949,9 @@ export class DojoTaskDialog extends HTMLElement {
       });
       chips.appendChild(addBtn);
     };
+
+    // Enlazar para que el selector de template pueda invocarla (US-36)
+    this._rebuildLabelChips = renderChips;
 
     // ── Formulario inline de creación (US-23 + US-09 pattern) ─────────────
     const buildCreateForm = (name: string): HTMLElement => {
@@ -1198,6 +1298,9 @@ export class DojoTaskDialog extends HTMLElement {
         });
         assigneesChips.appendChild(addBtn);
       };
+
+      // Enlazar para que el selector de template pueda invocarla (US-36)
+      this._rebuildAssigneeChips = renderAssigneeChips;
 
       assigneesField.appendChild(assigneesChips);
 

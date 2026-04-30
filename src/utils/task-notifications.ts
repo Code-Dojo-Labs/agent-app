@@ -14,8 +14,6 @@ export interface NotificationTaskSummary {
   statusName: string;
 }
 
-let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-
 function canUseSessionStorage(): boolean {
   if (typeof window === 'undefined') return false;
 
@@ -101,6 +99,8 @@ export async function syncTaskNotifications(): Promise<void> {
 
 export async function initializeTaskNotifications(): Promise<() => void> {
   if (!canUseTaskNotifications()) return () => {};
+
+  let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   const scheduleSync = (): void => {
     if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
