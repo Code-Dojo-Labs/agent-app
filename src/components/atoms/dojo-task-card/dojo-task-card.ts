@@ -30,8 +30,7 @@
 
 import type { Label, Person } from '../../../types/models.js';
 import { getDueStatus, formatRelativeDate, type DueStatus } from '../../../utils/date.js';
-import '../dojo-avatar-group/dojo-avatar-group.js';
-import type { DojoAvatarGroup } from '../dojo-avatar-group/dojo-avatar-group.js';
+import { DojoAvatarGroup } from '../dojo-avatar-group/dojo-avatar-group.js';
 // US-13: texto de chips siempre #FFFFFF (todos los colores de paleta cumplen ≥ 4.5:1 con blanco)
 
 export class DojoTaskCard extends HTMLElement {
@@ -515,15 +514,13 @@ export class DojoTaskCard extends HTMLElement {
       const group = document.createElement('dojo-avatar-group') as DojoAvatarGroup;
       group.setAttribute('max', '3');
       group.setAttribute('size', 'sm');
-      // Pasamos personas al render; la propiedad JS se fija después del append
-      assigneesRow.appendChild(group);
-      this._shadow.appendChild(assigneesRow);
-
-      // Fijar la propiedad tras insertar en el DOM para que el render funcione
+      // Asignar datos antes de insertar en DOM — evita doble render
       group.persons = this._assignees.map(p => ({
         id: p.id,
         name: p.name,
       }));
+      assigneesRow.appendChild(group);
+      this._shadow.appendChild(assigneesRow);
     }
 
     // ── Identificador de proyecto (US-26) ──────────────────────────────────

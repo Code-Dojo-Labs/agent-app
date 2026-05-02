@@ -50,7 +50,9 @@ export class DojoAvatarGroup extends HTMLElement {
 
   set persons(value: PersonLike[]) {
     this._persons = value ?? [];
-    if (this.isConnected) this._render();
+    // El Shadow DOM está disponible desde el constructor, renderizar siempre.
+    // connectedCallback también llama a _render(), cubriendo el caso de montaje tardío.
+    this._render();
   }
 
   // ── Getters de atributos ─────────────────────────────────────────────────
@@ -111,6 +113,18 @@ export class DojoAvatarGroup extends HTMLElement {
         margin-right: 0;
       }
 
+      @media (prefers-reduced-motion: reduce) {
+        .group > * {
+          transition: none;
+        }
+        .group:hover > * {
+          margin-right: -${overlap}px;
+        }
+        .group:hover > *:last-child {
+          margin-right: 0;
+        }
+      }
+
       .badge {
         display: inline-flex;
         align-items: center;
@@ -141,11 +155,15 @@ export class DojoAvatarGroup extends HTMLElement {
 
     // Badge "+N" — al estar en row-reverse, va primero en el DOM
     if (remaining > 0) {
+      const hiddenNames = persons
+        .slice(max)
+        .map(p => p.name)
+        .join(', ');
       const badge = document.createElement('div');
       badge.className = 'badge';
       badge.textContent = `+${remaining}`;
-      badge.setAttribute('title', `${remaining} persona${remaining !== 1 ? 's' : ''} más`);
-      badge.setAttribute('aria-hidden', 'true');
+      badge.setAttribute('role', 'listitem');
+      badge.setAttribute('aria-label', `${remaining} más: ${hiddenNames}`);
       group.appendChild(badge);
     }
 

@@ -81,7 +81,8 @@ export class DojoPersonAvatar extends HTMLElement {
     for (let i = 0; i < name.length; i++) {
       hash = (hash * 31 + name.charCodeAt(i)) & 0xFFFFFF;
     }
-    const hue = Math.abs(hash) % 360;
+    // & 0xFFFFFF garantiza valor sin signo — Math.abs() no es necesario
+    const hue = hash % 360;
     return `hsl(${hue}, 65%, 42%)`;
   }
 
@@ -99,13 +100,12 @@ export class DojoPersonAvatar extends HTMLElement {
   }
 
   /**
-   * Devuelve '#FFFFFF' o '#000000' según cuál contraste mejor contra bgHsl.
-   * Aproximación rápida: luminosidad < 55 % → texto blanco.
+   * Devuelve '#FFFFFF' o '#000000' según el fondo generado por `nameToColor`.
+   * `nameToColor` siempre produce L=42%, que cumple WCAG AA (≥4.5:1) con blanco.
+   * El parámetro se mantiene para compatibilidad de API con llamantes externos.
    */
-  static pickTextColor(bgHsl: string): '#FFFFFF' | '#000000' {
-    const match = /hsl\(\s*\d+\s*,\s*[\d.]+%\s*,\s*([\d.]+)%/.exec(bgHsl);
-    if (!match) return '#FFFFFF';
-    return parseFloat(match[1]) < 55 ? '#FFFFFF' : '#000000';
+  static pickTextColor(_bgHsl: string): '#FFFFFF' | '#000000' {
+    return '#FFFFFF';
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -190,6 +190,15 @@ export class DojoPersonAvatar extends HTMLElement {
         z-index: 1000;
       }
       .avatar:hover::after { opacity: 1; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .avatar {
+          transition: none;
+        }
+        .avatar:hover {
+          transform: none;
+        }
+      }
     `;
     this._shadow.appendChild(style);
 

@@ -33,14 +33,6 @@ import { getAllPersons, createPerson, updatePerson, deletePerson } from '../../.
 import { getAllTasks } from '../../../db/task.repository.js';
 import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 
-// ── Emojis predeterminados para avatares ───────────────────────────────────
-const PRESET_AVATARS = [
-  '👤', '👨‍💻', '👩‍💻', '🧑‍💼', '👨‍🔬', '👩‍🔬', 
-  '🧑‍🎨', '👨‍🏫', '👩‍🏫', '🧑‍🔧', '👨‍⚕️', '👩‍⚕️',
-  '🧙‍♂️', '🧙‍♀️', '🥷', '🦸‍♂️', '🦸‍♀️', '🤖', 
-  '👽', '🐱', '🐶', '🦄', '🐧', '🦁',
-] as const;
-
 // ── Clase ──────────────────────────────────────────────────────────────────
 
 export class DojoPersonManager extends HTMLElement {
@@ -115,9 +107,10 @@ export class DojoPersonManager extends HTMLElement {
   }
 
   /** Maneja la creación de una nueva persona. */
-  private async _handleCreatePerson(name: string, avatar: string): Promise<void> {
+  private async _handleCreatePerson(name: string): Promise<void> {
     try {
-      const person = await createPerson({ name: name.trim(), avatar });
+      // El avatar se auto-genera desde el nombre en dojo-person-avatar (IMP-09)
+      const person = await createPerson({ name: name.trim(), avatar: '' });
 
       // Emitir evento de nivel aplicación
       this.dispatchEvent(new CustomEvent('dojo:person-created', {
@@ -133,9 +126,9 @@ export class DojoPersonManager extends HTMLElement {
   }
 
   /** Maneja la actualización de una persona existente. */
-  private async _handleUpdatePerson(id: string, name: string, avatar: string): Promise<void> {
+  private async _handleUpdatePerson(id: string, name: string): Promise<void> {
     try {
-      const person = await updatePerson(id, { name: name.trim(), avatar });
+      const person = await updatePerson(id, { name: name.trim(), avatar: '' });
 
       // Emitir evento de nivel aplicación
       this.dispatchEvent(new CustomEvent('dojo:person-updated', {
@@ -456,35 +449,7 @@ export class DojoPersonManager extends HTMLElement {
           gap: 4px;
         }
 
-        .action-btn {
-          padding: 4px 8px;
-          border: none;
-          border-radius: var(--dojo-radius-sm, 6px);
-          background: none;
-          color: var(--dojo-text-secondary, #6B7280);
-          cursor: pointer;
-          font-size: 12px;
-          transition: all 0.15s ease;
-        }
-
-        .action-btn:hover {
-          background: var(--dojo-bg, #F9FAFB);
-          color: var(--dojo-text-primary, #1F2937);
-        }
-
-        .confirm-delete {
-          background: #FEF2F2;
-          border: 1px solid #FCA5A5;
-          border-radius: var(--dojo-radius, 8px);
-          padding: 16px;
-          margin-bottom: 8px;
-        }
-
-        .confirm-delete p {
-          margin: 0 0 12px 0;
-          font-size: 14px;
-          color: #7F1D1D;
-        }
+        /* .avatar-grid eliminado en IMP-09 — avatar auto-generado del nombre */
 
         .confirm-delete-actions {
           display: flex;
@@ -509,9 +474,6 @@ export class DojoPersonManager extends HTMLElement {
             max-width: none;
           }
 
-          .avatar-grid {
-            grid-template-columns: repeat(4, 1fr);
-          }
         }
       </style>
 
@@ -533,13 +495,9 @@ export class DojoPersonManager extends HTMLElement {
               <label for="create-name">Nombre completo</label>
               <input type="text" id="create-name" class="form-input" 
                      placeholder="Ej. Ana García" maxlength="60">
-            </div>
-
-            <div class="form-group">
-              <label>Avatar</label>
-              <div class="avatar-grid" id="avatar-grid">
-                <!-- Avatares se generan dinámicamente -->
-              </div>
+              <p style="margin:6px 0 0;font-size:0.75rem;color:var(--dojo-text-secondary)">
+                El avatar se genera automáticamente a partir del nombre.
+              </p>
             </div>
 
             <button class="btn btn-primary" id="create-btn" disabled>
@@ -553,7 +511,6 @@ export class DojoPersonManager extends HTMLElement {
         </div>
       </div>
     `;
-    this._generateAvatarGrid();
     this._setupEventListeners();
   }
 
@@ -580,10 +537,8 @@ export class DojoPersonManager extends HTMLElement {
 
     const validateCreateForm = () => {
       const name = nameInput?.value.trim() || '';
-      const selectedAvatar = this._shadow.querySelector('.avatar-option.selected')?.textContent || '';
-      
       if (createBtn) {
-        createBtn.disabled = !name || !selectedAvatar;
+        createBtn.disabled = !name;
       }
     };
 
@@ -591,45 +546,11 @@ export class DojoPersonManager extends HTMLElement {
 
     createBtn?.addEventListener('click', async () => {
       const name = nameInput?.value.trim() || '';
-      const selectedAvatar = this._shadow.querySelector('.avatar-option.selected')?.textContent || '';
-      
-      if (name && selectedAvatar) {
-        await this._handleCreatePerson(name, selectedAvatar);
-        
-        // Limpiar form
+      if (name) {
+        await this._handleCreatePerson(name);
         if (nameInput) nameInput.value = '';
-        this._shadow.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('selected'));
         validateCreateForm();
       }
-    });
-  }
-
-  /** Genera la grilla de avatares predeterminados. */
-  private _generateAvatarGrid(): void {
-    const grid = this._shadow.querySelector('#avatar-grid');
-    if (!grid) return;
-
-    grid.innerHTML = '';
-
-    PRESET_AVATARS.forEach(avatar => {
-      const option = document.createElement('div');
-      option.className = 'avatar-option';
-      option.textContent = avatar;
-      option.addEventListener('click', () => {
-        // Deseleccionar otros
-        grid.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('selected'));
-        // Seleccionar este
-        option.classList.add('selected');
-        
-        // Validar form
-        const createBtn = this._shadow.querySelector<HTMLButtonElement>('#create-btn');
-        const nameInput = this._shadow.querySelector<HTMLInputElement>('#create-name');
-        if (createBtn && nameInput) {
-          createBtn.disabled = !nameInput.value.trim();
-        }
-      });
-      
-      grid.appendChild(option);
     });
   }
 
@@ -667,8 +588,6 @@ export class DojoPersonManager extends HTMLElement {
 
       if (isEditing) {
         // ── Formulario de edición inline ────────────────────────────────
-        const isPersonEmoji = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(person.avatar);
-
         const editForm = document.createElement('div');
         editForm.className = 'create-form';
         editForm.style.marginBottom = '8px';
@@ -691,28 +610,6 @@ export class DojoPersonManager extends HTMLElement {
         nameGroup.appendChild(nameInput);
         editForm.appendChild(nameGroup);
 
-        // Avatar grid
-        const avatarGroup = document.createElement('div');
-        avatarGroup.className = 'form-group';
-        const avatarLabel = document.createElement('label');
-        avatarLabel.textContent = 'Avatar';
-        avatarGroup.appendChild(avatarLabel);
-
-        const editAvatarGrid = document.createElement('div');
-        editAvatarGrid.className = 'avatar-grid';
-        PRESET_AVATARS.forEach(av => {
-          const opt = document.createElement('div');
-          opt.className = 'avatar-option' + (av === person.avatar ? ' selected' : '');
-          opt.textContent = av;
-          opt.addEventListener('click', () => {
-            editAvatarGrid.querySelectorAll('.avatar-option').forEach(el => el.classList.remove('selected'));
-            opt.classList.add('selected');
-          });
-          editAvatarGrid.appendChild(opt);
-        });
-        avatarGroup.appendChild(editAvatarGrid);
-        editForm.appendChild(avatarGroup);
-
         // Acciones
         const actions = document.createElement('div');
         actions.style.display = 'flex';
@@ -724,8 +621,7 @@ export class DojoPersonManager extends HTMLElement {
         saveBtn.addEventListener('click', async () => {
           const newName = nameInput.value.trim();
           if (!newName) { nameInput.focus(); return; }
-          const selectedAvatar = editAvatarGrid.querySelector<HTMLElement>('.avatar-option.selected')?.textContent || person.avatar;
-          await this._handleUpdatePerson(person.id, newName, selectedAvatar);
+          await this._handleUpdatePerson(person.id, newName);
         });
 
         const cancelEditBtn = document.createElement('button');
