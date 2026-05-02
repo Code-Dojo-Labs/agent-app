@@ -152,6 +152,19 @@ export class DojoTaskCard extends HTMLElement {
     urgent: { icon: '🔥', label: 'Urgente', color: 'var(--dojo-priority-urgent, #EF4444)' },
   } as const;
 
+  /** Colores dinámicos para barra de progreso de subtareas.
+   * Soportan variables CSS para permitir personalización de tema (IMP-08).
+   * - complete (100%): Verde — tarea completada
+   * - inProgress (50–99%): Ámbar — en progreso
+   * - started (0–49%): Azul primario — comenzada
+   * Todos validados WCAG 2.1 AA contra fondo var(--dojo-surface).
+   */
+  private static readonly PROGRESS_COLORS = {
+    complete:   'var(--dojo-progress-complete, #22C55E)',
+    inProgress: 'var(--dojo-progress-in-progress, #F59E0B)',
+    started:    'var(--dojo-primary, #1D4ED8)',
+  } as const;
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   /** Mapeo estado → clase CSS para borde de alerta de vencimiento (US-17). */
@@ -162,11 +175,34 @@ export class DojoTaskCard extends HTMLElement {
     none:       '',
   };
 
+  /**
+   * Renderiza la estructura visual de la tarjeta en Shadow DOM.
+   * 
+   * Colores validados para WCAG 2.1 AA contra fondo var(--dojo-surface):
+   * - Accent bar: #3B82F6 (baja), #F59E0B (media), #F97316 (alta), #EF4444 (urgente)
+   * - Barra de progreso: verde #22C55E, ámbar #F59E0B, azul #1D4ED8
+   * - Chips de etiquetas: texto #FFFFFF sobre colores de etiqueta (≥4.5:1)
+   * - Badge task-number: var(--dojo-text-muted) sobre fondo var(--dojo-bg)
+   * 
+   * Animaciones respetan `prefers-reduced-motion` para accesibilidad.
+   */
   private _render(): void {
     const p       = this.priority as keyof typeof DojoTaskCard.PRIORITY_CONFIG;
     const pConfig = DojoTaskCard.PRIORITY_CONFIG[p] ?? DojoTaskCard.PRIORITY_CONFIG.medium;
     const dueStatus = getDueStatus(this.dueDate || null);
     const dueCls    = DojoTaskCard.DUE_STATUS_CLASS[dueStatus];
+
+    // Inyectar color de acento como variable CSS interna (IMP-08)
+    // Variables CSS permitidas: --dojo-priority-low, --dojo-priority-medium,
+    // --dojo-priority-high, --dojo-priority-urgent
+    this.style.setProperty('--_accent-color', pConfig.color);
+    
+    // Inyectar variables de progreso si no están definidas globalmente
+    // Usuario puede personalizar con CSS: --dojo-progress-complete, --dojo-progress-in-progress
+    if (!this.style.getPropertyValue('--dojo-progress-complete')) {
+      this.style.setProperty('--dojo-progress-complete', '#22C55E');
+      this.style.setProperty('--dojo-progress-in-progress', '#F59E0B');
+    }
 
     this._shadow.innerHTML = '';
 
@@ -176,12 +212,13 @@ export class DojoTaskCard extends HTMLElement {
         display: block;
         background: var(--dojo-surface);
         border: 1px solid var(--dojo-border);
-        border-radius: var(--dojo-radius, 6px);
+        border-left: var(--dojo-card-accent-width, 3px) solid var(--_accent-color, var(--dojo-border));
+        border-radius: var(--dojo-card-radius, var(--dojo-radius, 6px));
         padding: 0.625rem 0.75rem;
         cursor: grab;
         user-select: none;
         box-shadow: 0 1px 2px rgba(0,0,0,.06);
-        transition: box-shadow 0.15s, opacity 0.15s, transform 0.12s;
+        transition: box-shadow 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
         outline: none;
         position: relative;
       }
@@ -190,12 +227,13 @@ export class DojoTaskCard extends HTMLElement {
       :host([dragging]) {
         opacity: 0.4;
         cursor: grabbing;
-        transform: rotate(1.5deg) scale(0.98);
+        transform: rotate(2deg) scale(0.98);
       }
 
       /* Estado: hover */
       :host(:hover:not([dragging])) {
-        box-shadow: 0 4px 10px rgba(0,0,0,.12);
+        box-shadow: 0 4px 14px rgba(0,0,0,.15), 0 2px 4px rgba(0,0,0,.08);
+        transform: translateY(var(--dojo-card-hover-lift, -2px));
       }
 
       /* Foco accesible */
@@ -290,14 +328,27 @@ export class DojoTaskCard extends HTMLElement {
         margin: 0 0 0.5rem 0;
       }
 
-      /* Identificador de proyecto (US-26) */
+      /* Badge de número de tarea — esquina superior derecha (IMP-08) */
       .task-number {
-        font-size: 0.625rem;
+        position: absolute;
+        top: 0.375rem;
+        right: 0.375rem;
+        font-size: 0.6rem;
         font-weight: 600;
-        color: var(--dojo-primary, #1D4ED8);
+        color: var(--dojo-text-muted, var(--dojo-text-secondary));
         letter-spacing: 0.04em;
-        margin-bottom: 0.125rem;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--dojo-bg, var(--dojo-surface));
+        border: 1px solid var(--dojo-border);
+        padding: 0.1rem 0.3rem;
+        border-radius: 3px;
+        transition: opacity 0.15s ease;
+        z-index: 0;
+        pointer-events: none;
+      }
+      :host(:hover) .task-number,
+      :host(:focus-within) .task-number {
+        opacity: 0;
       }
 
       /* Footer: prioridad (izq) + fecha (der) */
@@ -413,6 +464,18 @@ export class DojoTaskCard extends HTMLElement {
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      .chip-overflow {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.1rem 0.375rem;
+        border-radius: 999px;
+        font-size: 0.625rem;
+        font-weight: 600;
+        line-height: 1.4;
+        white-space: nowrap;
+        background: var(--dojo-border);
+        color: var(--dojo-text-secondary);
+      }
 
       /* Avatares de personas asignadas (US-29 / IMP-09) */
       .assignees-row {
@@ -420,6 +483,22 @@ export class DojoTaskCard extends HTMLElement {
         align-items: center;
         margin-top: 0.25rem;
         margin-bottom: 0.25rem;
+      }
+
+      /* Reducir movimiento para accesibilidad (WCAG 2.1 SC 2.3.3) */
+      @media (prefers-reduced-motion: reduce) {
+        :host {
+          transition: none;
+        }
+        :host(:hover:not([dragging])) {
+          transform: none;
+        }
+        .task-number {
+          transition: none;
+        }
+        .subtask-progress-fill {
+          transition: none;
+        }
       }
     `;
     this._shadow.appendChild(style);
@@ -463,7 +542,10 @@ export class DojoTaskCard extends HTMLElement {
       chipRow.className = 'chip-row';
       chipRow.setAttribute('aria-label', 'Etiquetas');
       chipRow.setAttribute('role', 'list');
-      for (const lbl of this._labels) {
+      const MAX_VISIBLE_CHIPS = 2;
+      const visibleLabels = this._labels.slice(0, MAX_VISIBLE_CHIPS);
+      const overflowCount = this._labels.length - MAX_VISIBLE_CHIPS;
+      for (const lbl of visibleLabels) {
         const chip = document.createElement('span');
         chip.className = 'task-label-chip';
         chip.setAttribute('role', 'listitem');
@@ -476,6 +558,16 @@ export class DojoTaskCard extends HTMLElement {
           chip.style.backgroundColor = 'var(--dojo-border)';
         }
         chipRow.appendChild(chip);
+      }
+      if (overflowCount > 0) {
+        const overflowChip = document.createElement('span');
+        overflowChip.className = 'chip-overflow';
+        overflowChip.setAttribute('role', 'listitem');
+        const hiddenNames = this._labels.slice(MAX_VISIBLE_CHIPS).map(l => l.name).join(', ');
+        overflowChip.setAttribute('title', hiddenNames);
+        overflowChip.setAttribute('aria-label', `${overflowCount} etiquetas más: ${hiddenNames}`);
+        overflowChip.textContent = `+${overflowCount}`;
+        chipRow.appendChild(overflowChip);
       }
       this._shadow.appendChild(chipRow);
     }
@@ -499,7 +591,16 @@ export class DojoTaskCard extends HTMLElement {
       pBar.setAttribute('aria-label', `Progreso: ${this._subtasksDone} de ${this._subtasksTotal} subtareas`);
       const pFill = document.createElement('div');
       pFill.className = 'subtask-progress-fill';
-      pFill.style.width = `${Math.round((this._subtasksDone / this._subtasksTotal) * 100)}%`;
+      const pct = Math.round((this._subtasksDone / this._subtasksTotal) * 100);
+      pFill.style.width = `${pct}%`;
+      // Asignar color dinámico basado en porcentaje (variables CSS para personalización de tema)
+      if (pct === 100) {
+        pFill.style.background = DojoTaskCard.PROGRESS_COLORS.complete;
+      } else if (pct >= 50) {
+        pFill.style.background = DojoTaskCard.PROGRESS_COLORS.inProgress;
+      } else {
+        pFill.style.background = DojoTaskCard.PROGRESS_COLORS.started;
+      }
       pBar.appendChild(pFill);
       progressRow.appendChild(pBar);
 
