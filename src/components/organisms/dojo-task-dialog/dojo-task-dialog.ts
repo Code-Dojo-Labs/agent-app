@@ -34,11 +34,12 @@ import { generateUUID } from '../../../utils/uuid.js';
 import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 
+// Prioridades sin emojis para mejor compatibilidad en select nativo (IMP-07)
 const PRIORITIES: { value: Priority; label: string }[] = [
-  { value: 'low',    label: '⬇️ Baja'    },
-  { value: 'medium', label: '➡️ Media'   },
-  { value: 'high',   label: '⬆️ Alta'    },
-  { value: 'urgent', label: '🔥 Urgente' },
+  { value: 'low',    label: 'Baja'    },
+  { value: 'medium', label: 'Media'   },
+  { value: 'high',   label: 'Alta'    },
+  { value: 'urgent', label: 'Urgente' },
 ];
 
 export class DojoTaskDialog extends HTMLElement {
