@@ -35,11 +35,12 @@ import { generateUUID } from '../../../utils/uuid.js';
 
 // ── Constantes ─────────────────────────────────────────────────────────────
 
-const PRIORITIES: { value: Priority; label: string; icon: string }[] = [
-  { value: 'low',    label: 'Baja',    icon: '⬇️' },
-  { value: 'medium', label: 'Media',   icon: '➡️' },
-  { value: 'high',   label: 'Alta',    icon: '⬆️' },
-  { value: 'urgent', label: 'Urgente', icon: '🔥' },
+// Prioridades con nombres de iconos SVG en lugar de emojis (IMP-07)
+const PRIORITIES: { value: Priority; label: string; iconName: string }[] = [
+  { value: 'low',    label: 'Baja',    iconName: 'priority-low' },
+  { value: 'medium', label: 'Media',   iconName: 'priority-medium' },
+  { value: 'high',   label: 'Alta',    iconName: 'priority-high' },
+  { value: 'urgent', label: 'Urgente', iconName: 'priority-urgent' },
 ];
 
 /** Instancia cacheada de Intl.RelativeTimeFormat para fechas de actividad (US-20). */
@@ -1098,10 +1099,10 @@ export class DojoTaskDetail extends HTMLElement {
     priSelect.id        = 'detail-priority';
     priSelect.className = 'field-select';
     priSelect.setAttribute('aria-label', 'Prioridad de la tarea');
-    PRIORITIES.forEach(({ value, label, icon }) => {
+    PRIORITIES.forEach(({ value, label }) => {
       const opt = document.createElement('option');
       opt.value       = value;
-      opt.textContent = `${icon} ${label}`;
+      opt.textContent = label;  // Sin iconos en select nativo para mejor accesibilidad
       if (value === task.priority) opt.selected = true;
       priSelect.appendChild(opt);
     });
