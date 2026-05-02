@@ -31,6 +31,10 @@ Aplicación web de gestión de tareas tipo Trello con tablero Kanban, orientada 
 | IMP-04 | [improvements-04-larger-edit-dialog.md](./improvements-04-larger-edit-dialog.md) | UI/UX | Modal de edición de tickets al 90% del viewport |
 | IMP-05 | [improvements-05-task-templates.md](./improvements-05-task-templates.md) | Gestión de tareas | Templates reutilizables para la creación de tickets |
 | IMP-06 | [improvements-06-default-columns.md](./improvements-06-default-columns.md) | Tablero Kanban | Columnas estándar predefinidas en tableros nuevos |
+| IMP-07 | [improvements-07-svg-icon-system.md](./improvements-07-svg-icon-system.md) | UI / Design System | Sistema de iconos SVG personalizado que reemplaza emojis |
+| IMP-08 | [improvements-08-modern-card-design.md](./improvements-08-modern-card-design.md) | UI / UX | Rediseño moderno de tarjetas con barra de prioridad, hover y progreso visual |
+| IMP-09 | [improvements-09-avatar-system.md](./improvements-09-avatar-system.md) | UI / Personas | Avatares generativos coloridos con iniciales para personas asignadas |
+| IMP-10 | [improvements-10-smooth-animations.md](./improvements-10-smooth-animations.md) | UI / Motion | Micro-interacciones, toasts de feedback y animaciones de drag & drop |
 
 ---
 
