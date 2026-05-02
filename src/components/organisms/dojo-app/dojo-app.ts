@@ -24,6 +24,8 @@ import '../dojo-template-manager/dojo-template-manager.js';
 import '../../atoms/dojo-theme-toggle/dojo-theme-toggle.js';
 import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 import '../../atoms/dojo-avatar-group/dojo-avatar-group.js';
+import '../../atoms/dojo-icon/dojo-icon.js';
+import '../../atoms/dojo-toast/dojo-toast.js';
 
 import type { Label } from '../../../types/models.js';
 import { getAllBoards } from '../../../db/board.repository.js';
