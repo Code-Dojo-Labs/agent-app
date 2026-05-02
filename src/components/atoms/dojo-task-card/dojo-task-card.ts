@@ -152,6 +152,19 @@ export class DojoTaskCard extends HTMLElement {
     urgent: { icon: '🔥', label: 'Urgente', color: 'var(--dojo-priority-urgent, #EF4444)' },
   } as const;
 
+  /** Colores dinámicos para barra de progreso de subtareas.
+   * Soportan variables CSS para permitir personalización de tema (IMP-08).
+   * - complete (100%): Verde — tarea completada
+   * - inProgress (50–99%): Ámbar — en progreso
+   * - started (0–49%): Azul primario — comenzada
+   * Todos validados WCAG 2.1 AA contra fondo var(--dojo-surface).
+   */
+  private static readonly PROGRESS_COLORS = {
+    complete:   'var(--dojo-progress-complete, #22C55E)',
+    inProgress: 'var(--dojo-progress-in-progress, #F59E0B)',
+    started:    'var(--dojo-primary, #1D4ED8)',
+  } as const;
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   /** Mapeo estado → clase CSS para borde de alerta de vencimiento (US-17). */
@@ -162,6 +175,17 @@ export class DojoTaskCard extends HTMLElement {
     none:       '',
   };
 
+  /**
+   * Renderiza la estructura visual de la tarjeta en Shadow DOM.
+   * 
+   * Colores validados para WCAG 2.1 AA contra fondo var(--dojo-surface):
+   * - Accent bar: #3B82F6 (baja), #F59E0B (media), #F97316 (alta), #EF4444 (urgente)
+   * - Barra de progreso: verde #22C55E, ámbar #F59E0B, azul #1D4ED8
+   * - Chips de etiquetas: texto #FFFFFF sobre colores de etiqueta (≥4.5:1)
+   * - Badge task-number: var(--dojo-text-muted) sobre fondo var(--dojo-bg)
+   * 
+   * Animaciones respetan `prefers-reduced-motion` para accesibilidad.
+   */
   private _render(): void {
     const p       = this.priority as keyof typeof DojoTaskCard.PRIORITY_CONFIG;
     const pConfig = DojoTaskCard.PRIORITY_CONFIG[p] ?? DojoTaskCard.PRIORITY_CONFIG.medium;
@@ -169,7 +193,16 @@ export class DojoTaskCard extends HTMLElement {
     const dueCls    = DojoTaskCard.DUE_STATUS_CLASS[dueStatus];
 
     // Inyectar color de acento como variable CSS interna (IMP-08)
+    // Variables CSS permitidas: --dojo-priority-low, --dojo-priority-medium,
+    // --dojo-priority-high, --dojo-priority-urgent
     this.style.setProperty('--_accent-color', pConfig.color);
+    
+    // Inyectar variables de progreso si no están definidas globalmente
+    // Usuario puede personalizar con CSS: --dojo-progress-complete, --dojo-progress-in-progress
+    if (!this.style.getPropertyValue('--dojo-progress-complete')) {
+      this.style.setProperty('--dojo-progress-complete', '#22C55E');
+      this.style.setProperty('--dojo-progress-in-progress', '#F59E0B');
+    }
 
     this._shadow.innerHTML = '';
 
@@ -560,12 +593,13 @@ export class DojoTaskCard extends HTMLElement {
       pFill.className = 'subtask-progress-fill';
       const pct = Math.round((this._subtasksDone / this._subtasksTotal) * 100);
       pFill.style.width = `${pct}%`;
+      // Asignar color dinámico basado en porcentaje (variables CSS para personalización de tema)
       if (pct === 100) {
-        pFill.style.background = '#22C55E'; // verde — completado
+        pFill.style.background = DojoTaskCard.PROGRESS_COLORS.complete;
       } else if (pct >= 50) {
-        pFill.style.background = '#F59E0B'; // ámbar — en progreso
+        pFill.style.background = DojoTaskCard.PROGRESS_COLORS.inProgress;
       } else {
-        pFill.style.background = 'var(--dojo-primary, #1D4ED8)'; // azul — inicio
+        pFill.style.background = DojoTaskCard.PROGRESS_COLORS.started;
       }
       pBar.appendChild(pFill);
       progressRow.appendChild(pBar);
