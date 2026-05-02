@@ -452,6 +452,37 @@ export class DojoPersonManager extends HTMLElement {
         /* .avatar-grid eliminado en IMP-09 — avatar auto-generado del nombre */
 
         .confirm-delete-actions {
+        .action-btn {
+          padding: 4px 8px;
+          border: none;
+          border-radius: var(--dojo-radius-sm, 6px);
+          background: none;
+          color: var(--dojo-text-secondary, #6B7280);
+          cursor: pointer;
+          font-size: 12px;
+          transition: all 0.15s ease;
+        }
+
+        .action-btn:hover {
+          background: var(--dojo-bg, #F9FAFB);
+          color: var(--dojo-text-primary, #1F2937);
+        }
+
+        .confirm-delete {
+          background: #FEF2F2;
+          border: 1px solid #FCA5A5;
+          border-radius: var(--dojo-radius, 8px);
+          padding: 16px;
+          margin-bottom: 8px;
+        }
+
+        .confirm-delete p {
+          margin: 0 0 12px 0;
+          font-size: 14px;
+          color: #7F1D1D;
+        }
+
+        .confirm-delete-actions {
           display: flex;
           gap: 8px;
         }
