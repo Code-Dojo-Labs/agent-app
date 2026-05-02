@@ -1429,13 +1429,14 @@ export class DojoKanbanBoard extends HTMLElement {
   }
 
   private async _handleCreateTask(e: CustomEvent): Promise<void> {
-    const { statusId, title, description, priority, dueDate, labelIds, assignees, projectId } = e.detail as {
+    const { statusId, title, description, priority, dueDate, labelIds, subtasks, assignees, projectId } = e.detail as {
       statusId:    string;
       title:       string;
       description: string;
       priority:    string;
       dueDate?:    string | null;
       labelIds?:   string[];
+      subtasks?:   Task['subtasks'];
       assignees?:  string[];
       projectId?:  string;
     };
@@ -1474,6 +1475,7 @@ export class DojoKanbanBoard extends HTMLElement {
         taskNumber,
         priority:    priority as Task['priority'],
         labelIds:    labelIds ?? [],
+        subtasks:    subtasks ?? [],
         assignees:   assignees ?? [],
         order:       tasks.length,
         dueDate:     dueDate ?? null,

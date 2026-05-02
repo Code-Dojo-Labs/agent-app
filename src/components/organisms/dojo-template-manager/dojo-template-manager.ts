@@ -19,7 +19,7 @@
  * --dojo-danger, --dojo-radius, --dojo-radius-sm, --dojo-shadow
  */
 
-import type { TaskTemplate, Label, Priority, Person } from '../../../types/models.js';
+import type { TaskTemplate, Label, Priority, Person, Subtask } from '../../../types/models.js';
 import {
   getAllTemplates,
   createTemplate,
@@ -51,6 +51,7 @@ export class DojoTemplateManager extends HTMLElement {
   private _allPersons: Person[] = [];
   private _selectedLabelIds: Set<string> = new Set();
   private _selectedPersonIds: Set<string> = new Set();
+  private _draftSubtasks: Subtask[] = [];
 
   private _onDocKeydown = (e: KeyboardEvent): void => {
     if (!this._isOpen()) return;
@@ -339,6 +340,57 @@ export class DojoTemplateManager extends HTMLElement {
       .person-option:hover { background: var(--dojo-bg); }
       .person-option input[type="checkbox"] { accent-color: var(--dojo-primary, #1D4ED8); flex-shrink: 0; width: auto; }
 
+      /* ── Subtareas (opcional) ── */
+      .subtasks-section { display: flex; flex-direction: column; gap: 0.375rem; }
+      .subtasks-list {
+        display: flex; flex-direction: column; gap: 0.25rem;
+        min-height: 0; max-height: 200px; overflow-y: auto;
+      }
+      .subtask-item {
+        display: flex; align-items: center; gap: 0.5rem;
+        padding: 0.4375rem 0.75rem; background: var(--dojo-bg);
+        border: 1px solid var(--dojo-border); border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.875rem;
+      }
+      .subtask-text { flex: 1; color: var(--dojo-text-primary); }
+      .subtask-remove {
+        background: transparent; border: none; cursor: pointer;
+        padding: 0; line-height: 1; font-size: 1rem;
+        color: var(--dojo-text-secondary); opacity: 0.65; transition: opacity 0.1s;
+      }
+      .subtask-remove:hover { opacity: 1; color: var(--dojo-danger, #DC2626); }
+      .subtasks-input-wrapper {
+        display: flex; gap: 0.375rem;
+      }
+      .subtasks-input-wrapper input {
+        flex: 1;
+        padding: 0.4375rem 0.75rem;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.875rem;
+        background: var(--dojo-bg);
+        color: var(--dojo-text-primary);
+      }
+      .subtasks-input-wrapper input:focus {
+        outline: none;
+        border-color: var(--dojo-primary, #1D4ED8);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dojo-primary, #1D4ED8) 20%, transparent);
+      }
+      .subtasks-add-btn {
+        padding: 0.4375rem 0.75rem;
+        background: var(--dojo-primary, #1D4ED8);
+        color: #fff;
+        border: none; border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.875rem; font-weight: 500;
+        cursor: pointer; transition: opacity 0.15s;
+      }
+      .subtasks-add-btn:hover { opacity: 0.85; }
+      .subtasks-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .subtasks-empty {
+        font-size: 0.8125rem; color: var(--dojo-text-secondary);
+        font-style: italic; text-align: center; padding: 0.75rem;
+      }
+
       /* ── Acciones formulario ── */
       .form-actions {
         display: flex; justify-content: flex-end; gap: 0.625rem; margin-top: 0.5rem;
@@ -544,6 +596,7 @@ export class DojoTemplateManager extends HTMLElement {
     this._editingId = tpl?.id ?? null;
     this._selectedLabelIds  = new Set(tpl?.labelIds ?? []);
     this._selectedPersonIds = new Set(tpl?.personIds ?? []);
+    this._draftSubtasks     = tpl?.subtasks ? [...tpl.subtasks] : [];
     this._buildContent();
     // El foco lo gestiona _buildForm mediante requestAnimationFrame
   }
@@ -649,6 +702,9 @@ export class DojoTemplateManager extends HTMLElement {
     personsField.appendChild(personsChips);
     personsField.appendChild(personsPicker);
 
+    // Campo: subtareas
+    const subtasksField = this._buildSubtasksField();
+
     // Acciones
     const formActions = document.createElement('div');
     formActions.className = 'form-actions';
@@ -674,6 +730,7 @@ export class DojoTemplateManager extends HTMLElement {
     body.appendChild(prioField);
     body.appendChild(labelsField);
     body.appendChild(personsField);
+    body.appendChild(subtasksField);
     body.appendChild(formActions);
 
     // Auto-focus nombre
@@ -854,6 +911,99 @@ export class DojoTemplateManager extends HTMLElement {
     return picker;
   }
 
+  // ── Subtasks section ─────────────────────────────────────────────────────
+
+  private _buildSubtasksField(): HTMLElement {
+    const field = document.createElement('div');
+    field.className = 'field subtasks-section';
+
+    const lbl = document.createElement('label');
+    lbl.textContent = 'Subtareas (opcional)';
+    field.appendChild(lbl);
+
+    const subtasksList = document.createElement('div');
+    subtasksList.className = 'subtasks-list';
+    this._renderSubtasksList(subtasksList);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'subtasks-input-wrapper';
+    const input = document.createElement('input');
+    input.type        = 'text';
+    input.placeholder = 'Agregar una subtarea…';
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (text) {
+          this._draftSubtasks.push({
+            id: crypto.randomUUID(),
+            text,
+            completed: false,
+          });
+          input.value = '';
+          this._renderSubtasksList(subtasksList);
+          input.focus();
+        }
+      }
+    });
+
+    const addBtn = document.createElement('button');
+    addBtn.type       = 'button';
+    addBtn.className  = 'subtasks-add-btn';
+    addBtn.textContent = 'Agregar';
+    addBtn.addEventListener('click', () => {
+      const text = input.value.trim();
+      if (text) {
+        this._draftSubtasks.push({
+          id: crypto.randomUUID(),
+          text,
+          completed: false,
+        });
+        input.value = '';
+        this._renderSubtasksList(subtasksList);
+        input.focus();
+      }
+    });
+
+    wrapper.appendChild(input);
+    wrapper.appendChild(addBtn);
+
+    field.appendChild(subtasksList);
+    field.appendChild(wrapper);
+
+    return field;
+  }
+
+  private _renderSubtasksList(container: HTMLElement): void {
+    container.innerHTML = '';
+    if (this._draftSubtasks.length === 0) {
+      const empty = document.createElement('div');
+      empty.className   = 'subtasks-empty';
+      empty.textContent = 'Sin subtareas predefinidas';
+      container.appendChild(empty);
+      return;
+    }
+    for (const st of this._draftSubtasks) {
+      const item = document.createElement('div');
+      item.className = 'subtask-item';
+      const text = document.createElement('span');
+      text.className = 'subtask-text';
+      text.textContent = st.text;
+      const removeBtn = document.createElement('button');
+      removeBtn.className   = 'subtask-remove';
+      removeBtn.type        = 'button';
+      removeBtn.textContent = '×';
+      removeBtn.setAttribute('aria-label', `Quitar subtarea: ${st.text}`);
+      removeBtn.addEventListener('click', () => {
+        this._draftSubtasks = this._draftSubtasks.filter(s => s.id !== st.id);
+        this._renderSubtasksList(container);
+      });
+      item.appendChild(text);
+      item.appendChild(removeBtn);
+      container.appendChild(item);
+    }
+  }
+
   // ── Guardar ──────────────────────────────────────────────────────────────
 
   private async _handleSave(
@@ -881,6 +1031,7 @@ export class DojoTemplateManager extends HTMLElement {
       priority:    (prioSelect.value as Priority) || undefined,
       labelIds:    this._selectedLabelIds.size > 0 ? [...this._selectedLabelIds] : undefined,
       personIds:   this._selectedPersonIds.size > 0 ? [...this._selectedPersonIds] : undefined,
+      subtasks:    this._draftSubtasks.length > 0 ? this._draftSubtasks : undefined,
     };
 
     try {

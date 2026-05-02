@@ -198,6 +198,8 @@ export interface TaskTemplate {
   labelIds?: string[];
   /** Lista de FK → Person.id asignados por defecto. */
   personIds?: string[];
+  /** Lista de subtareas pre-definidas para el template (US-36 enhancement). */
+  subtasks?: Subtask[];
   /** Fecha de creación en formato ISO 8601. */
   createdAt: string;
 }

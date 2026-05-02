@@ -3292,3 +3292,304 @@ interface PersonManagerState {
 ### Posible prompt
 
 "@Builder y @Designer, actualicen toda la UI para seguir el nuevo DESIGN.md".
+
+---
+
+## Paso 33 - Mapa Completo de la Base de Datos (IndexedDB) + Ejemplo de Base Llena
+
+**Fecha:** 2026-05-01  
+**Solicitado por:** Usuario  
+**Objetivo:** Tener trazabilidad completa del esquema persistido para detectar campos faltantes o degradados.
+
+### 1. Resumen de base
+
+- **Motor:** IndexedDB nativo.
+- **Nombre de DB:** `kanban-app-db`.
+- **Version actual:** `6`.
+- **Estrategia de migracion:** incremental en `onupgradeneeded` (`v1` a `v6`).
+- **Archivo fuente del esquema:** `src/db/database.ts`.
+
+### 2. Object Stores, claves e indices
+
+| Store | keyPath | Indices | Unicos |
+|---|---|---|---|
+| `tasks` | `id` | `by-status(statusId)`, `by-priority(priority)`, `by-created(createdAt)`, `by-board(boardId)`, `by-project(projectId)` | Ninguno |
+| `columns` | `id` | `by-board(boardId)` | Ninguno |
+| `labels` | `id` | `by-name(name)` | `by-name` |
+| `activity` | `id` | `by-taskId(taskId)` | Ninguno |
+| `boards` | `id` | - | - |
+| `projects` | `id` | `by-prefix(prefix)` | `by-prefix` |
+| `persons` | `id` | - | - |
+| `taskTemplates` | `id` | - | - |
+
+### 3. Mapa de campos por entidad (shape esperado)
+
+#### 3.1 `tasks`
+
+Campos persistidos:
+
+- `id: string` (PK)
+- `boardId: string` (FK logica -> `boards.id`)
+- `projectId: string` (FK logica -> `projects.id`)
+- `taskNumber: string` (ej. `GEN-001`)
+- `title: string`
+- `description: string`
+- `statusId: string` (FK logica -> `columns.id`)
+- `priority: 'low' | 'medium' | 'high' | 'urgent'`
+- `labelIds: string[]` (FKs logicas -> `labels.id`)
+- `createdAt: string` (ISO)
+- `updatedAt: string` (ISO)
+- `order: number`
+- `assignees: string[]` (FKs logicas -> `persons.id`)
+- `dueDate?: string | null`
+- `notifications?: boolean`
+- `subtasks?: Array<{ id: string; text: string; completed: boolean }>`
+
+Reglas importantes:
+
+- Si `dueDate` no existe o es null, la normalizacion de repositorio fuerza `notifications = false`.
+- Si existe `dueDate` y `notifications` llega undefined, la normalizacion fuerza `notifications = true`.
+
+#### 3.2 `columns`
+
+- `id: string` (PK)
+- `boardId: string`
+- `name: string`
+- `icon: string`
+- `order: number`
+- `color?: string`
+- `isDefault?: boolean`
+- `wipLimit?: number | null`
+
+#### 3.3 `labels`
+
+- `id: string` (PK)
+- `name: string` (indice unico por `by-name`)
+- `color: string`
+
+#### 3.4 `activity`
+
+- `id: string` (PK)
+- `taskId: string` (FK logica -> `tasks.id`)
+- `type: 'created' | 'status_change' | 'priority_change' | 'label_added' | 'label_removed'`
+- `payload: Record<string, unknown>`
+- `createdAt: string`
+
+#### 3.5 `boards`
+
+- `id: string` (PK)
+- `name: string`
+- `emoji?: string`
+- `createdAt: string`
+
+#### 3.6 `projects`
+
+- `id: string` (PK)
+- `name: string`
+- `prefix: string` (unico, uppercase 1-5 chars)
+- `description: string`
+- `nextTaskNumber: number`
+- `createdAt: string`
+
+#### 3.7 `persons`
+
+- `id: string` (PK)
+- `name: string`
+- `avatar: string`
+- `createdAt: string`
+
+#### 3.8 `taskTemplates`
+
+- `id: string` (PK)
+- `name: string`
+- `description?: string`
+- `priority?: 'low' | 'medium' | 'high' | 'urgent'`
+- `labelIds?: string[]`
+- `personIds?: string[]`
+- `createdAt: string`
+
+### 4. Relaciones y cascadas (logicas de negocio)
+
+- `boards (1) -> (N) columns` por `columns.boardId`.
+- `boards (1) -> (N) tasks` por `tasks.boardId`.
+- `columns (1) -> (N) tasks` por `tasks.statusId`.
+- `projects (1) -> (N) tasks` por `tasks.projectId`.
+- `tasks (N) <-> (N) labels` via `tasks.labelIds[]`.
+- `tasks (N) <-> (N) persons` via `tasks.assignees[]`.
+- `tasks (1) -> (N) activity` por `activity.taskId`.
+
+Cascadas manuales relevantes:
+
+- Al eliminar una etiqueta, se limpia en todas las tareas (`labelIds`).
+- Al eliminar una persona, se limpia en todas las tareas (`assignees`).
+- Al eliminar un proyecto (no `GEN`), sus tareas se reasignan a `General`.
+- Al eliminar una tarea, se recomienda eliminar su actividad asociada.
+
+### 5. Posibles puntos donde "se pierden" campos
+
+Hallazgo principal en import/export:
+
+- La validacion de `Task` en `src/db/export-import.ts` es minima y solo exige campos base (`id`, `title`, `description`, `statusId`, `priority`, `labelIds`, `createdAt`, `updatedAt`, `order`).
+- No exige `boardId`, `projectId`, `taskNumber`, `assignees`, `dueDate`, `notifications`, `subtasks`.
+
+Implicacion:
+
+- Un JSON antiguo o incompleto puede importarse como valido y dejar tareas sin campos modernos.
+- No siempre "se borran" campos; puede que nunca entren en el import por venir ausentes en el snapshot.
+
+### 6. Ejemplo de "base llena" (snapshot de export)
+
+Este ejemplo sigue el formato de `BoardExport` y contiene datos en todos los stores activos.
+
+```json
+{
+  "version": 1,
+  "exportedAt": "2026-05-01T10:30:00.000Z",
+  "boards": [
+    {
+      "id": "b-001",
+      "name": "Mi tablero",
+      "emoji": "🥋",
+      "createdAt": "2026-05-01T08:00:00.000Z"
+    }
+  ],
+  "projects": [
+    {
+      "id": "p-001",
+      "name": "General",
+      "prefix": "GEN",
+      "description": "Proyecto por defecto",
+      "nextTaskNumber": 3,
+      "createdAt": "2026-05-01T08:01:00.000Z"
+    }
+  ],
+  "persons": [
+    {
+      "id": "u-001",
+      "name": "Juan Mendez",
+      "avatar": "JM",
+      "createdAt": "2026-05-01T08:02:00.000Z"
+    },
+    {
+      "id": "u-002",
+      "name": "Ana Torres",
+      "avatar": "AT",
+      "createdAt": "2026-05-01T08:03:00.000Z"
+    }
+  ],
+  "columns": [
+    {
+      "id": "c-001",
+      "boardId": "b-001",
+      "name": "Por Hacer",
+      "icon": "🔲",
+      "order": 0,
+      "isDefault": true,
+      "wipLimit": 5,
+      "color": "#1D4ED8"
+    },
+    {
+      "id": "c-002",
+      "boardId": "b-001",
+      "name": "En Progreso",
+      "icon": "🔄",
+      "order": 1,
+      "isDefault": true,
+      "wipLimit": 3,
+      "color": "#15803D"
+    }
+  ],
+  "labels": [
+    {
+      "id": "l-001",
+      "name": "Bug",
+      "color": "#B91C1C"
+    },
+    {
+      "id": "l-002",
+      "name": "Feature",
+      "color": "#1D4ED8"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t-001",
+      "boardId": "b-001",
+      "projectId": "p-001",
+      "taskNumber": "GEN-001",
+      "title": "Corregir validacion de import",
+      "description": "Detectar campos faltantes en tareas antiguas.",
+      "statusId": "c-001",
+      "priority": "high",
+      "labelIds": ["l-001"],
+      "createdAt": "2026-05-01T08:10:00.000Z",
+      "updatedAt": "2026-05-01T09:00:00.000Z",
+      "dueDate": "2026-05-05T18:00:00.000Z",
+      "notifications": true,
+      "subtasks": [
+        {
+          "id": "st-001",
+          "text": "Agregar fallback de boardId",
+          "completed": true
+        },
+        {
+          "id": "st-002",
+          "text": "Agregar fallback de projectId",
+          "completed": false
+        }
+      ],
+      "assignees": ["u-001", "u-002"],
+      "order": 0
+    },
+    {
+      "id": "t-002",
+      "boardId": "b-001",
+      "projectId": "p-001",
+      "taskNumber": "GEN-002",
+      "title": "Documentar mapa de DB",
+      "description": "Incluir stores, indices y ejemplo de datos.",
+      "statusId": "c-002",
+      "priority": "medium",
+      "labelIds": ["l-002"],
+      "createdAt": "2026-05-01T08:20:00.000Z",
+      "updatedAt": "2026-05-01T09:10:00.000Z",
+      "dueDate": null,
+      "notifications": false,
+      "subtasks": [],
+      "assignees": ["u-002"],
+      "order": 0
+    }
+  ],
+  "activity": [
+    {
+      "id": "a-001",
+      "taskId": "t-001",
+      "type": "created",
+      "payload": {
+        "source": "ui"
+      },
+      "createdAt": "2026-05-01T08:10:01.000Z"
+    },
+    {
+      "id": "a-002",
+      "taskId": "t-001",
+      "type": "status_change",
+      "payload": {
+        "from": "c-001",
+        "to": "c-002"
+      },
+      "createdAt": "2026-05-01T09:00:00.000Z"
+    }
+  ]
+}
+```
+
+### 7. Checklist rapida de diagnostico de perdida de campos
+
+1. Exportar datos actuales y verificar si cada `task` trae `boardId`, `projectId`, `taskNumber`, `assignees`, `notifications`, `subtasks`.
+2. Confirmar que toda `column` tenga `boardId`.
+3. Confirmar que todo `project` tenga `prefix` unico y `nextTaskNumber` numerico.
+4. Confirmar que no haya `assignees` apuntando a `persons` inexistentes.
+5. Si el JSON es antiguo, completar campos faltantes antes de importar.
+
+Resultado de esta receta: queda definido un mapa operativo y un snapshot de referencia para comparar la integridad de cualquier backup/export.

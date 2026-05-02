@@ -12,7 +12,7 @@
  * ## Eventos despachados
  * | Nombre                    | Detalle                                                 | Descripción           |
  * |---------------------------|---------------------------------------------------------|-----------------------|
- * | dojo:dialog-create-task   | { statusId, title, description, priority, labelIds }    | Usuario confirmó crear|
+ * | dojo:dialog-create-task   | { statusId, title, description, priority, labelIds, subtasks }    | Usuario confirmó crear|
  *
  * ## Validaciones (US-04)
  * - Título obligatorio (no vacío)
@@ -24,12 +24,13 @@
  * --dojo-danger, --dojo-radius, --dojo-radius-sm, --dojo-shadow
  */
 
-import type { Priority, Label, Project, Person } from '../../../types/models.js';
+import type { Priority, Label, Project, Person, Subtask } from '../../../types/models.js';
 import type { TaskTemplate } from '../../../types/models.js';
 import { getAllLabels, createLabel } from '../../../db/label.repository.js';
 import { getAllProjects } from '../../../db/project.repository.js';
 import { getAllPersons } from '../../../db/person.repository.js';
 import { getAllTemplates } from '../../../db/template.repository.js';
+import { generateUUID } from '../../../utils/uuid.js';
 import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 
 const PRIORITIES: { value: Priority; label: string }[] = [
@@ -576,6 +577,72 @@ export class DojoTaskDialog extends HTMLElement {
         border-color: var(--dojo-primary, #1D4ED8);
         box-shadow: 0 0 0 2px color-mix(in srgb, var(--dojo-primary, #1D4ED8) 20%, transparent);
       }
+
+      /* ── Subtareas — creación ── */
+      .subtasks-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .subtasks-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+      }
+      .subtask-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.625rem;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        background: var(--dojo-bg);
+      }
+      .subtask-item-text {
+        flex: 1;
+        font-size: 0.875rem;
+        color: var(--dojo-text-primary);
+        line-height: 1.4;
+        word-break: break-word;
+      }
+      .subtask-remove-btn {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 0.125rem 0.25rem;
+        border-radius: var(--dojo-radius-sm, 4px);
+        font-size: 0.8125rem;
+        color: var(--dojo-text-secondary);
+      }
+      .subtask-remove-btn:hover { color: var(--dojo-danger, #DC2626); }
+      .subtask-remove-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
+      .subtask-add-row {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .subtask-add-btn {
+        flex-shrink: 0;
+        padding: 0.5rem 0.875rem;
+        border: 1px solid var(--dojo-border);
+        border-radius: var(--dojo-radius-sm, 4px);
+        background: var(--dojo-primary, #1D4ED8);
+        color: #fff;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .subtask-add-btn:hover { opacity: 0.9; }
+      .subtask-add-btn:focus-visible {
+        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline-offset: 2px;
+      }
     `;
     this._shadow.appendChild(style);
 
@@ -665,6 +732,34 @@ export class DojoTaskDialog extends HTMLElement {
           this._selectedAssigneeIds = new Set(tpl.personIds);
           this._rebuildAssigneeChips();
         }
+
+        // Pre-rellenar subtareas (será renderizado cuando se llame a renderSubtasks más adelante)
+        if (tpl.subtasks?.length) {
+          const draftSubtasksVarName = Object.keys(draftSubtasks).length > 0 ? draftSubtasks : [];
+          draftSubtasks.splice(0, draftSubtasks.length, ...tpl.subtasks);
+          // Re-renderizar la lista de subtasks si la función está disponible
+          requestAnimationFrame(() => {
+            const subtasksListEl = this._shadow.querySelector<HTMLUListElement>('.subtasks-list');
+            if (subtasksListEl) {
+              subtasksListEl.innerHTML = '';
+              draftSubtasks.forEach((st, idx) => {
+                const item = document.createElement('li');
+                item.className = 'subtask-item';
+                const text = document.createElement('span');
+                text.className = 'subtask-item-text';
+                text.textContent = st.text;
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'subtask-remove-btn';
+                removeBtn.textContent = '✕';
+                removeBtn.setAttribute('aria-label', `Eliminar subtarea: ${st.text}`);
+                item.appendChild(text);
+                item.appendChild(removeBtn);
+                subtasksListEl.appendChild(item);
+              });
+            }
+          });
+        }
       });
 
       tplSelector.appendChild(tplLabel);
@@ -685,6 +780,8 @@ export class DojoTaskDialog extends HTMLElement {
     formBody.appendChild(formMain);
     formBody.appendChild(formAside);
     dialog.appendChild(formBody);
+
+    const draftSubtasks: Subtask[] = [];
 
     // ── Campo: Título (obligatorio, máx 120) ───────────────────────────────
     const MAX_TITLE = 120;
@@ -753,6 +850,84 @@ export class DojoTaskDialog extends HTMLElement {
     descField.appendChild(descLabel);
     descField.appendChild(descInput);
     formMain.appendChild(descField);
+
+    // ── Campo: Subtareas (opcional) ─────────────────────────────────────
+    const subtasksField = document.createElement('div');
+    subtasksField.className = 'field subtasks-field';
+
+    const subtasksLabel = document.createElement('label');
+    subtasksLabel.setAttribute('for', 'task-subtask-input');
+    subtasksLabel.textContent = 'Subtareas (opcional)';
+
+    const subtasksList = document.createElement('ul');
+    subtasksList.className = 'subtasks-list';
+    subtasksList.setAttribute('aria-label', 'Subtareas nuevas');
+
+    const subtaskAddRow = document.createElement('div');
+    subtaskAddRow.className = 'subtask-add-row';
+
+    const subtaskInput = document.createElement('input');
+    subtaskInput.id = 'task-subtask-input';
+    subtaskInput.type = 'text';
+    subtaskInput.maxLength = 200;
+    subtaskInput.placeholder = 'Ej. Validar migración';
+    subtaskInput.setAttribute('aria-label', 'Texto de subtarea');
+
+    const subtaskAddBtn = document.createElement('button');
+    subtaskAddBtn.type = 'button';
+    subtaskAddBtn.className = 'subtask-add-btn';
+    subtaskAddBtn.textContent = '+ Añadir';
+
+    const renderSubtasks = (): void => {
+      subtasksList.innerHTML = '';
+      draftSubtasks.forEach((subtask, index) => {
+        const item = document.createElement('li');
+        item.className = 'subtask-item';
+
+        const text = document.createElement('span');
+        text.className = 'subtask-item-text';
+        text.textContent = subtask.text;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'subtask-remove-btn';
+        removeBtn.textContent = '✕';
+        removeBtn.setAttribute('aria-label', `Eliminar subtarea: ${subtask.text}`);
+        removeBtn.addEventListener('click', () => {
+          draftSubtasks.splice(index, 1);
+          renderSubtasks();
+          requestAnimationFrame(() => subtaskInput.focus());
+        });
+
+        item.appendChild(text);
+        item.appendChild(removeBtn);
+        subtasksList.appendChild(item);
+      });
+    };
+
+    const addSubtask = (): void => {
+      const text = subtaskInput.value.trim();
+      if (!text) return;
+      draftSubtasks.push({ id: generateUUID(), text, completed: false });
+      subtaskInput.value = '';
+      renderSubtasks();
+      subtaskInput.focus();
+    };
+
+    subtaskAddBtn.addEventListener('click', addSubtask);
+    subtaskInput.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addSubtask();
+      }
+    });
+
+    subtaskAddRow.appendChild(subtaskInput);
+    subtaskAddRow.appendChild(subtaskAddBtn);
+    subtasksField.appendChild(subtasksLabel);
+    subtasksField.appendChild(subtasksList);
+    subtasksField.appendChild(subtaskAddRow);
+    formMain.appendChild(subtasksField);
 
     // ── Campo: Prioridad (default medium) ─────────────────────────────────
     const priField = document.createElement('div');
@@ -1253,99 +1428,108 @@ export class DojoTaskDialog extends HTMLElement {
     formAside.appendChild(labelsField);
 
     // ── Campo: Personas asignadas (US-29) ─────────────────────────────────
-    if (this._allPersons.length > 0) {
-      const assigneesField = document.createElement('div');
-      assigneesField.className = 'field';
+    const assigneesField = document.createElement('div');
+    assigneesField.className = 'field';
 
-      const assigneesLbl = document.createElement('label');
-      assigneesLbl.textContent = 'Asignados (opcional)';
-      assigneesField.appendChild(assigneesLbl);
+    const assigneesLbl = document.createElement('label');
+    assigneesLbl.textContent = 'Asignados (opcional)';
+    assigneesField.appendChild(assigneesLbl);
 
-      const assigneesChips = document.createElement('div');
-      assigneesChips.className = 'labels-chips';
-      assigneesChips.setAttribute('aria-label', 'Personas asignadas seleccionadas');
+    const assigneesChips = document.createElement('div');
+    assigneesChips.className = 'labels-chips';
+    assigneesChips.setAttribute('aria-label', 'Personas asignadas seleccionadas');
 
-      const renderAssigneeChips = (): void => {
-        assigneesChips.innerHTML = '';
-        for (const personId of this._selectedAssigneeIds) {
-          const person = this._allPersons.find(p => p.id === personId);
-          if (!person) continue;
-          const chip = document.createElement('span');
-          chip.className = 'label-chip';
-          chip.style.cssText = 'background: var(--dojo-bg); border: 1px solid var(--dojo-border); color: var(--dojo-text-primary); gap: 0.25rem;';
-          chip.textContent = `${person.avatar} ${person.name}`;
+    const emptyAssigneesHint = document.createElement('p');
+    emptyAssigneesHint.style.cssText = 'margin:0;font-size:0.8125rem;color:var(--dojo-text-secondary);';
+    emptyAssigneesHint.textContent = 'No hay personas disponibles en el directorio. Crea una desde Gestión de personas para poder asignarla.';
 
-          const removeBtn = document.createElement('button');
-          removeBtn.className = 'label-chip-remove';
-          removeBtn.setAttribute('aria-label', `Quitar ${person.name}`);
-          removeBtn.textContent = '×';
-          removeBtn.addEventListener('click', () => {
-            this._selectedAssigneeIds.delete(personId);
-            renderAssigneeChips();
-            updateAssigneePicker();
-          });
-          chip.appendChild(removeBtn);
-          assigneesChips.appendChild(chip);
-        }
+    const renderAssigneeChips = (): void => {
+      assigneesChips.innerHTML = '';
+      if (this._allPersons.length === 0) {
+        return;
+      }
 
-        const addBtn = document.createElement('button');
-        addBtn.className = 'add-label-btn';
-        addBtn.type = 'button';
-        addBtn.textContent = '+ Asignar';
-        addBtn.addEventListener('click', () => {
-          const picker = assigneesField.querySelector<HTMLElement>('.assignee-picker');
-          if (picker) picker.classList.toggle('open');
+      for (const personId of this._selectedAssigneeIds) {
+        const person = this._allPersons.find(p => p.id === personId);
+        if (!person) continue;
+        const chip = document.createElement('span');
+        chip.className = 'label-chip';
+        chip.style.cssText = 'background: var(--dojo-bg); border: 1px solid var(--dojo-border); color: var(--dojo-text-primary); gap: 0.25rem;';
+        chip.textContent = `${person.avatar} ${person.name}`;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'label-chip-remove';
+        removeBtn.setAttribute('aria-label', `Quitar ${person.name}`);
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          this._selectedAssigneeIds.delete(personId);
+          renderAssigneeChips();
+          updateAssigneePicker();
         });
-        assigneesChips.appendChild(addBtn);
-      };
+        chip.appendChild(removeBtn);
+        assigneesChips.appendChild(chip);
+      }
 
-      // Enlazar para que el selector de template pueda invocarla (US-36)
-      this._rebuildAssigneeChips = renderAssigneeChips;
-
-      assigneesField.appendChild(assigneesChips);
-
-      // Picker de personas
-      const assigneePicker = document.createElement('div');
-      assigneePicker.className = 'labels-picker assignee-picker';
-      assigneePicker.setAttribute('aria-label', 'Seleccionar personas');
-
-      const updateAssigneePicker = (): void => {
-        assigneePicker.innerHTML = '';
-        for (const person of this._allPersons) {
-          const opt = document.createElement('label');
-          opt.className = 'label-option';
-          const cb = document.createElement('input');
-          cb.type = 'checkbox';
-          cb.checked = this._selectedAssigneeIds.has(person.id);
-          cb.addEventListener('change', () => {
-            if (cb.checked) this._selectedAssigneeIds.add(person.id);
-            else this._selectedAssigneeIds.delete(person.id);
-            renderAssigneeChips();
-          });
-          const avatarSpan = document.createElement('span');
-          avatarSpan.textContent = person.avatar;
-          const nameSp = document.createElement('span');
-          nameSp.textContent = person.name;
-          opt.appendChild(cb);
-          opt.appendChild(avatarSpan);
-          opt.appendChild(nameSp);
-          assigneePicker.appendChild(opt);
-        }
-      };
-
-      assigneePicker.addEventListener('keydown', (ev: KeyboardEvent) => {
-        if (ev.key === 'Escape') {
-          ev.preventDefault();
-          assigneePicker.classList.remove('open');
-          assigneesChips.querySelector<HTMLElement>('.add-label-btn')?.focus();
-        }
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-label-btn';
+      addBtn.type = 'button';
+      addBtn.textContent = '+ Asignar';
+      addBtn.addEventListener('click', () => {
+        const picker = assigneesField.querySelector<HTMLElement>('.assignee-picker');
+        if (picker) picker.classList.toggle('open');
       });
+      assigneesChips.appendChild(addBtn);
+    };
 
-      updateAssigneePicker();
-      renderAssigneeChips();
-      assigneesField.appendChild(assigneePicker);
-      formAside.appendChild(assigneesField);
+    // Enlazar para que el selector de template pueda invocarla (US-36)
+    this._rebuildAssigneeChips = renderAssigneeChips;
+
+    assigneesField.appendChild(assigneesChips);
+
+    // Picker de personas
+    const assigneePicker = document.createElement('div');
+    assigneePicker.className = 'labels-picker assignee-picker';
+    assigneePicker.setAttribute('aria-label', 'Seleccionar personas');
+
+    const updateAssigneePicker = (): void => {
+      assigneePicker.innerHTML = '';
+      for (const person of this._allPersons) {
+        const opt = document.createElement('label');
+        opt.className = 'label-option';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = this._selectedAssigneeIds.has(person.id);
+        cb.addEventListener('change', () => {
+          if (cb.checked) this._selectedAssigneeIds.add(person.id);
+          else this._selectedAssigneeIds.delete(person.id);
+          renderAssigneeChips();
+        });
+        const avatarSpan = document.createElement('span');
+        avatarSpan.textContent = person.avatar;
+        const nameSp = document.createElement('span');
+        nameSp.textContent = person.name;
+        opt.appendChild(cb);
+        opt.appendChild(avatarSpan);
+        opt.appendChild(nameSp);
+        assigneePicker.appendChild(opt);
+      }
+    };
+
+    assigneePicker.addEventListener('keydown', (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        assigneePicker.classList.remove('open');
+        assigneesChips.querySelector<HTMLElement>('.add-label-btn')?.focus();
+      }
+    });
+
+    updateAssigneePicker();
+    renderAssigneeChips();
+    if (this._allPersons.length === 0) {
+      assigneesField.appendChild(emptyAssigneesHint);
     }
+    assigneesField.appendChild(assigneePicker);
+    formAside.appendChild(assigneesField);
 
     // ── Acciones ───────────────────────────────────────────────────────────
     const actions = document.createElement('div');
@@ -1379,6 +1563,7 @@ export class DojoTaskDialog extends HTMLElement {
           description: descInput.value.trim(),
           priority:    priSelect.value as Priority,
           labelIds:    [...this._selectedLabelIds],
+          subtasks:    draftSubtasks.map(subtask => ({ ...subtask })),
           assignees:   [...this._selectedAssigneeIds],
           projectId:   projSelect.value || undefined,
           dueDate:     (() => {
