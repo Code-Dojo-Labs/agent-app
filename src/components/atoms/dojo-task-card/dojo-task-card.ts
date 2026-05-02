@@ -146,10 +146,10 @@ export class DojoTaskCard extends HTMLElement {
   // ── Prioridades ───────────────────────────────────────────────────────────
 
   private static readonly PRIORITY_CONFIG = {
-    low:    { icon: '⬇️', label: 'Baja',    color: 'var(--dojo-priority-low,    #3B82F6)' },
-    medium: { icon: '➡️', label: 'Media',   color: 'var(--dojo-priority-medium, #F59E0B)' },
-    high:   { icon: '⬆️', label: 'Alta',    color: 'var(--dojo-priority-high,   #F97316)' },
-    urgent: { icon: '🔥', label: 'Urgente', color: 'var(--dojo-priority-urgent, #EF4444)' },
+    low:    { iconName: 'priority-low',    label: 'Baja',    color: 'var(--dojo-priority-low,    #3B82F6)' },
+    medium: { iconName: 'priority-medium', label: 'Media',   color: 'var(--dojo-priority-medium, #F59E0B)' },
+    high:   { iconName: 'priority-high',   label: 'Alta',    color: 'var(--dojo-priority-high,   #F97316)' },
+    urgent: { iconName: 'priority-urgent', label: 'Urgente', color: 'var(--dojo-priority-urgent, #EF4444)' },
   } as const;
 
   /** Colores dinámicos para barra de progreso de subtareas.
@@ -646,10 +646,12 @@ export class DojoTaskCard extends HTMLElement {
     const footerPriority = document.createElement('div');
     footerPriority.className = 'footer-priority';
 
-    const iconEl = document.createElement('span');
+    // Usar dojo-icon en lugar de emoji (IMP-07)
+    const iconEl = document.createElement('dojo-icon');
+    (iconEl as any).setAttribute('name', pConfig.iconName);
+    (iconEl as any).setAttribute('size', 'sm');
+    (iconEl as any).setAttribute('color', pConfig.color);
     iconEl.className = 'priority-icon';
-    iconEl.setAttribute('aria-hidden', 'true');
-    iconEl.textContent = pConfig.icon;
 
     const label = document.createElement('span');
     label.className = 'priority-label';
@@ -681,7 +683,17 @@ export class DojoTaskCard extends HTMLElement {
         ? `Venció ${dueRelative}`
         : `Vence ${dueRelative}`;
       dueEl.setAttribute('aria-label', ariaLabel);
-      dueEl.textContent = `📅 ${dueRelative}`;
+      
+      // Usar dojo-icon en lugar de emoji (IMP-07)
+      const iconEl = document.createElement('dojo-icon');
+      (iconEl as any).setAttribute('name', 'calendar');
+      (iconEl as any).setAttribute('size', 'xs');
+      dueEl.appendChild(iconEl);
+      
+      const textNode = document.createElement('span');
+      textNode.textContent = dueRelative;
+      dueEl.appendChild(textNode);
+      
       footer.appendChild(dueEl);
     }
 
