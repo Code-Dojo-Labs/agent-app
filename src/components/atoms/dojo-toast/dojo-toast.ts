@@ -17,6 +17,9 @@ export class DojoToast extends HTMLElement {
   private _shadow: ShadowRoot;
   private _timeoutId: ReturnType<typeof setTimeout> | null = null;
   private _isShowing = false;
+  private _dismissBtn: HTMLButtonElement | null = null;
+  private _undoBtn: HTMLButtonElement | null = null;
+  private _container: HTMLElement | null = null;
 
   get isShowing(): boolean { return this._isShowing; }
 
@@ -33,9 +36,24 @@ export class DojoToast extends HTMLElement {
   }
 
   disconnectedCallback(): void {
+    // Limpiar timeout
     if (this._timeoutId !== null) {
       clearTimeout(this._timeoutId);
+      this._timeoutId = null;
     }
+    
+    // Limpiar event listeners de botones
+    if (this._dismissBtn) {
+      this._dismissBtn.removeEventListener('click', this._onClickDismiss);
+      this._dismissBtn = null;
+    }
+    if (this._undoBtn) {
+      this._undoBtn.removeEventListener('click', this._onClickUndo);
+      this._undoBtn = null;
+    }
+    
+    // Limpiar referencias de contenedor
+    this._container = null;
   }
 
   attributeChangedCallback(): void {
@@ -103,10 +121,12 @@ export class DojoToast extends HTMLElement {
 
   private _performDismiss(): void {
     this._isShowing = false;
-    const container = this._shadow.querySelector('.toast-container');
+    const container = this._container || this._shadow.querySelector('.toast-container');
     if (container) {
       container.classList.add('dismissing');
-      setTimeout(() => {
+      
+      // Esperar a que la animación termine ANTES de remover el elemento
+      const removeToast = () => {
         this.dispatchEvent(new CustomEvent('dojo:toast-dismiss', {
           bubbles: true,
           composed: true,
@@ -114,7 +134,17 @@ export class DojoToast extends HTMLElement {
         if (this.parentElement) {
           this.parentElement.removeChild(this);
         }
-      }, 150);
+      };
+      
+      // Escuchar el evento de fin de animación
+      const handleAnimationEnd = () => {
+        container.removeEventListener('animationend', handleAnimationEnd);
+        removeToast();
+      };
+      container.addEventListener('animationend', handleAnimationEnd, { once: true });
+      
+      // Fallback en caso de que animationend no dispare (170ms es buffer de seguridad)
+      setTimeout(removeToast, 170);
     }
   }
 
@@ -147,6 +177,16 @@ export class DojoToast extends HTMLElement {
 
   private _render(): void {
     const vConfig = DojoToast.VARIANT_CONFIG[this.variant];
+
+    // Limpiar referencias previas de botones
+    if (this._dismissBtn) {
+      this._dismissBtn.removeEventListener('click', this._onClickDismiss);
+      this._dismissBtn = null;
+    }
+    if (this._undoBtn) {
+      this._undoBtn.removeEventListener('click', this._onClickUndo);
+      this._undoBtn = null;
+    }
 
     this._shadow.innerHTML = '';
 
@@ -285,6 +325,7 @@ export class DojoToast extends HTMLElement {
     this._shadow.appendChild(style);
 
     const container = document.createElement('div');
+    this._container = container;  // Guardar referencia
     container.className = 'toast-container';
     container.role = 'status';
     container.setAttribute('aria-live', 'polite');
@@ -309,6 +350,7 @@ export class DojoToast extends HTMLElement {
 
     if (this.variant === 'warning' && this.hasAttribute('show-undo')) {
       const undoBtn = document.createElement('button');
+      this._undoBtn = undoBtn;  // Guardar referencia para cleanup
       undoBtn.className = 'toast-undo-btn';
       undoBtn.type = 'button';
       undoBtn.textContent = this.undoLabel;
@@ -319,6 +361,7 @@ export class DojoToast extends HTMLElement {
 
     if (this.isDismissible) {
       const dismissBtn = document.createElement('button');
+      this._dismissBtn = dismissBtn;  // Guardar referencia para cleanup
       dismissBtn.className = 'toast-dismiss-btn';
       dismissBtn.type = 'button';
       dismissBtn.textContent = '✕';
