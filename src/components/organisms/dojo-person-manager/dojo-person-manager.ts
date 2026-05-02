@@ -31,6 +31,7 @@
 import type { Person } from '../../../types/models.js';
 import { getAllPersons, createPerson, updatePerson, deletePerson } from '../../../db/person.repository.js';
 import { getAllTasks } from '../../../db/task.repository.js';
+import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 
 // ── Emojis predeterminados para avatares ───────────────────────────────────
 const PRESET_AVATARS = [
@@ -429,16 +430,6 @@ export class DojoPersonManager extends HTMLElement {
         }
 
         .person-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: var(--dojo-radius-sm, 6px);
-          background: var(--dojo-primary, #3B82F6);
-          color: #FFFFFF;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 600;
-          font-size: 14px;
           flex-shrink: 0;
         }
 
@@ -789,15 +780,13 @@ export class DojoPersonManager extends HTMLElement {
 
       } else {
         // Mostrar persona normal — construido con createElement (OWASP A3)
-        const isEmoji = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(person.avatar);
-
         const personItem = document.createElement('div');
         personItem.className = 'person-item';
 
-        const avatarEl = document.createElement('div');
+        const avatarEl = document.createElement('dojo-person-avatar');
         avatarEl.className = 'person-avatar';
-        if (isEmoji) avatarEl.style.cssText = 'background: transparent; color: inherit; border: 1px solid var(--dojo-border, #E5E7EB);';
-        avatarEl.textContent = person.avatar;
+        avatarEl.setAttribute('name', person.name);
+        avatarEl.setAttribute('size', 'md');
 
         const infoEl = document.createElement('div');
         infoEl.className = 'person-info';

@@ -1,17 +1,22 @@
 /**
- * dojo-person-avatar — Átomo avatar de persona
+ * dojo-person-avatar — Átomo avatar de persona (IMP-09)
  *
- * Muestra el avatar (emoji o inicial) de una persona asignada a tareas.
- * Soporta tooltips con el nombre completo y indicating si es emoji o inicial generada.
+ * Avatar circular con iniciales generadas y color de fondo determinístico
+ * basado en el nombre. Compatible con imagen de perfil vía `src`.
  *
- * ## Atributos
- * - `avatar`  → string  — emoji o inicial(es) de la persona 
- * - `name`    → string  — nombre completo para tooltip
- * - `size`    → 'sm' | 'md' | 'lg' — tamaño del avatar (default: 'md')
+ * ## Atributos observados
+ * | Atributo | Tipo              | Descripción                                   |
+ * |----------|-------------------|-----------------------------------------------|
+ * | name     | string            | Nombre completo → genera iniciales y color    |
+ * | size     | 'sm'|'md'|'lg'   | Tamaño del avatar (default: 'md')             |
+ * | src      | string (opcional) | URL o data-URL de imagen de perfil            |
  *
- * ## CSS Custom Properties heredadas  
- * --dojo-bg, --dojo-surface, --dojo-border, --dojo-text-primary,
- * --dojo-radius-sm, --dojo-primary
+ * ## CSS Custom Properties
+ * --dojo-surface, --dojo-border, --dojo-shadow
+ *
+ * ## Utilidades estáticas exportadas
+ * - `DojoPersonAvatar.nameToColor(name)` → color HSL determinístico
+ * - `DojoPersonAvatar.nameToInitials(name)` → string de 1-2 caracteres
  */
 
 export class DojoPersonAvatar extends HTMLElement {
@@ -25,32 +30,21 @@ export class DojoPersonAvatar extends HTMLElement {
   }
 
   connectedCallback(): void {
-    if (this._shadow.childElementCount > 0) return;
     this._render();
   }
 
   static get observedAttributes(): string[] {
-    return ['avatar', 'name', 'size'];
+    return ['name', 'size', 'src'];
   }
 
   attributeChangedCallback(): void {
-    if (this._shadow.childElementCount > 0) {
-      this._render();
-    }
+    if (this.isConnected) this._render();
   }
 
   // ── Getters de atributos ─────────────────────────────────────────────────
 
-  get avatar(): string {
-    return this.getAttribute('avatar') || '?';
-  }
-
-  set avatar(value: string) {
-    this.setAttribute('avatar', value);
-  }
-
   get name(): string {
-    return this.getAttribute('name') || 'Persona sin nombre';
+    return this.getAttribute('name') ?? '';
   }
 
   set name(value: string) {
@@ -58,128 +52,168 @@ export class DojoPersonAvatar extends HTMLElement {
   }
 
   get size(): 'sm' | 'md' | 'lg' {
-    const value = this.getAttribute('size');
-    return value === 'sm' || value === 'lg' ? value : 'md';
+    const v = this.getAttribute('size');
+    return v === 'sm' || v === 'lg' ? v : 'md';
   }
 
   set size(value: 'sm' | 'md' | 'lg') {
     this.setAttribute('size', value);
   }
 
+  get src(): string {
+    return this.getAttribute('src') ?? '';
+  }
+
+  set src(value: string) {
+    if (value) this.setAttribute('src', value);
+    else this.removeAttribute('src');
+  }
+
+  // ── Utilidades estáticas (reutilizables externamente) ────────────────────
+
+  /**
+   * Genera un color HSL determinístico a partir del nombre.
+   * Mismo nombre → mismo color en cualquier sesión/dispositivo.
+   * Saturación 65 % y luminosidad 42 % garantizan colores vividos y accesibles.
+   */
+  static nameToColor(name: string): string {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = (hash * 31 + name.charCodeAt(i)) & 0xFFFFFF;
+    }
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 65%, 42%)`;
+  }
+
+  /**
+   * Extrae hasta 2 iniciales del nombre completo.
+   * "Ana Torres"  → "AT"
+   * "Juan"        → "J"
+   * ""            → "?"
+   */
+  static nameToInitials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  /**
+   * Devuelve '#FFFFFF' o '#000000' según cuál contraste mejor contra bgHsl.
+   * Aproximación rápida: luminosidad < 55 % → texto blanco.
+   */
+  static pickTextColor(bgHsl: string): '#FFFFFF' | '#000000' {
+    const match = /hsl\(\s*\d+\s*,\s*[\d.]+%\s*,\s*([\d.]+)%/.exec(bgHsl);
+    if (!match) return '#FFFFFF';
+    return parseFloat(match[1]) < 55 ? '#FFFFFF' : '#000000';
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   private _render(): void {
-    const avatar = this.avatar;
-    const name = this.name;
-    const size = this.size;
+    const name     = this.name;
+    const size     = this.size;
+    const src      = this.src;
+    const initials = DojoPersonAvatar.nameToInitials(name);
+    const bg       = DojoPersonAvatar.nameToColor(name || '?');
+    const textColor = DojoPersonAvatar.pickTextColor(bg);
 
-    // Detectar si es emoji o iniciales
-    const isEmoji = this._isEmoji(avatar);
-    
+    const sizeMap = { sm: '20px', md: '28px', lg: '40px' } as const;
+    const fontMap = { sm: '9px',  md: '11px', lg: '15px' } as const;
+    const px = sizeMap[size];
+    const fs = fontMap[size];
+
+    this._shadow.innerHTML = '';
+
     const style = document.createElement('style');
     style.textContent = `
       :host {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        flex-shrink: 0;
       }
 
       .avatar {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border-radius: var(--dojo-radius-sm, 6px);
-        background: ${isEmoji ? 'transparent' : 'var(--dojo-primary, #3B82F6)'};
-        color: ${isEmoji ? 'inherit' : '#FFFFFF'};
-        font-weight: 600;
+        border-radius: 50%;
+        width: ${px};
+        height: ${px};
+        font-size: ${fs};
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        background: ${bg};
+        color: ${textColor};
+        border: 2px solid var(--dojo-surface, #FFFFFF);
+        box-shadow: 0 0 0 1px rgba(0,0,0,.08);
         cursor: default;
         position: relative;
-        border: 1px solid var(--dojo-border, #E5E7EB);
-        transition: all 0.15s ease;
+        flex-shrink: 0;
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+        overflow: hidden;
+        user-select: none;
       }
 
       .avatar:hover {
-        transform: scale(1.05);
-        border-color: var(--dojo-primary, #3B82F6);
+        transform: scale(1.1);
+        box-shadow: 0 0 0 2px ${bg}, 0 2px 6px rgba(0,0,0,.18);
+        z-index: 1;
       }
 
-      /* Tamaños */
-      .avatar--sm {
-        width: 20px;
-        height: 20px;
-        font-size: 10px;
-        line-height: 1;
+      .avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
       }
 
-      .avatar--md {
-        width: 28px;
-        height: 28px;
-        font-size: ${isEmoji ? '14px' : '12px'};
-        line-height: 1;
-      }
-
-      .avatar--lg {
-        width: 36px;
-        height: 36px;
-        font-size: ${isEmoji ? '18px' : '14px'};
-        line-height: 1;
-      }
-
-      /* Tooltip */
+      /* Tooltip nativo mejorado */
       .avatar::after {
-        content: attr(title);
+        content: attr(aria-label);
         position: absolute;
-        bottom: 110%;
+        bottom: calc(100% + 6px);
         left: 50%;
         transform: translateX(-50%);
-        background: var(--dojo-surface, #1F2937);
+        background: rgba(17,24,39,0.92);
         color: #FFFFFF;
-        padding: 4px 8px;
-        border-radius: var(--dojo-radius-sm, 6px);
-        font-size: 12px;
-        font-weight: 400;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 500;
         white-space: nowrap;
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.15s ease;
         z-index: 1000;
       }
-
-      .avatar:hover::after {
-        opacity: 1;
-      }
-
-      /* Responsive */
-      @media (max-width: 640px) {
-        .avatar--md {
-          width: 24px;
-          height: 24px;
-          font-size: ${isEmoji ? '12px' : '10px'};
-        }
-      }
+      .avatar:hover::after { opacity: 1; }
     `;
+    this._shadow.appendChild(style);
 
     const avatarEl = document.createElement('div');
-    avatarEl.className = `avatar avatar--${size}`;
-    avatarEl.textContent = avatar;
-    avatarEl.title = name;
+    avatarEl.className = 'avatar';
+    avatarEl.setAttribute('role', 'img');
+    avatarEl.setAttribute('aria-label', name || 'Avatar');
 
-    this._shadow.innerHTML = '';
-    this._shadow.appendChild(style);
+    if (src) {
+      // Modo imagen — fallback a iniciales si la imagen falla
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = name;
+      img.addEventListener('error', () => {
+        img.remove();
+        avatarEl.textContent = initials;
+      });
+      avatarEl.appendChild(img);
+    } else {
+      avatarEl.textContent = initials;
+    }
+
     this._shadow.appendChild(avatarEl);
-  }
-
-  // ── Utilidades ────────────────────────────────────────────────────────────
-
-  /**
-   * Detecta si un string contiene emojis.
-   * Regex simplificado que cubre la mayoría de emojis Unicode.
-   */
-  private _isEmoji(str: string): boolean {
-    const emojiRegex = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u;
-    return emojiRegex.test(str);
   }
 }
 
-// Registrar el componente
 customElements.define(DojoPersonAvatar.TAG, DojoPersonAvatar);

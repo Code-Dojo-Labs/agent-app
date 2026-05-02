@@ -32,6 +32,7 @@ import { getAllPersons } from '../../../db/person.repository.js';
 import { getAllTemplates } from '../../../db/template.repository.js';
 import { generateUUID } from '../../../utils/uuid.js';
 import { pickTextColor, meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
+import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 
 const PRIORITIES: { value: Priority; label: string }[] = [
   { value: 'low',    label: '⬇️ Baja'    },
@@ -1454,8 +1455,16 @@ export class DojoTaskDialog extends HTMLElement {
         if (!person) continue;
         const chip = document.createElement('span');
         chip.className = 'label-chip';
-        chip.style.cssText = 'background: var(--dojo-bg); border: 1px solid var(--dojo-border); color: var(--dojo-text-primary); gap: 0.25rem;';
-        chip.textContent = `${person.avatar} ${person.name}`;
+        chip.style.cssText = 'background: var(--dojo-bg); border: 1px solid var(--dojo-border); color: var(--dojo-text-primary); gap: 0.25rem; display: inline-flex; align-items: center;';
+
+        const chipAvatar = document.createElement('dojo-person-avatar');
+        chipAvatar.setAttribute('name', person.name);
+        chipAvatar.setAttribute('size', 'sm');
+        chip.appendChild(chipAvatar);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = person.name;
+        chip.appendChild(nameSpan);
 
         const removeBtn = document.createElement('button');
         removeBtn.className = 'label-chip-remove';
@@ -1504,12 +1513,13 @@ export class DojoTaskDialog extends HTMLElement {
           else this._selectedAssigneeIds.delete(person.id);
           renderAssigneeChips();
         });
-        const avatarSpan = document.createElement('span');
-        avatarSpan.textContent = person.avatar;
+        const avatarEl = document.createElement('dojo-person-avatar');
+        avatarEl.setAttribute('name', person.name);
+        avatarEl.setAttribute('size', 'sm');
         const nameSp = document.createElement('span');
         nameSp.textContent = person.name;
         opt.appendChild(cb);
-        opt.appendChild(avatarSpan);
+        opt.appendChild(avatarEl);
         opt.appendChild(nameSp);
         assigneePicker.appendChild(opt);
       }
