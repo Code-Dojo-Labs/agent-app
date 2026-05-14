@@ -1,8 +1,8 @@
-# IMP-11 — Integración con Supabase: Backend, Auth y Sincronización en la Nube
+# IMP-11 — Integración con Supabase Personal: Backend, Auth y Sincronización en la Nube
 
-> Versión: 1.0
-> Fecha: 2026-05-12
-> Estado: Propuesta
+> Versión: 2.0
+> Fecha: 2026-05-14
+> Estado: Propuesta Actualizada
 
 ---
 
@@ -15,44 +15,99 @@ La aplicación actualmente persiste todos los datos en **IndexedDB** (almacenami
 - La colaboración en tiempo real entre múltiples usuarios o pestañas se resuelve con BroadcastChannel (US-30), pero no funciona entre dispositivos distintos.
 - Un borrado de caché o cambio de navegador implica **pérdida total de datos**.
 
+### Decisión de Arquitectura: Supabase Personal (BYOS)
+
+La integración **no** utiliza un proyecto de Supabase centralizado gestionado por la aplicación. En cambio, **cada usuario provee su propio proyecto de Supabase** (modelo _Bring Your Own Supabase_). Esto garantiza:
+
+- **Privacidad total:** los datos del usuario nunca pasan por infraestructura de terceros distintos de su propio proyecto.
+- **Control completo:** el usuario es dueño de su base de datos, claves y cuotas.
+- **Sin costos ocultos:** el plan gratuito de Supabase es más que suficiente para uso personal.
+- **Uso opcional:** la app funciona 100% en modo offline/local sin necesidad de configurar Supabase.
+
 ---
 
 ## Propuesta de Solución
 
-Integrar **Supabase** como capa de backend, manteniendo IndexedDB como caché local para soporte offline, implementando un patrón **offline-first con sincronización**.
+Integrar **Supabase** como capa de backend opcional y personal, manteniendo IndexedDB como almacenamiento primario para soporte offline, implementando un patrón **offline-first con sincronización voluntaria**.
+
+### Flujo de Onboarding de Supabase
+
+Al abrir la app por primera vez (o desde Ajustes), el usuario verá dos opciones:
+
+```
+┌─────────────────────────────────────────────┐
+│         ¿Cómo quieres usar la app?          │
+│                                             │
+│  [ 🖥  Modo Local (offline) ]               │
+│    Sin cuenta, datos en este navegador      │
+│                                             │
+│  [ ☁️  Conectar mi Supabase ]               │
+│    Sincroniza entre dispositivos con tu     │
+│    propio proyecto gratuito de Supabase     │
+└─────────────────────────────────────────────┘
+```
+
+Si elige **Conectar mi Supabase**, se mostrará un formulario de configuración:
+
+```
+┌─────────────────────────────────────────┐
+│        Configurar Supabase Personal     │
+│                                         │
+│  Project URL:                           │
+│  [ https://xxxx.supabase.co          ] │
+│                                         │
+│  Anon Key:                              │
+│  [ eyJhbGciOiJIUzI1NiIs...           ] │
+│                                         │
+│  ¿Dónde los encuentro?  [Ver guía →]   │
+│                                         │
+│              [ Conectar ]               │
+└─────────────────────────────────────────┘
+```
+
+Las credenciales se almacenan **exclusivamente en `localStorage` del navegador del usuario**. La app nunca las envía a ningún servidor propio.
 
 ### Arquitectura propuesta
 
 ```
-┌─────────────────────────────────────┐
-│           Frontend (Lit + TS)       │
-│                                     │
-│  ┌──────────────┐  ┌─────────────┐  │
-│  │  IndexedDB   │  │  Supabase   │  │
-│  │ (cache/      │◄─►│  JS Client  │  │
-│  │  offline)    │  │             │  │
-│  └──────────────┘  └──────┬──────┘  │
-└─────────────────────────  │ ────────┘
-                            │
-                    ┌───────▼────────┐
-                    │   Supabase     │
-                    │  ┌──────────┐  │
-                    │  │ Auth     │  │
-                    │  ├──────────┤  │
-                    │  │ Postgres │  │
-                    │  ├──────────┤  │
-                    │  │ Realtime │  │
-                    │  └──────────┘  │
-                    └────────────────┘
+┌─────────────────────────────────────────────────┐
+│                Frontend (Lit + TS)              │
+│                                                 │
+│  ┌──────────────┐      ┌──────────────────────┐ │
+│  │  IndexedDB   │      │  Supabase JS Client  │ │
+│  │  (primario / │◄────►│  (Project URL +      │ │
+│  │   offline)   │      │   Anon Key propios)  │ │
+│  └──────────────┘      └──────────┬───────────┘ │
+└──────────────────────────────────  │  ───────────┘
+                                     │
+                          ┌──────────▼──────────┐
+                          │  Supabase del       │
+                          │  USUARIO            │
+                          │  ┌───────────────┐  │
+                          │  │ Auth          │  │
+                          │  ├───────────────┤  │
+                          │  │ Postgres (RLS)│  │
+                          │  ├───────────────┤  │
+                          │  │ Realtime      │  │
+                          │  └───────────────┘  │
+                          └─────────────────────┘
 ```
 
 ### Componentes a implementar
 
-#### 1. Autenticación (Supabase Auth)
-- Login con **email + contraseña** y con **OAuth (Google, GitHub)**.
+#### 0. Pantalla de Selección de Modo (nuevo)
+- Componente `dojo-setup-screen` mostrado al primer uso o desde Ajustes.
+- Opción **Modo Local**: continúa usando solo IndexedDB. Sin fricción adicional.
+- Opción **Conectar Supabase**: muestra formulario para ingresar `Project URL` y `Anon Key`.
+- Enlace a guía de ayuda para obtener las credenciales desde el dashboard de Supabase.
+- Las credenciales se validan con una llamada de prueba antes de guardarlas.
+- Estado de conexión visible en la barra superior de la app (ícono nube / offline).
+
+#### 1. Autenticación (Supabase Auth) — solo en modo conectado
+- Login con **email + contraseña** y con **OAuth (Google, GitHub)** configurado por el usuario en su proyecto.
 - Sesión persistida en `localStorage` vía el cliente de Supabase.
 - Pantalla de login minimalista (`dojo-auth-screen` Web Component).
-- Protección de rutas: tablero solo accesible con sesión activa.
+- Protección de rutas: tablero solo accesible con sesión activa (en modo conectado).
 - Row-Level Security (RLS) en Postgres para aislar datos por usuario.
 
 #### 2. Migración del Modelo de Datos
@@ -68,6 +123,8 @@ Nuevas tablas en Supabase con RLS habilitado:
 | `subtasks` | Subtareas / checklist |
 | `activity_log` | Historial de actividad |
 
+La app incluirá un script SQL de inicialización que el usuario puede ejecutar en su proyecto de Supabase para crear estas tablas con RLS preconfigurado.
+
 #### 3. Capa de Repositorios Unificada
 Refactorizar los repositorios existentes (`src/db/`) para implementar una interfaz común:
 
@@ -82,33 +139,48 @@ interface IRepository<T> {
 ```
 
 Implementaciones:
-- `IndexedDBRepository<T>` — existente, para offline.
-- `SupabaseRepository<T>` — nueva, contra Supabase.
+- `IndexedDBRepository<T>` — existente, para modo local/offline.
+- `SupabaseRepository<T>` — nueva, contra el Supabase personal del usuario.
 - `SyncRepository<T>` — wrapper que escribe en ambos y sincroniza al recuperar conexión.
+
+Un `RepositoryFactory` instancia la implementación correcta según si Supabase está configurado o no.
 
 #### 4. Sincronización en Tiempo Real
 - Usar **Supabase Realtime** (Postgres Changes) para propagar cambios entre dispositivos/pestañas.
-- Reemplazar el BroadcastChannel actual (US-30) por Realtime como fuente única de verdad.
+- Reemplazar el BroadcastChannel actual (US-30) por Realtime como fuente única de verdad (solo en modo conectado).
 - Estrategia de conflictos: **last-write-wins** basado en `updated_at`.
 
 #### 5. Indicador de Estado de Conexión
 - Banner/indicador visual cuando la app opera en modo offline.
 - Cola de escrituras pendientes sincronizadas al recuperar conexión.
+- Indicador diferenciado entre "sin Supabase configurado" vs "Supabase configurado pero sin internet".
 
 ---
 
 ## Criterios de Aceptación
 
-### Autenticación
-- [ ] El usuario puede registrarse con email y contraseña.
-- [ ] El usuario puede iniciar sesión con Google u OAuth configurado.
+### Modo Local (offline — sin Supabase)
+- [ ] La app funciona completamente sin configurar Supabase: creación, edición, eliminación y drag & drop de tareas operan sobre IndexedDB.
+- [ ] El usuario puede elegir "Modo Local" al primer uso y omitir la configuración de Supabase.
+- [ ] Desde Ajustes, el usuario puede conectar Supabase en cualquier momento posterior.
+
+### Configuración de Supabase Personal
+- [ ] El usuario puede ingresar su `Project URL` y `Anon Key` desde la pantalla de configuración o Ajustes.
+- [ ] La app valida las credenciales con una llamada de prueba antes de guardarlas.
+- [ ] Las credenciales se almacenan solo en `localStorage`; nunca se envían a servidores propios de la app.
+- [ ] El usuario puede desconectar Supabase y volver a modo local en cualquier momento.
+- [ ] Se muestra una guía/enlace de ayuda para obtener las credenciales desde el dashboard de Supabase.
+
+### Autenticación (solo en modo conectado)
+- [ ] El usuario puede registrarse con email y contraseña en su propio proyecto de Supabase.
+- [ ] El usuario puede iniciar sesión con OAuth si lo configura en su proyecto de Supabase.
 - [ ] La sesión persiste entre recargas de página.
 - [ ] Cerrar sesión borra la sesión local y redirige al login.
 - [ ] Un usuario no puede ver datos de otro usuario (RLS verificado).
 
 ### Sincronización
 - [ ] Los cambios realizados en el dispositivo A aparecen en el dispositivo B en menos de 2 segundos (con conexión activa).
-- [ ] En modo offline, las operaciones CRUD siguen funcionando via IndexedDB.
+- [ ] En modo offline (sin internet pero con Supabase configurado), las operaciones CRUD siguen funcionando via IndexedDB.
 - [ ] Al recuperar conexión, los cambios offline se sincronizan automáticamente con Supabase.
 - [ ] Los conflictos se resuelven por `updated_at` más reciente.
 
@@ -116,8 +188,8 @@ Implementaciones:
 - [ ] La carga inicial del tablero no supera 1.5 s en conexión estándar.
 - [ ] Las operaciones locales (crear, mover tarea) son inmediatas (optimistic updates).
 
-### Migración
-- [ ] Existe un proceso de migración que importa los datos de IndexedDB existente a Supabase al primer login.
+### Migración de Datos Existentes
+- [ ] Al conectar Supabase por primera vez, se ofrece migrar los datos de IndexedDB existentes al proyecto del usuario.
 - [ ] El proceso de migración es reversible / exportable.
 
 ---
