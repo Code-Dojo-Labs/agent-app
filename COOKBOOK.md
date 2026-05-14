@@ -44,6 +44,7 @@
    - [Paso 30 — Sincronización entre pestañas (US-30)](#paso-30--sincronización-entre-pestañas-us-30)
    - [Paso 31 — Soporte PWA (US-31 / Issue #49)](#paso-31--soporte-pwa-us-31--issue-49)
    - [Paso 32 — Sistema de asignación de personas completo (US-29 / Issue #47)](#paso-32--sistema-de-asignación-de-personas-completo-us-29--issue-47)
+   - [Paso 33 — Mapa Completo de la Base de Datos (IndexedDB)](#paso-33---mapa-completo-de-la-base-de-datos-indexeddb--ejemplo-de-base-llena)
    - [Paso 34 — Actualización del Wiki: US-28 a US-37 (Issue #100)](#paso-34--actualización-del-wiki-us-28-a-us-37-issue-100)
 
 ---

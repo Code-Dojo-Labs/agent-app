@@ -265,6 +265,100 @@ const WIKI_SECTIONS: WikiSection[] = [
     `,
   },
   {
+    id: 'busqueda-global',
+    title: 'Búsqueda global',
+    icon: '🔍',
+    html: `
+      <h2>Búsqueda global y paleta de comandos</h2>
+      <p>Usa <kbd>Cmd / Ctrl + K</kbd> para abrir la <strong>paleta de comandos global</strong> y buscar tareas, tableros o acciones en toda la aplicación.</p>
+
+      <h3>Cómo usar la paleta</h3>
+      <ol>
+        <li>Pulsa <kbd>Cmd / Ctrl + K</kbd> (o haz clic en el ícono 🔍 del encabezado).</li>
+        <li>Escribe el nombre de una tarea, tablero o acción.</li>
+        <li>Navega con <kbd>↑</kbd> / <kbd>↓</kbd> y abre con <kbd>Enter</kbd>.</li>
+        <li>Cierra con <kbd>Escape</kbd> o clic fuera de la paleta.</li>
+      </ol>
+
+      <h3>Tipos de búsqueda</h3>
+      <table>
+        <thead><tr><th scope="col">Búsqueda</th><th scope="col">Cómo</th></tr></thead>
+        <tbody>
+          <tr><td>Por título</td><td>Escribe el texto directamente</td></tr>
+          <tr><td>Por descripción</td><td>Escribe el texto — resultados secundarios</td></tr>
+          <tr><td>Por etiqueta</td><td>Escribe <code>#nombre-etiqueta</code></td></tr>
+        </tbody>
+      </table>
+      <p class="note">Si no hay resultados, puedes crear la tarea directamente desde la paleta.</p>
+    `,
+  },
+  {
+    id: 'assignees',
+    title: 'Asignación de personas',
+    icon: '👤',
+    html: `
+      <h2>Asignación de personas</h2>
+      <p>Asigna una o más personas a cada tarea para distribuir el trabajo y ver quién es responsable directamente desde la tarjeta del tablero.</p>
+
+      <h3>Crear una persona</h3>
+      <ol>
+        <li>Accede a <strong>Ajustes → Personas</strong> (o desde el selector en el detalle de una tarea).</li>
+        <li>Haz clic en <strong>Nueva persona</strong>.</li>
+        <li>Introduce el nombre y opcionalmente un emoji o inicial para el avatar.</li>
+        <li>Confirma. La persona queda guardada en IndexedDB.</li>
+      </ol>
+
+      <h3>Asignar personas a una tarea</h3>
+      <ol>
+        <li>Abre el detalle de la tarea.</li>
+        <li>En la sección <strong>Asignados</strong>, haz clic en el selector.</li>
+        <li>Selecciona una o varias personas de la lista.</li>
+      </ol>
+
+      <h3>Ver asignados en el tablero</h3>
+      <p>Los avatares aparecen en la esquina inferior derecha de la tarjeta. Si hay más de tres asignados se muestra <strong>+N</strong>.</p>
+
+      <h3>Filtrar por persona</h3>
+      <p>Usa el <strong>panel de filtros</strong> (ícono embudo) y selecciona una persona para mostrar solo sus tareas en el tablero activo.</p>
+      <p class="note">El directorio de personas es global a todos los tableros.</p>
+    `,
+  },
+  {
+    id: 'pwa',
+    title: 'Usar como app (PWA)',
+    icon: '📱',
+    html: `
+      <h2>Usar como app (PWA)</h2>
+      <p>Dojo Kanban es una <strong>Progressive Web App</strong>: puedes instalarla en tu escritorio o móvil y usarla sin conexión como si fuera una app nativa.</p>
+
+      <h3>Instalar en escritorio (Chrome / Edge)</h3>
+      <ol>
+        <li>Abre la app en el navegador.</li>
+        <li>Haz clic en el ícono <strong>⊕ Instalar</strong> en la barra de dirección.</li>
+        <li>Confirma la instalación. La app se abre en su propia ventana.</li>
+      </ol>
+
+      <h3>Instalar en móvil</h3>
+      <ul>
+        <li><strong>Android (Chrome):</strong> menú <strong>⋮ → Añadir a pantalla de inicio</strong>.</li>
+        <li><strong>iOS (Safari):</strong> botón <strong>Compartir → Añadir a pantalla de inicio</strong>.</li>
+      </ul>
+
+      <h3>Funcionalidad offline</h3>
+      <table>
+        <thead><tr><th scope="col">Acción</th><th scope="col">¿Disponible offline?</th></tr></thead>
+        <tbody>
+          <tr><td>Ver tableros y tareas</td><td>✅</td></tr>
+          <tr><td>Crear, editar, mover tareas</td><td>✅</td></tr>
+          <tr><td>Sincronización con Supabase</td><td>⏳ Se aplaza hasta tener conexión</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Actualizar la app</h3>
+      <p>Cuando hay una nueva versión, aparece un <strong>banner de actualización</strong>. Haz clic en <strong>Actualizar</strong> para recargar con la última versión.</p>
+    `,
+  },
+  {
     id: 'wip-limits',
     title: 'Límites WIP',
     icon: '🚦',
@@ -288,7 +382,7 @@ const WIKI_SECTIONS: WikiSection[] = [
 
       <h3>Estados visuales del contador</h3>
       <table>
-        <thead><tr><th>Estado</th><th>Color</th></tr></thead>
+        <thead><tr><th scope="col">Estado</th><th scope="col">Color</th></tr></thead>
         <tbody>
           <tr><td>Dentro del límite</td><td>Normal</td></tr>
           <tr><td>En el límite exacto</td><td>Amarillo / advertencia</td></tr>
@@ -319,7 +413,7 @@ const WIKI_SECTIONS: WikiSection[] = [
 
       <h3>Columnas disponibles</h3>
       <table>
-        <thead><tr><th>Columna</th><th>Ordenable</th></tr></thead>
+        <thead><tr><th scope="col">Columna</th><th scope="col">Ordenable</th></tr></thead>
         <tbody>
           <tr><td>Título</td><td>✅</td></tr>
           <tr><td>Estado</td><td>✅</td></tr>
@@ -354,7 +448,7 @@ const WIKI_SECTIONS: WikiSection[] = [
 
       <h3>Tipos de notificaciones</h3>
       <table>
-        <thead><tr><th>Momento</th><th>Mensaje</th></tr></thead>
+        <thead><tr><th scope="col">Momento</th><th scope="col">Mensaje</th></tr></thead>
         <tbody>
           <tr><td>24 h antes</td><td>⏰ "La tarea <em>X</em> vence mañana"</td></tr>
           <tr><td>Al vencer</td><td>🔴 "La tarea <em>X</em> ha vencido"</td></tr>
@@ -385,7 +479,7 @@ const WIKI_SECTIONS: WikiSection[] = [
 
       <h3>Cerrar el modal</h3>
       <table>
-        <thead><tr><th>Acción</th><th>Resultado</th></tr></thead>
+        <thead><tr><th scope="col">Acción</th><th scope="col">Resultado</th></tr></thead>
         <tbody>
           <tr><td>Clic en <strong>✕</strong></td><td>Cierra el modal</td></tr>
           <tr><td>Clic en el backdrop</td><td>Cierra el modal</td></tr>
@@ -432,7 +526,7 @@ const WIKI_SECTIONS: WikiSection[] = [
       <p>Cuando creas un <strong>nuevo tablero</strong>, se inicializa automáticamente con cuatro columnas estandarizadas:</p>
 
       <table>
-        <thead><tr><th>Orden</th><th>Nombre</th><th>Uso sugerido</th></tr></thead>
+        <thead><tr><th scope="col">Orden</th><th scope="col">Nombre</th><th scope="col">Uso sugerido</th></tr></thead>
         <tbody>
           <tr><td>1</td><td><strong>Backlog</strong></td><td>Tareas pendientes de planificar</td></tr>
           <tr><td>2</td><td><strong>En progreso</strong></td><td>Tareas actualmente en desarrollo</td></tr>
@@ -450,72 +544,6 @@ const WIKI_SECTIONS: WikiSection[] = [
         <li><strong>Reordenar</strong> arrastrando la cabecera.</li>
       </ul>
       <p class="note">Los tableros creados antes de esta versión no se ven afectados.</p>
-    `,
-  },
-  {
-    id: 'pwa',
-    title: 'Usar como app (PWA)',
-    icon: '📱',
-    html: `
-      <h2>Usar como app (PWA)</h2>
-      <p>Dojo Kanban es una <strong>Progressive Web App</strong>: puedes instalarla en tu escritorio o móvil y usarla sin conexión como si fuera una app nativa.</p>
-
-      <h3>Instalar en escritorio (Chrome / Edge)</h3>
-      <ol>
-        <li>Abre la app en el navegador.</li>
-        <li>Haz clic en el ícono <strong>⊕ Instalar</strong> en la barra de dirección.</li>
-        <li>Confirma la instalación. La app se abre en su propia ventana.</li>
-      </ol>
-
-      <h3>Instalar en móvil</h3>
-      <ul>
-        <li><strong>Android (Chrome):</strong> menú <strong>⋮ → Añadir a pantalla de inicio</strong>.</li>
-        <li><strong>iOS (Safari):</strong> botón <strong>Compartir → Añadir a pantalla de inicio</strong>.</li>
-      </ul>
-
-      <h3>Funcionalidad offline</h3>
-      <table>
-        <thead><tr><th>Acción</th><th>¿Disponible offline?</th></tr></thead>
-        <tbody>
-          <tr><td>Ver tableros y tareas</td><td>✅</td></tr>
-          <tr><td>Crear, editar, mover tareas</td><td>✅</td></tr>
-          <tr><td>Sincronización con Supabase</td><td>⏳ Se aplaza hasta tener conexión</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Actualizar la app</h3>
-      <p>Cuando hay una nueva versión, aparece un <strong>banner de actualización</strong>. Haz clic en <strong>Actualizar</strong> para recargar con la última versión.</p>
-    `,
-  },
-  {
-    id: 'assignees',
-    title: 'Asignación de personas',
-    icon: '👤',
-    html: `
-      <h2>Asignación de personas</h2>
-      <p>Asigna una o más personas a cada tarea para distribuir el trabajo y ver quién es responsable directamente desde la tarjeta del tablero.</p>
-
-      <h3>Crear una persona</h3>
-      <ol>
-        <li>Accede a <strong>Ajustes → Personas</strong> (o desde el selector en el detalle de una tarea).</li>
-        <li>Haz clic en <strong>Nueva persona</strong>.</li>
-        <li>Introduce el nombre y opcionalmente un emoji o inicial para el avatar.</li>
-        <li>Confirma. La persona queda guardada en IndexedDB.</li>
-      </ol>
-
-      <h3>Asignar personas a una tarea</h3>
-      <ol>
-        <li>Abre el detalle de la tarea.</li>
-        <li>En la sección <strong>Asignados</strong>, haz clic en el selector.</li>
-        <li>Selecciona una o varias personas de la lista.</li>
-      </ol>
-
-      <h3>Ver asignados en el tablero</h3>
-      <p>Los avatares aparecen en la esquina inferior derecha de la tarjeta. Si hay más de tres asignados se muestra <strong>+N</strong>.</p>
-
-      <h3>Filtrar por persona</h3>
-      <p>Usa el <strong>panel de filtros</strong> (ícono embudo) y selecciona una persona para mostrar solo sus tareas en el tablero activo.</p>
-      <p class="note">El directorio de personas es global a todos los tableros.</p>
     `,
   },
 ];
