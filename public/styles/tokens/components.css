@@ -34,8 +34,8 @@
   --btn-primary-bg:       var(--dojo-primary);
   --btn-primary-bg-hover: var(--dojo-primary-hover);
   --btn-primary-text:     var(--dojo-text-on-primary);
-  --btn-primary-radius:   var(--dojo-radius-sm);
-
+  --btn-primary-radius:   var(--dojo-radius-sm);  --btn-disabled-bg:      var(--color-slate-300);
+  --btn-disabled-text:    var(--color-slate-500);
   /* ── dojo-btn (botón peligro) ────────────────────────────────── */
   --btn-danger-bg:        var(--dojo-danger);
   --btn-danger-bg-hover:  var(--dojo-danger-hover);
@@ -76,4 +76,7 @@
   --customizer-border:    var(--dojo-border);
   --customizer-radius:    var(--dojo-radius-lg);
   --customizer-shadow:    var(--dojo-shadow-md);
+
+  /* ── dojo-person-avatar ──────────────────────────────────────── */
+  --avatar-bg-default:    var(--color-slate-300);
 }

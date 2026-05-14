@@ -68,7 +68,7 @@ async function bootstrap(): Promise<void> {
     // Será reemplazado por <dojo-error> Web Component cuando esté implementado.
     const errEl = document.createElement('div');
     errEl.setAttribute('role', 'alert');
-    errEl.style.cssText = 'padding:2rem;font-family:system-ui;color:#DC2626;text-align:center';
+    errEl.style.cssText = 'padding:2rem;font-family:system-ui;color:var(--dojo-danger,#DC2626);text-align:center';
 
     const title = document.createElement('h1');
     title.style.cssText = 'margin-bottom:.5rem;font-size:1.25rem';

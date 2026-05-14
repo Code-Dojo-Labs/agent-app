@@ -25,6 +25,17 @@
 
 const STORAGE_KEY = 'dojo-primary-color';
 
+/** Solo acepta hex de exactamente 6 dígitos (#RRGGBB). */
+const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
+
+/**
+ * Valida y devuelve un color hex seguro.
+ * Si el valor es inválido o nulo, devuelve el fallback.
+ */
+function sanitizeHex(value: string | null, fallback: string): string {
+  return value && HEX_RE.test(value) ? value : fallback;
+}
+
 /** Paleta de presets predefinidos */
 const COLOR_PRESETS: ReadonlyArray<{ label: string; value: string }> = [
   { label: 'Índigo (por defecto)', value: '#1D4ED8' },
@@ -56,13 +67,14 @@ function applyPrimaryColor(primary: string): void {
   const root = document.documentElement;
   root.style.setProperty('--dojo-primary',       primary);
   root.style.setProperty('--dojo-primary-hover',  darkenHex(primary));
-  root.style.setProperty('--dojo-primary-focus',  primary + '4D'); /* 30% opacidad aproximada */
+  root.style.setProperty('--dojo-primary-focus',  `color-mix(in srgb, ${primary} 30%, transparent)`);
 }
 
 /** Restaura el color desde localStorage (llamar en bootstrap). */
 export function restoreThemeCustomization(): void {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) applyPrimaryColor(saved);
+  const raw = localStorage.getItem(STORAGE_KEY);
+  const saved = sanitizeHex(raw, DEFAULT_PRIMARY);
+  if (raw) applyPrimaryColor(saved);
 }
 
 export class DojoThemeCustomizer extends HTMLElement {
@@ -86,6 +98,10 @@ export class DojoThemeCustomizer extends HTMLElement {
       this._shadow.querySelector('.panel')?.setAttribute('aria-hidden', String(!isOpen));
       if (isOpen) {
         document.addEventListener('keydown', this._onKeyDown);
+        // WCAG 2.1 §2.4.3: mover foco al primer elemento interactivo del dialog
+        requestAnimationFrame(() => {
+          (this._shadow.querySelector<HTMLElement>('.btn-close'))?.focus();
+        });
       } else {
         document.removeEventListener('keydown', this._onKeyDown);
       }
@@ -142,6 +158,7 @@ export class DojoThemeCustomizer extends HTMLElement {
   }
 
   private _applyAndSave(color: string): void {
+    if (!HEX_RE.test(color)) return; // rechazar valores no-hex
     applyPrimaryColor(color);
     localStorage.setItem(STORAGE_KEY, color);
     this._updateActivePreset(color);
@@ -167,7 +184,7 @@ export class DojoThemeCustomizer extends HTMLElement {
   // ── Render ───────────────────────────────────────────────────────
 
   private _render(): void {
-    const saved = localStorage.getItem(STORAGE_KEY) ?? DEFAULT_PRIMARY;
+    const saved = sanitizeHex(localStorage.getItem(STORAGE_KEY), DEFAULT_PRIMARY);
 
     this._shadow.innerHTML = `
       <style>
@@ -344,7 +361,7 @@ export class DojoThemeCustomizer extends HTMLElement {
         aria-hidden="true"
       >
         <header class="panel-header">
-          <h2>🎨 Personalizar tema</h2>
+          <h2><span aria-hidden="true">🎨</span> Personalizar tema</h2>
           <button class="btn-close" aria-label="Cerrar personalizador">✕</button>
         </header>
 

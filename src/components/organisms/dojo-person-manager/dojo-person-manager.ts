@@ -381,7 +381,7 @@ export class DojoPersonManager extends HTMLElement {
         }
 
         .btn-primary:disabled {
-          background: var(--dojo-text-muted);
+          background: var(--btn-disabled-bg);
           cursor: not-allowed;
         }
 
