@@ -17,10 +17,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="DojoKanban" />
     <link rel="apple-touch-icon" href="./icons/icon-192.svg" />
+
     <!--
-      Los estilos globales únicamente definen el reset base y las variables de tema.
-      Cada componente Web encapsula sus propios estilos en Shadow DOM.
+      Sistema de Design Tokens en 3 capas (US-43 / IMP-12):
+        1. primitives.css — escala de valores brutos (colores, tipografía, espaciado).
+        2. semantic.css   — tokens de rol que referencian primitivos; incluye light/dark.
+        3. components.css — overrides por componente.
+      Cada Web Component usa únicamente variables --dojo-* o --{componente}-*.
     -->
+    <link rel="stylesheet" href="./styles/tokens/primitives.css" />
+    <link rel="stylesheet" href="./styles/tokens/semantic.css" />
+    <link rel="stylesheet" href="./styles/tokens/components.css" />
+
     <style>
       /* ── Reset mínimo ─────────────────────────────────────────────── */
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -30,46 +38,6 @@
         background-color: var(--dojo-bg);
         color: var(--dojo-text-primary);
         min-height: 100dvh;
-      }
-
-      /* ── Tokens globales — modo claro ─────────────────────────────── */
-      :root {
-        --dojo-primary:        #1D4ED8;
-        --dojo-primary-hover:  #1E40AF;
-        --dojo-danger:         #DC2626;
-        --dojo-success:        #16A34A;
-        --dojo-warning:        #D97706;
-
-        --dojo-bg:             #F1F5F9;
-        --dojo-surface:        #FFFFFF;
-        --dojo-surface-hover:  #F7F8FA;
-        --dojo-border:         #E2E8F0;
-
-        --dojo-text-primary:   #172B4D;
-        --dojo-text-secondary: #5E6C84;
-        --dojo-text-muted:     #94A3B8;
-
-        --dojo-radius:         8px;
-        --dojo-radius-sm:      4px;
-
-        --dojo-shadow:         0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
-        --dojo-shadow-md:      0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
-      }
-
-      /* ── Tokens globales — modo oscuro ────────────────────────────── */
-      /* El tema se gestiona íntegramente mediante el atributo data-theme.
-         JS (theme.ts) establece data-theme="light"|"dark" según la preferencia
-         del usuario o la detección automática del SO. */
-      [data-theme="dark"] {
-        --dojo-bg:             #0F172A;
-        --dojo-surface:        #1E293B;
-        --dojo-surface-hover:  #273349;
-        --dojo-border:         #334155;
-        --dojo-text-primary:   #F1F5F9;
-        --dojo-text-secondary: #94A3B8;
-        --dojo-text-muted:     #475569;
-        --dojo-shadow:         0 1px 3px rgba(0,0,0,.24), 0 1px 2px rgba(0,0,0,.18);
-        --dojo-shadow-md:      0 4px 6px rgba(0,0,0,.20), 0 2px 4px rgba(0,0,0,.16);
       }
     </style>
 

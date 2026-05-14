@@ -256,7 +256,7 @@ export class DojoLabelManager extends HTMLElement {
         line-height: 1;
         transition: background 0.15s, color 0.15s;
       }
-      .delete-btn:hover { background: #FEE2E2; color: #B91C1C; }
+      .delete-btn:hover { background: var(--dojo-danger-bg); color: var(--dojo-danger-hover); }
       .delete-btn:focus-visible {
         outline: 2px solid #EF4444;
         outline-offset: 2px;
@@ -278,9 +278,9 @@ export class DojoLabelManager extends HTMLElement {
       }
       .delete-confirm-warning {
         font-size: 0.75rem;
-        color: #B45309;
+        color: var(--dojo-warning-text);
         margin: 0;
-        background: #FEF3C7;
+        background: var(--wiki-note-bg);
         border: 1px solid #F59E0B;
         border-radius: var(--dojo-radius-sm, 4px);
         padding: 0.3rem 0.5rem;
@@ -309,9 +309,9 @@ export class DojoLabelManager extends HTMLElement {
         font-size: 0.75rem;
         cursor: pointer;
         font-family: inherit;
-        background: #EF4444;
+        background: var(--dojo-danger-light);
         border: 1px solid #EF4444;
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         font-weight: 600;
         transition: opacity 0.15s;
       }
@@ -402,16 +402,16 @@ export class DojoLabelManager extends HTMLElement {
       /* Mensaje de error */
       .edit-error {
         font-size: 0.75rem;
-        color: #EF4444;
+        color: var(--dojo-danger-text);
         margin: 0;
       }
 
       /* Advertencia de contraste WCAG (US-13) */
       .edit-contrast-warning {
         font-size: 0.75rem;
-        color: #92400E;
+        color: var(--dojo-warning-text-dark);
         margin: 0;
-        background: #FEF3C7;
+        background: var(--wiki-note-bg);
         border: 1px solid #F59E0B;
         border-radius: var(--dojo-radius-sm, 4px);
         padding: 0.3rem 0.5rem;
@@ -472,7 +472,7 @@ export class DojoLabelManager extends HTMLElement {
         font-family: inherit;
         background: var(--dojo-primary, #1D4ED8);
         border: 1px solid var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         font-weight: 600;
         transition: opacity 0.15s;
       }

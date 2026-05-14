@@ -373,15 +373,15 @@ export class DojoPersonManager extends HTMLElement {
 
         .btn-primary {
           background: var(--dojo-primary, #3B82F6);
-          color: #FFFFFF;
+          color: var(--dojo-text-on-primary);
         }
 
         .btn-primary:hover {
-          background: #2563EB;
+          background: var(--dojo-primary);
         }
 
         .btn-primary:disabled {
-          background: #9CA3AF;
+          background: var(--dojo-text-muted);
           cursor: not-allowed;
         }
 
@@ -397,12 +397,12 @@ export class DojoPersonManager extends HTMLElement {
         }
 
         .btn-danger {
-          background: #DC2626;
-          color: #FFFFFF;
+          background: var(--dojo-danger);
+          color: var(--dojo-text-on-primary);
         }
 
         .btn-danger:hover {
-          background: #B91C1C;
+          background: var(--dojo-danger-hover);
         }
 
         .person-list {
@@ -469,7 +469,7 @@ export class DojoPersonManager extends HTMLElement {
         }
 
         .confirm-delete {
-          background: #FEF2F2;
+          background: var(--dojo-danger-bg);
           border: 1px solid #FCA5A5;
           border-radius: var(--dojo-radius, 8px);
           padding: 16px;
@@ -479,7 +479,7 @@ export class DojoPersonManager extends HTMLElement {
         .confirm-delete p {
           margin: 0 0 12px 0;
           font-size: 14px;
-          color: #7F1D1D;
+          color: var(--dojo-danger-hover);
         }
 
         .confirm-delete-actions {

@@ -81,7 +81,7 @@ export class DojoThemeToggle extends HTMLElement {
       }
       .toggle-btn[aria-pressed="true"] {
         background: var(--dojo-primary, #1D4ED8);
-        color: #FFFFFF;
+        color: var(--dojo-text-on-primary);
       }
       .toggle-btn:focus-visible {
         outline: 2px solid var(--dojo-primary, #1D4ED8);

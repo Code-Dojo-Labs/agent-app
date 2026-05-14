@@ -206,25 +206,25 @@ export class DojoDeleteConfirmDialog extends HTMLElement {
       }
       .cancel-btn:hover { background: var(--dojo-bg); }
       .cancel-btn:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
       .confirm-btn {
         padding: 0.4375rem 1rem;
-        background: #EF4444;
+        background: var(--dojo-danger-light);
         border: none;
-        border-radius: var(--dojo-radius-sm, 4px);
+        border-radius: var(--dojo-radius-sm);
         font-size: 0.875rem;
         font-weight: 600;
-        color: #fff;
+        color: var(--dojo-text-on-danger);
         cursor: pointer;
         font-family: inherit;
         transition: background 0.15s;
       }
-      .confirm-btn:hover  { background: #DC2626; }
+      .confirm-btn:hover  { background: var(--dojo-danger); }
       .confirm-btn:focus-visible {
-        outline: 2px solid #EF4444;
+        outline: 2px solid var(--dojo-danger-focus);
         outline-offset: 2px;
       }
     `;
