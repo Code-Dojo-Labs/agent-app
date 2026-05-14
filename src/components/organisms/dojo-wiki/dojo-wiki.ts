@@ -264,6 +264,288 @@ const WIKI_SECTIONS: WikiSection[] = [
       <p class="note">En macOS usa <kbd>Cmd</kbd>; en Windows y Linux usa <kbd>Ctrl</kbd>.</p>
     `,
   },
+  {
+    id: 'busqueda-global',
+    title: 'Búsqueda global',
+    icon: '🔍',
+    html: `
+      <h2>Búsqueda global y paleta de comandos</h2>
+      <p>Usa <kbd>Cmd / Ctrl + K</kbd> para abrir la <strong>paleta de comandos global</strong> y buscar tareas, tableros o acciones en toda la aplicación.</p>
+
+      <h3>Cómo usar la paleta</h3>
+      <ol>
+        <li>Pulsa <kbd>Cmd / Ctrl + K</kbd> (o haz clic en el ícono 🔍 del encabezado).</li>
+        <li>Escribe el nombre de una tarea, tablero o acción.</li>
+        <li>Navega con <kbd>↑</kbd> / <kbd>↓</kbd> y abre con <kbd>Enter</kbd>.</li>
+        <li>Cierra con <kbd>Escape</kbd> o clic fuera de la paleta.</li>
+      </ol>
+
+      <h3>Tipos de búsqueda</h3>
+      <table>
+        <thead><tr><th scope="col">Búsqueda</th><th scope="col">Cómo</th></tr></thead>
+        <tbody>
+          <tr><td>Por título</td><td>Escribe el texto directamente</td></tr>
+          <tr><td>Por descripción</td><td>Escribe el texto — resultados secundarios</td></tr>
+          <tr><td>Por etiqueta</td><td>Escribe <code>#nombre-etiqueta</code></td></tr>
+        </tbody>
+      </table>
+      <p class="note">Si no hay resultados, puedes crear la tarea directamente desde la paleta.</p>
+    `,
+  },
+  {
+    id: 'assignees',
+    title: 'Asignación de personas',
+    icon: '👤',
+    html: `
+      <h2>Asignación de personas</h2>
+      <p>Asigna una o más personas a cada tarea para distribuir el trabajo y ver quién es responsable directamente desde la tarjeta del tablero.</p>
+
+      <h3>Crear una persona</h3>
+      <ol>
+        <li>Accede a <strong>Ajustes → Personas</strong> (o desde el selector en el detalle de una tarea).</li>
+        <li>Haz clic en <strong>Nueva persona</strong>.</li>
+        <li>Introduce el nombre y opcionalmente un emoji o inicial para el avatar.</li>
+        <li>Confirma. La persona queda guardada en IndexedDB.</li>
+      </ol>
+
+      <h3>Asignar personas a una tarea</h3>
+      <ol>
+        <li>Abre el detalle de la tarea.</li>
+        <li>En la sección <strong>Asignados</strong>, haz clic en el selector.</li>
+        <li>Selecciona una o varias personas de la lista.</li>
+      </ol>
+
+      <h3>Ver asignados en el tablero</h3>
+      <p>Los avatares aparecen en la esquina inferior derecha de la tarjeta. Si hay más de tres asignados se muestra <strong>+N</strong>.</p>
+
+      <h3>Filtrar por persona</h3>
+      <p>Usa el <strong>panel de filtros</strong> (ícono embudo) y selecciona una persona para mostrar solo sus tareas en el tablero activo.</p>
+      <p class="note">El directorio de personas es global a todos los tableros.</p>
+    `,
+  },
+  {
+    id: 'pwa',
+    title: 'Usar como app (PWA)',
+    icon: '📱',
+    html: `
+      <h2>Usar como app (PWA)</h2>
+      <p>Dojo Kanban es una <strong>Progressive Web App</strong>: puedes instalarla en tu escritorio o móvil y usarla sin conexión como si fuera una app nativa.</p>
+
+      <h3>Instalar en escritorio (Chrome / Edge)</h3>
+      <ol>
+        <li>Abre la app en el navegador.</li>
+        <li>Haz clic en el ícono <strong>⊕ Instalar</strong> en la barra de dirección.</li>
+        <li>Confirma la instalación. La app se abre en su propia ventana.</li>
+      </ol>
+
+      <h3>Instalar en móvil</h3>
+      <ul>
+        <li><strong>Android (Chrome):</strong> menú <strong>⋮ → Añadir a pantalla de inicio</strong>.</li>
+        <li><strong>iOS (Safari):</strong> botón <strong>Compartir → Añadir a pantalla de inicio</strong>.</li>
+      </ul>
+
+      <h3>Funcionalidad offline</h3>
+      <table>
+        <thead><tr><th scope="col">Acción</th><th scope="col">¿Disponible offline?</th></tr></thead>
+        <tbody>
+          <tr><td>Ver tableros y tareas</td><td>✅</td></tr>
+          <tr><td>Crear, editar, mover tareas</td><td>✅</td></tr>
+          <tr><td>Sincronización con Supabase</td><td>⏳ Se aplaza hasta tener conexión</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Actualizar la app</h3>
+      <p>Cuando hay una nueva versión, aparece un <strong>banner de actualización</strong>. Haz clic en <strong>Actualizar</strong> para recargar con la última versión.</p>
+    `,
+  },
+  {
+    id: 'wip-limits',
+    title: 'Límites WIP',
+    icon: '🚦',
+    html: `
+      <h2>Límites WIP por columna</h2>
+      <p>Los <strong>límites WIP</strong> (Work In Progress) establecen un máximo de tareas por columna para identificar cuellos de botella y mantener un flujo sostenible.</p>
+
+      <h3>Configurar el límite al crear una columna</h3>
+      <ol>
+        <li>Haz clic en <strong>"+ Columna"</strong>.</li>
+        <li>Rellena el campo opcional <strong>Límite WIP</strong> con un número entero positivo.</li>
+        <li>Confirma la creación.</li>
+      </ol>
+
+      <h3>Configurar el límite en una columna existente</h3>
+      <ol>
+        <li>Abre el menú <strong>⋮</strong> de la columna → <strong>Editar columna</strong>.</li>
+        <li>Modifica el campo <strong>Límite WIP</strong>.</li>
+        <li>Guarda los cambios.</li>
+      </ol>
+
+      <h3>Estados visuales del contador</h3>
+      <table>
+        <thead><tr><th scope="col">Estado</th><th scope="col">Color</th></tr></thead>
+        <tbody>
+          <tr><td>Dentro del límite</td><td>Normal</td></tr>
+          <tr><td>En el límite exacto</td><td>Amarillo / advertencia</td></tr>
+          <tr><td>Superado</td><td>Rojo — banner de alerta</td></tr>
+        </tbody>
+      </table>
+      <p class="note">El límite WIP no bloquea el drag &amp; drop; muestra una alerta visual cuando se supera.</p>
+
+      <h3>Eliminar el límite</h3>
+      <p>Edita la columna y deja el campo <strong>Límite WIP</strong> vacío.</p>
+    `,
+  },
+  {
+    id: 'vista-lista',
+    title: 'Vista de lista',
+    icon: '☰',
+    html: `
+      <h2>Vista de lista / tabla</h2>
+      <p>Cambia entre el tablero Kanban y una <strong>vista de lista</strong> con todas las tareas en formato tabla ordenable.</p>
+
+      <h3>Cambiar de vista</h3>
+      <p>Usa los botones en la barra superior del tablero:</p>
+      <ul>
+        <li><strong>📋 Tablero</strong> — vista Kanban por columnas.</li>
+        <li><strong>☰ Lista</strong> — vista tabla con filas ordenables.</li>
+      </ul>
+      <p>La preferencia se guarda automáticamente por tablero.</p>
+
+      <h3>Columnas disponibles</h3>
+      <table>
+        <thead><tr><th scope="col">Columna</th><th scope="col">Ordenable</th></tr></thead>
+        <tbody>
+          <tr><td>Título</td><td>✅</td></tr>
+          <tr><td>Estado</td><td>✅</td></tr>
+          <tr><td>Prioridad</td><td>✅</td></tr>
+          <tr><td>Etiquetas</td><td>—</td></tr>
+          <tr><td>Asignados</td><td>—</td></tr>
+          <tr><td>Vencimiento</td><td>✅</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Ordenar</h3>
+      <p>Haz clic en el encabezado de una columna para ordenar: primer clic ↑, segundo ↓, tercer clic sin orden.</p>
+
+      <h3>Acciones desde la lista</h3>
+      <p>Cada fila tiene un menú <strong>⋮</strong> con las acciones: <strong>Abrir detalle</strong>, <strong>Cambiar estado</strong> y <strong>Eliminar</strong>.</p>
+    `,
+  },
+  {
+    id: 'notificaciones',
+    title: 'Notificaciones',
+    icon: '🔔',
+    html: `
+      <h2>Notificaciones de vencimiento</h2>
+      <p>Dojo Kanban puede enviarte <strong>notificaciones del navegador</strong> cuando una tarea está próxima a vencer o ha vencido, incluso con la app en segundo plano.</p>
+
+      <h3>Activar notificaciones</h3>
+      <ol>
+        <li>La app mostrará una solicitud de permiso la primera vez que detecte tareas con fecha de vencimiento.</li>
+        <li>Haz clic en <strong>Permitir</strong> para activar los recordatorios.</li>
+        <li>Si lo omitiste, puedes activarlo desde <strong>Ajustes → Notificaciones</strong>.</li>
+      </ol>
+
+      <h3>Tipos de notificaciones</h3>
+      <table>
+        <thead><tr><th scope="col">Momento</th><th scope="col">Mensaje</th></tr></thead>
+        <tbody>
+          <tr><td>24 h antes</td><td>⏰ "La tarea <em>X</em> vence mañana"</td></tr>
+          <tr><td>Al vencer</td><td>🔴 "La tarea <em>X</em> ha vencido"</td></tr>
+        </tbody>
+      </table>
+      <p>Cada notificación incluye el botón <strong>Abrir tarea</strong>.</p>
+
+      <h3>Desactivar notificaciones</h3>
+      <p>Ve a <strong>Ajustes → Notificaciones</strong> y desactiva el interruptor, o revoca el permiso desde la configuración del navegador.</p>
+
+      <p class="note">Las notificaciones cuando la app está cerrada solo funcionan si tienes la <strong>PWA instalada</strong>.</p>
+    `,
+  },
+  {
+    id: 'modal-edicion',
+    title: 'Modal de edición',
+    icon: '📝',
+    html: `
+      <h2>Modal ampliado de edición</h2>
+      <p>Al hacer clic sobre una tarjeta, el panel de detalle se abre como un <strong>modal de pantalla completa</strong> (90 % del viewport) para trabajar cómodamente con descripciones extensas, subtareas e historial.</p>
+
+      <h3>Estructura del modal</h3>
+      <ul>
+        <li><strong>Header fijo</strong> — título de la tarea y botón de cierre.</li>
+        <li><strong>Área de contenido con scroll</strong> — descripción Markdown, subtareas, asignados, etiquetas, fecha de vencimiento e historial.</li>
+        <li><strong>Footer fijo</strong> — botones Guardar y Cancelar.</li>
+      </ul>
+
+      <h3>Cerrar el modal</h3>
+      <table>
+        <thead><tr><th scope="col">Acción</th><th scope="col">Resultado</th></tr></thead>
+        <tbody>
+          <tr><td>Clic en <strong>✕</strong></td><td>Cierra el modal</td></tr>
+          <tr><td>Clic en el backdrop</td><td>Cierra el modal</td></tr>
+          <tr><td><kbd>Escape</kbd></td><td>Cierra el modal</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Si hay cambios sin guardar, se mostrará un aviso de confirmación antes de cerrar.</p>
+    `,
+  },
+  {
+    id: 'templates-tareas',
+    title: 'Plantillas de tareas',
+    icon: '📄',
+    html: `
+      <h2>Plantillas de tareas</h2>
+      <p>Guarda configuraciones predefinidas de tarea para reutilizarlas en tickets recurrentes como <em>Bug Report</em>, <em>Feature</em> o <em>Revisión</em>.</p>
+
+      <h3>Crear una plantilla</h3>
+      <ol>
+        <li>Ve a <strong>Ajustes → Plantillas</strong>.</li>
+        <li>Haz clic en <strong>Nueva plantilla</strong>.</li>
+        <li>Rellena: <strong>nombre</strong> (obligatorio), descripción Markdown, prioridad, etiquetas y asignados.</li>
+        <li>Guarda.</li>
+      </ol>
+
+      <h3>Usar una plantilla al crear una tarea</h3>
+      <ol>
+        <li>Abre el diálogo <strong>Nueva tarea</strong>.</li>
+        <li>Haz clic en <strong>Usar plantilla</strong> y selecciona una de la lista.</li>
+        <li>Los campos se rellenan automáticamente. Ajusta lo necesario y confirma.</li>
+      </ol>
+
+      <h3>Editar y eliminar plantillas</h3>
+      <p>Desde <strong>Ajustes → Plantillas</strong> cada entrada tiene los botones <strong>Editar</strong> y <strong>Eliminar</strong>. La eliminación no afecta a las tareas ya creadas con esa plantilla.</p>
+      <p class="note">Las plantillas son globales a todos los tableros.</p>
+    `,
+  },
+  {
+    id: 'columnas-defecto',
+    title: 'Columnas por defecto',
+    icon: '📐',
+    html: `
+      <h2>Columnas por defecto</h2>
+      <p>Cuando creas un <strong>nuevo tablero</strong>, se inicializa automáticamente con cuatro columnas estandarizadas:</p>
+
+      <table>
+        <thead><tr><th scope="col">Orden</th><th scope="col">Nombre</th><th scope="col">Uso sugerido</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><strong>Backlog</strong></td><td>Tareas pendientes de planificar</td></tr>
+          <tr><td>2</td><td><strong>En progreso</strong></td><td>Tareas actualmente en desarrollo</td></tr>
+          <tr><td>3</td><td><strong>En revisión</strong></td><td>Tareas esperando revisión</td></tr>
+          <tr><td>4</td><td><strong>Hecho</strong></td><td>Tareas finalizadas y validadas</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Personalizar</h3>
+      <p>Las columnas por defecto son solo un punto de partida. Puedes:</p>
+      <ul>
+        <li><strong>Renombrar</strong> cualquier columna desde su menú <strong>⋮ → Editar</strong>.</li>
+        <li><strong>Eliminar</strong> las que no necesites.</li>
+        <li><strong>Añadir</strong> nuevas con <strong>"+ Columna"</strong>.</li>
+        <li><strong>Reordenar</strong> arrastrando la cabecera.</li>
+      </ul>
+      <p class="note">Los tableros creados antes de esta versión no se ven afectados.</p>
+    `,
+  },
 ];
 
 // ── Clase ──────────────────────────────────────────────────────────────────
