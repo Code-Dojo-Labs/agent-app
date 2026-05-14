@@ -44,6 +44,7 @@
    - [Paso 30 — Sincronización entre pestañas (US-30)](#paso-30--sincronización-entre-pestañas-us-30)
    - [Paso 31 — Soporte PWA (US-31 / Issue #49)](#paso-31--soporte-pwa-us-31--issue-49)
    - [Paso 32 — Sistema de asignación de personas completo (US-29 / Issue #47)](#paso-32--sistema-de-asignación-de-personas-completo-us-29--issue-47)
+   - [Paso 34 — Actualización del Wiki: US-28 a US-37 (Issue #100)](#paso-34--actualización-del-wiki-us-28-a-us-37-issue-100)
 
 ---
 
@@ -3593,3 +3594,50 @@ Este ejemplo sigue el formato de `BoardExport` y contiene datos en todos los sto
 5. Si el JSON es antiguo, completar campos faltantes antes de importar.
 
 Resultado de esta receta: queda definido un mapa operativo y un snapshot de referencia para comparar la integridad de cualquier backup/export.
+
+---
+
+## Paso 34 — Actualización del Wiki: US-28 a US-37 (Issue #100)
+
+> **Fecha:** 2026-05-14  
+> **Rama:** `docs/100-wiki-update-us28-us37`  
+> **Issue:** [#100](https://github.com/Code-Dojo-Labs/agent-app/issues/100)  
+> **Agentes:** `documentalista` + `builder`
+
+### Contexto
+
+La wiki del proyecto en `docs/wiki/` solo documentaba las funcionalidades base (US-01 a US-22). Las funcionalidades avanzadas implementadas entre US-28 y US-37 carecían de documentación de usuario, generando una brecha entre lo implementado y lo comunicado.
+
+### Decisión
+
+Crear una página Markdown por funcionalidad siguiendo el estilo y estructura de las páginas existentes: introducción, pasos de uso, diagramas ASCII, tabla de referencia y sección FAQ.
+
+### Páginas creadas
+
+| Archivo | Funcionalidad | US |
+|---------|---------------|----|
+| `08-busqueda-global.md` | Paleta de comandos y búsqueda global | US-28 |
+| `09-assignees.md` | Asignación de personas a tareas | US-29 |
+| `10-pwa.md` | Instalación y uso como PWA | US-31 |
+| `11-wip-limits.md` | Límites WIP por columna | US-32 |
+| `12-vista-lista.md` | Vista alternativa de lista/tabla | US-33 |
+| `13-notificaciones.md` | Notificaciones del navegador | US-34 |
+| `14-modal-edicion.md` | Modal de edición al 90% del viewport | US-35 |
+| `15-templates-tareas.md` | Plantillas de tareas reutilizables | US-36 |
+| `16-columnas-defecto.md` | Columnas por defecto en tableros nuevos | US-37 |
+
+### Archivos modificados
+
+- `docs/wiki/index.md` — actualizado con las 9 nuevas entradas (secciones 8-16).
+
+### Patrón de estructura usado
+
+Cada página sigue el patrón:
+1. Párrafo de introducción con negrita en el término clave.
+2. Pasos de uso numerados (con diagramas ASCII cuando aplica).
+3. Tabla de referencia rápida.
+4. Sección **FAQ** con 2-3 preguntas frecuentes.
+
+### Resultado
+
+El wiki pasa de 7 a 16 páginas, cubriendo todas las funcionalidades hasta US-37. El índice centralizado en `docs/wiki/index.md` sirve como punto de entrada navegable.
