@@ -79,8 +79,10 @@ export function generateCycleTimeScatterChart(
   const xScale = createScale(0, data.length - 1, 0, plotWidth);
   const yScale = createScale(0, maxDays * 1.1, plotHeight, 0);
 
-  // Elemento SVG raíz
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${config.width} ${config.height}" preserveAspectRatio="xMidYMid meet" class="chart-scatter">`;
+  // Elemento SVG raíz con atributos de accesibilidad (WCAG 2.1 AA - 1.1.1 Non-text Content)
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${config.width} ${config.height}" role="img" aria-label="Cycle time distribution: P50 ${percentiles.p50.toFixed(1)}d, P85 ${percentiles.p85.toFixed(1)}d, P95 ${percentiles.p95.toFixed(1)}d" preserveAspectRatio="xMidYMid meet" class="chart-scatter">`;
+  svg += `<title>Cycle Time Distribution</title>`;
+  svg += `<desc>Scatter plot showing cycle time for ${data.length} completed tasks. P50: ${percentiles.p50.toFixed(1)} days, P85: ${percentiles.p85.toFixed(1)} days, P95: ${percentiles.p95.toFixed(1)} days.</desc>`;
 
   // Fondo
   svg += `<rect width="${config.width}" height="${config.height}" fill="var(--dojo-bg, #fff)"/>`;
@@ -161,7 +163,9 @@ export function generateThroughputBarChart(
   const xScale = createScale(0, data.length - 1, 0, plotWidth);
   const yScale = createScale(0, maxCount, plotHeight, 0);
 
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${config.width} ${config.height}" preserveAspectRatio="xMidYMid meet" class="chart-bar">`;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${config.width} ${config.height}" role="img" aria-label="Weekly throughput: ${average.toFixed(1)} tasks per week on average across ${data.length} weeks" preserveAspectRatio="xMidYMid meet" class="chart-bar">`;
+  svg += `<title>Weekly Throughput</title>`;
+  svg += `<desc>Bar chart showing tasks completed per week. Average throughput: ${average.toFixed(1)} tasks/week over ${data.length} weeks.</desc>`;
 
   svg += `<rect width="${config.width}" height="${config.height}" fill="var(--dojo-bg, #fff)"/>`;
 
@@ -242,7 +246,9 @@ export function generateCumulativeFlowDiagram(
 
   const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
 
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${config.width} ${config.height}" preserveAspectRatio="xMidYMid meet" class="chart-cfd">`;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${config.width} ${config.height}" role="img" aria-label="Cumulative flow diagram across ${columnNames.length} columns: ${columnNames.join(', ')}" preserveAspectRatio="xMidYMid meet" class="chart-cfd">`;
+  svg += `<title>Cumulative Flow Diagram</title>`;
+  svg += `<desc>Stacked area chart showing task accumulation across workflow columns: ${columnNames.join(', ')}. Data points: ${data.length}.</desc>`;
 
   svg += `<rect width="${config.width}" height="${config.height}" fill="var(--dojo-bg, #fff)"/>`;
 
@@ -323,7 +329,8 @@ export function generateCumulativeFlowDiagram(
 
 function createEmptyChart(config: ChartConfig): string {
   return `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${config.width} ${config.height}" class="chart-empty">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${config.width} ${config.height}" role="img" aria-label="No data available" class="chart-empty">
+      <title>No data available</title>
       <rect width="${config.width}" height="${config.height}" fill="var(--dojo-bg, #f9fafb)"/>
       <text x="${config.width / 2}" y="${config.height / 2}" text-anchor="middle" dominant-baseline="middle" font-size="14" fill="var(--dojo-text-secondary, #9ca3af)">
         No data available

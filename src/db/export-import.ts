@@ -160,8 +160,18 @@ export function validateImportData(raw: unknown): ValidateResult {
   if (!Array.isArray(obj.columns)) {
     return { ok: false, message: 'El archivo no contiene la colección "columns".' };
   }
+
+  // Pre-extraer boardIds para validación referencial de columnas (boards es opcional)
+  const boardIds = Array.isArray(obj.boards)
+    ? new Set<string>(
+        (obj.boards as Array<Record<string, unknown>>)
+          .filter(b => typeof b.id === 'string' && (b.id as string).length > 0)
+          .map(b => b.id as string),
+      )
+    : undefined;
+
   for (const col of obj.columns) {
-    if (!_isValidColumn(col)) {
+    if (!_isValidColumn(col, boardIds)) {
       return { ok: false, message: 'Una o más columnas tienen un formato inválido.' };
     }
   }
@@ -170,8 +180,16 @@ export function validateImportData(raw: unknown): ValidateResult {
   if (!Array.isArray(obj.tasks)) {
     return { ok: false, message: 'El archivo no contiene la colección "tasks".' };
   }
+
+  // Construir set de columnIds para validar referential integrity de task.statusId
+  const columnIds = new Set<string>(
+    (obj.columns as Array<Record<string, unknown>>)
+      .filter(c => typeof c.id === 'string')
+      .map(c => c.id as string),
+  );
+
   for (const task of obj.tasks) {
-    if (!_isValidTask(task)) {
+    if (!_isValidTask(task, columnIds)) {
       return { ok: false, message: 'Una o más tareas tienen un formato inválido.' };
     }
   }
@@ -381,27 +399,29 @@ function _fileTimestamp(): string {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
 }
 
-function _isValidColumn(obj: unknown): obj is Column {
+function _isValidColumn(obj: unknown, boardIds?: Set<string>): obj is Column {
   if (obj === null || typeof obj !== 'object') return false;
   const c = obj as Record<string, unknown>;
   return (
-    typeof c.id       === 'string' &&
-    typeof c.boardId  === 'string' &&
-    typeof c.name     === 'string' &&
+    typeof c.id       === 'string' && c.id.length > 0 &&
+    typeof c.boardId  === 'string' && c.boardId.length > 0 &&
+    (boardIds === undefined || boardIds.has(c.boardId as string)) &&
+    typeof c.name     === 'string' && c.name.length > 0 &&
     typeof c.icon     === 'string' &&
     typeof c.order    === 'number'
   );
 }
 
-function _isValidTask(obj: unknown): obj is Task {
+function _isValidTask(obj: unknown, columnIds?: Set<string>): obj is Task {
   if (obj === null || typeof obj !== 'object') return false;
   const t = obj as Record<string, unknown>;
   return (
-    typeof t.id          === 'string' &&
-    typeof t.boardId     === 'string' &&
-    typeof t.title       === 'string' &&
+    typeof t.id          === 'string' && t.id.length > 0 &&
+    typeof t.boardId     === 'string' && t.boardId.length > 0 &&
+    typeof t.title       === 'string' && t.title.length > 0 &&
     typeof t.description === 'string' &&
-    typeof t.statusId    === 'string' &&
+    typeof t.statusId    === 'string' && t.statusId.length > 0 &&
+    (columnIds === undefined || columnIds.has(t.statusId as string)) &&
     typeof t.priority    === 'string' &&
     Array.isArray(t.labelIds) &&
     typeof t.createdAt   === 'string' &&

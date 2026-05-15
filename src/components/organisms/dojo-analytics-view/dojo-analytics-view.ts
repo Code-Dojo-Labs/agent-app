@@ -504,11 +504,23 @@ export class DojoAnalyticsView extends HTMLElement {
     for (const card of cards) {
       const el = document.createElement('div');
       el.className = 'metric-card';
-      el.innerHTML = `
-        <div class="metric-label">${card.label}</div>
-        <div class="metric-value">${card.value}</div>
-        <div class="metric-sublabel">${card.sub}</div>
-      `;
+
+      // ✅ XSS FIX: usar DOM API en lugar de innerHTML para datos de usuario
+      const labelEl = document.createElement('div');
+      labelEl.className = 'metric-label';
+      labelEl.textContent = card.label;
+
+      const valueEl = document.createElement('div');
+      valueEl.className = 'metric-value';
+      valueEl.textContent = card.value;
+
+      const subEl = document.createElement('div');
+      subEl.className = 'metric-sublabel';
+      subEl.textContent = card.sub;
+
+      el.appendChild(labelEl);
+      el.appendChild(valueEl);
+      el.appendChild(subEl);
       metricsGrid.appendChild(el);
     }
 
@@ -524,10 +536,15 @@ export class DojoAnalyticsView extends HTMLElement {
     cycleChart.innerHTML = `<div class="chart-title">📈 Cycle Time Distribution</div>`;
     const svgCycle = document.createElement('div');
     svgCycle.className = 'chart-svg';
-    svgCycle.innerHTML = generateCycleTimeScatterChart(
-      this._metrics.cycleTime.data.map((d, i) => ({ days: d.cycleTimeDays, index: i })),
-      this._metrics.cycleTime.percentiles,
+    // ✅ XSS FIX: parsear SVG via DOMParser en lugar de innerHTML
+    const cycleSvgDoc = new DOMParser().parseFromString(
+      generateCycleTimeScatterChart(
+        this._metrics.cycleTime.data.map((d, i) => ({ days: d.cycleTimeDays, index: i })),
+        this._metrics.cycleTime.percentiles,
+      ),
+      'image/svg+xml',
     );
+    svgCycle.appendChild(cycleSvgDoc.documentElement);
     cycleChart.appendChild(svgCycle);
     chartsSection.appendChild(cycleChart);
 
@@ -537,14 +554,18 @@ export class DojoAnalyticsView extends HTMLElement {
     throughputChart.innerHTML = `<div class="chart-title">📊 Weekly Throughput</div>`;
     const svgThroughput = document.createElement('div');
     svgThroughput.className = 'chart-svg';
-    svgThroughput.innerHTML = generateThroughputBarChart(
-      this._metrics.throughput.data.map((d, i) => ({
-        weekLabel: d.weekLabel,
-        completedCount: d.completedCount,
-        index: i,
-      })),
-      this._metrics.throughput.averagePerWeek,
+    const throughputSvgDoc = new DOMParser().parseFromString(
+      generateThroughputBarChart(
+        this._metrics.throughput.data.map((d, i) => ({
+          weekLabel: d.weekLabel,
+          completedCount: d.completedCount,
+          index: i,
+        })),
+        this._metrics.throughput.averagePerWeek,
+      ),
+      'image/svg+xml',
     );
+    svgThroughput.appendChild(throughputSvgDoc.documentElement);
     throughputChart.appendChild(svgThroughput);
     chartsSection.appendChild(throughputChart);
 
@@ -555,10 +576,14 @@ export class DojoAnalyticsView extends HTMLElement {
     const svgCFD = document.createElement('div');
     svgCFD.className = 'chart-svg';
     // TODO: Implement actual column names from board
-    svgCFD.innerHTML = generateCumulativeFlowDiagram(
-      this._metrics.cfd.data,
-      ['To Do', 'In Progress', 'In Review', 'Done'],
+    const cfdSvgDoc = new DOMParser().parseFromString(
+      generateCumulativeFlowDiagram(
+        this._metrics.cfd.data,
+        ['To Do', 'In Progress', 'In Review', 'Done'],
+      ),
+      'image/svg+xml',
     );
+    svgCFD.appendChild(cfdSvgDoc.documentElement);
     cfdChart.appendChild(svgCFD);
     chartsSection.appendChild(cfdChart);
 
@@ -571,7 +596,8 @@ export class DojoAnalyticsView extends HTMLElement {
 
       const title = document.createElement('div');
       title.className = 'overdue-tasks-title';
-      title.innerHTML = '⚠️ Overdue Tasks (' + this._metrics.deadlines.overdueTasks.length + ')';
+      // ✅ XSS FIX: textContent es seguro para contenido mixto
+      title.textContent = `⚠️ Overdue Tasks (${this._metrics.deadlines.overdueTasks.length})`;
       overdueSection.appendChild(title);
 
       const list = document.createElement('div');
@@ -580,10 +606,15 @@ export class DojoAnalyticsView extends HTMLElement {
       for (const task of this._metrics.deadlines.overdueTasks.slice(0, 5)) {
         const item = document.createElement('div');
         item.className = 'overdue-task-item';
-        item.innerHTML = `
-          <div class="overdue-task-name">${task.taskTitle}</div>
-          <div class="overdue-task-days">${task.daysOverdue}d overdue</div>
-        `;
+        // ✅ XSS FIX: task.taskTitle es dato de usuario → usar DOM API
+        const nameEl = document.createElement('div');
+        nameEl.className = 'overdue-task-name';
+        nameEl.textContent = task.taskTitle;
+        const daysEl = document.createElement('div');
+        daysEl.className = 'overdue-task-days';
+        daysEl.textContent = `${task.daysOverdue}d overdue`;
+        item.appendChild(nameEl);
+        item.appendChild(daysEl);
         item.addEventListener('click', () => {
           this.dispatchEvent(
             new CustomEvent('dojo:open-task', { detail: { taskId: task.taskId } }),
