@@ -1,0 +1,82 @@
+/**
+ * components.css — Capa 3: Tokens de componente.
+ *
+ * IMPORTANTE: Este archivo debe importarse DESPUÉS de semantic.css.
+ * Define tokens específicos de componente que permiten
+ * personalizar partes concretas sin afectar al sistema global.
+ *
+ * Convención: --{componente}-{elemento}-{propiedad}
+ * Todos los valores referencian tokens semánticos (--dojo-*).
+ */
+
+:root {
+  /* ── dojo-card ───────────────────────────────────────────────── */
+  --card-bg:           var(--dojo-surface);
+  --card-border:       var(--dojo-border);
+  --card-radius:       var(--dojo-radius);
+  --card-shadow:       var(--dojo-shadow);
+  --card-padding:      var(--space-3);
+
+  /* ── dojo-column ─────────────────────────────────────────────── */
+  --column-bg:         var(--dojo-bg);
+  --column-header-bg:  var(--dojo-surface);
+  --column-border:     var(--dojo-border);
+  --column-radius:     var(--dojo-radius);
+  --column-padding:    var(--space-3);
+  --column-gap:        var(--space-2);
+
+  /* ── dojo-header ─────────────────────────────────────────────── */
+  --header-bg:         var(--dojo-surface);
+  --header-border:     var(--dojo-border);
+  --header-height:     56px;
+
+  /* ── dojo-btn (botón primario) ────────────────────────────────── */
+  --btn-primary-bg:       var(--dojo-primary);
+  --btn-primary-bg-hover: var(--dojo-primary-hover);
+  --btn-primary-text:     var(--dojo-text-on-primary);
+  --btn-primary-radius:   var(--dojo-radius-sm);  --btn-disabled-bg:      var(--color-slate-300);
+  --btn-disabled-text:    var(--color-slate-500);
+  /* ── dojo-btn (botón peligro) ────────────────────────────────── */
+  --btn-danger-bg:        var(--dojo-danger);
+  --btn-danger-bg-hover:  var(--dojo-danger-hover);
+  --btn-danger-text:      var(--dojo-text-on-danger);
+  --btn-danger-focus:     var(--dojo-danger-focus);
+
+  /* ── inputs / formularios ────────────────────────────────────── */
+  --input-border:         var(--dojo-border);
+  --input-border-focus:   var(--dojo-primary);
+  --input-bg:             var(--dojo-surface);
+  --input-text:           var(--dojo-text-primary);
+  --input-radius:         var(--dojo-radius-sm);
+
+  /* ── badges / etiquetas ──────────────────────────────────────── */
+  --badge-radius:         var(--radius-full);
+  --badge-padding:        var(--space-1) var(--space-2);
+
+  /* ── dojo-wiki (notas / callouts) ────────────────────────────── */
+  --wiki-note-bg:         var(--dojo-warning-bg);
+  --wiki-note-border:     var(--dojo-warning);
+  --wiki-note-text:       var(--dojo-warning-text-dark);
+  --wiki-blockquote-border: var(--dojo-primary);
+
+  /* ── dojo-modal / diálogos ───────────────────────────────────── */
+  --modal-bg:             var(--dojo-surface);
+  --modal-overlay:        rgba(0, 0, 0, 0.5);
+  --modal-radius:         var(--dojo-radius-lg);
+  --modal-shadow:         var(--dojo-shadow-md);
+
+  /* ── wip-limits ──────────────────────────────────────────────── */
+  --wip-ok-color:         var(--dojo-text-secondary);
+  --wip-warn-color:       var(--dojo-warning);
+  --wip-exceeded-color:   var(--dojo-danger);
+
+  /* ── dojo-theme-customizer ───────────────────────────────────── */
+  --customizer-width:     280px;
+  --customizer-bg:        var(--dojo-surface);
+  --customizer-border:    var(--dojo-border);
+  --customizer-radius:    var(--dojo-radius-lg);
+  --customizer-shadow:    var(--dojo-shadow-md);
+
+  /* ── dojo-person-avatar ──────────────────────────────────────── */
+  --avatar-bg-default:    var(--color-slate-300);
+}

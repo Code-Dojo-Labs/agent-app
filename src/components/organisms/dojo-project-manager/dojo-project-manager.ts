@@ -161,7 +161,7 @@ export class DojoProjectManager extends HTMLElement {
       }
       .panel-close:hover { color: var(--dojo-text-primary); background: var(--dojo-bg); }
       .panel-close:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -201,10 +201,10 @@ export class DojoProjectManager extends HTMLElement {
       .create-btn:hover {
         background: var(--dojo-bg);
         color: var(--dojo-text-primary);
-        border-color: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary);
       }
       .create-btn:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -229,11 +229,11 @@ export class DojoProjectManager extends HTMLElement {
         justify-content: center;
         min-width: 48px;
         padding: 0.125rem 0.5rem;
-        background: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        background: var(--dojo-primary);
+        color: var(--dojo-text-on-primary);
         font-size: 0.6875rem;
         font-weight: 700;
-        border-radius: var(--dojo-radius-sm, 4px);
+        border-radius: var(--dojo-radius-sm);
         flex-shrink: 0;
         letter-spacing: 0.03em;
         font-family: monospace;
@@ -274,9 +274,9 @@ export class DojoProjectManager extends HTMLElement {
         transition: background 0.15s, color 0.15s;
       }
       .action-btn:hover { background: var(--dojo-bg); color: var(--dojo-text-primary); }
-      .action-btn.danger:hover { background: #FEE2E2; color: #B91C1C; }
+      .action-btn.danger:hover { background: var(--dojo-danger-bg); color: var(--dojo-danger-hover); }
       .action-btn:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -311,7 +311,7 @@ export class DojoProjectManager extends HTMLElement {
         box-sizing: border-box;
       }
       .form-input:focus {
-        border-color: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary);
       }
       .form-input:disabled {
         opacity: 0.6;
@@ -324,7 +324,7 @@ export class DojoProjectManager extends HTMLElement {
       }
       .form-error {
         font-size: 0.75rem;
-        color: #EF4444;
+        color: var(--dojo-danger-text);
         margin: 0;
       }
 
@@ -348,13 +348,13 @@ export class DojoProjectManager extends HTMLElement {
       .btn-secondary:hover { background: var(--dojo-bg); color: var(--dojo-text-primary); }
       .btn-primary {
         padding: 0.25rem 0.625rem;
-        border-radius: var(--dojo-radius-sm, 4px);
+        border-radius: var(--dojo-radius-sm);
         font-size: 0.75rem;
         cursor: pointer;
         font-family: inherit;
-        background: var(--dojo-primary, #1D4ED8);
-        border: 1px solid var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        background: var(--dojo-primary);
+        border: 1px solid var(--dojo-primary);
+        color: var(--dojo-text-on-primary);
         font-weight: 600;
         transition: opacity 0.15s;
       }
@@ -362,25 +362,25 @@ export class DojoProjectManager extends HTMLElement {
       .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
       .btn-secondary:focus-visible,
       .btn-primary:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
       .btn-danger {
         padding: 0.25rem 0.625rem;
-        border-radius: var(--dojo-radius-sm, 4px);
+        border-radius: var(--dojo-radius-sm);
         font-size: 0.75rem;
         cursor: pointer;
         font-family: inherit;
-        background: #EF4444;
-        border: 1px solid #EF4444;
-        color: #fff;
+        background: var(--dojo-danger);
+        border: 1px solid var(--dojo-danger);
+        color: var(--dojo-text-on-danger);
         font-weight: 600;
         transition: opacity 0.15s;
       }
       .btn-danger:hover { opacity: 0.88; }
       .btn-danger:disabled { opacity: 0.55; cursor: not-allowed; }
       .btn-danger:focus-visible {
-        outline: 2px solid #EF4444;
+        outline: 2px solid var(--dojo-danger-focus);
         outline-offset: 2px;
       }
 
@@ -400,11 +400,11 @@ export class DojoProjectManager extends HTMLElement {
       }
       .delete-confirm-warning {
         font-size: 0.75rem;
-        color: #B45309;
+        color: var(--dojo-warning-text);
         margin: 0;
-        background: #FEF3C7;
-        border: 1px solid #F59E0B;
-        border-radius: var(--dojo-radius-sm, 4px);
+        background: var(--wiki-note-bg);
+        border: 1px solid var(--dojo-warning-border);
+        border-radius: var(--dojo-radius-sm);
         padding: 0.3rem 0.5rem;
       }
       .delete-confirm-actions {

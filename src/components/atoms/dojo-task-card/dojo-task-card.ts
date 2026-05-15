@@ -272,8 +272,8 @@ export class DojoTaskCard extends HTMLElement {
         transition: background 0.15s, color 0.15s;
       }
       .quick-delete-btn:hover {
-        background: #FEE2E2;
-        color: #EF4444;
+        background: var(--dojo-danger-bg);
+        color: var(--dojo-danger-text);
       }
       .drag-handle-btn {
         cursor: grab;

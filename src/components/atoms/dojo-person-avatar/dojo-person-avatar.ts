@@ -178,7 +178,7 @@ export class DojoPersonAvatar extends HTMLElement {
         left: 50%;
         transform: translateX(-50%);
         background: rgba(17,24,39,0.92);
-        color: #FFFFFF;
+        color: var(--dojo-text-on-primary);
         padding: 3px 8px;
         border-radius: 4px;
         font-size: 11px;

@@ -726,7 +726,7 @@ export class DojoWiki extends HTMLElement {
         color: var(--dojo-text-primary);
       }
       .panel-close:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -772,12 +772,12 @@ export class DojoWiki extends HTMLElement {
       }
       .sidebar-item.active {
         background: var(--dojo-surface);
-        color: var(--dojo-primary, #1D4ED8);
+        color: var(--dojo-primary);
         font-weight: 600;
-        border-right: 3px solid var(--dojo-primary, #1D4ED8);
+        border-right: 3px solid var(--dojo-primary);
       }
       .sidebar-item:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: -2px;
       }
       .sidebar-icon {
@@ -864,24 +864,24 @@ export class DojoWiki extends HTMLElement {
 
       /* ── Mensajes especiales ─────────────────────────────────── */
       .content .warning {
-        background: #FEF3C7;
-        border-left: 3px solid #D97706;
-        border-radius: 0 var(--dojo-radius-sm, 4px) var(--dojo-radius-sm, 4px) 0;
+        background: var(--wiki-note-bg);
+        border-left: 3px solid var(--wiki-note-border);
+        border-radius: 0 var(--dojo-radius-sm) var(--dojo-radius-sm) 0;
         padding: 0.625rem 0.875rem;
-        color: #92400E;
+        color: var(--wiki-note-text);
         font-size: 0.8125rem;
       }
       .content .note {
         background: var(--dojo-bg);
-        border-left: 3px solid var(--dojo-primary, #1D4ED8);
-        border-radius: 0 var(--dojo-radius-sm, 4px) var(--dojo-radius-sm, 4px) 0;
+        border-left: 3px solid var(--wiki-blockquote-border);
+        border-radius: 0 var(--dojo-radius-sm) var(--dojo-radius-sm) 0;
         padding: 0.625rem 0.875rem;
         color: var(--dojo-text-secondary);
         font-size: 0.8125rem;
       }
       [data-theme="dark"] .content .warning {
         background: rgba(217,119,6,0.15);
-        color: #FCD34D;
+        color: var(--dojo-code-accent);
       }
 
       /* ── Responsive: sidebar colapsado en pantallas pequeñas ── */

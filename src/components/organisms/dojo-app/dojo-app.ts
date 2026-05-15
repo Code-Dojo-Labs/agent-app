@@ -238,7 +238,7 @@ export class DojoApp extends HTMLElement {
       .notification-banner-btn.primary {
         background: var(--dojo-warning, #D97706);
         border-color: transparent;
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         font-weight: 700;
       }
       .notification-banner-btn:focus-visible {
@@ -325,7 +325,7 @@ export class DojoApp extends HTMLElement {
       .import-confirm-btn {
         background: var(--dojo-danger, #DC2626);
         border: 1px solid transparent;
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         font-weight: 600;
       }
       .import-confirm-btn:hover { opacity: 0.9; }
@@ -434,7 +434,7 @@ export class DojoApp extends HTMLElement {
       }
       .view-toggle-btn.active {
         background: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         font-weight: 600;
       }
       .view-toggle-btn:hover:not(.active) {

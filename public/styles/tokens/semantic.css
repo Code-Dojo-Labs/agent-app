@@ -1,0 +1,109 @@
+/**
+ * semantic.css — Capa 2: Tokens semánticos (rol / intención).
+ *
+ * IMPORTANTE: Este archivo debe importarse DESPUÉS de primitives.css.
+ * Todos los valores referencian exclusivamente variables de primitivos;
+ * ningún valor hexadecimal aparece aquí directamente.
+ *
+ * El cambio de tema claro → oscuro se controla mediante el atributo
+ * data-theme="light"|"dark" en el elemento <html>, gestionado por theme.ts.
+ *
+ * Variables con prefijo --dojo- son las únicas que los componentes
+ * deben consumir directamente.
+ */
+
+/* ══════════════════════════════════════════════════════════════════
+   MODO CLARO (por defecto)
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Color de marca (personalizable) ──────────────────────────── */
+  --dojo-primary:          var(--color-blue-700);
+  --dojo-primary-hover:    var(--color-blue-800);
+  --dojo-primary-light:    var(--color-blue-100);
+  --dojo-primary-focus:    var(--color-blue-300);
+
+  /* ── Semántica de estado: peligro ─────────────────────────────── */
+  --dojo-danger:           var(--color-red-600);
+  --dojo-danger-hover:     var(--color-red-700);
+  --dojo-danger-light:     var(--color-red-500);
+  --dojo-danger-bg:        var(--color-red-100);
+  --dojo-danger-border:    var(--color-red-500);
+  --dojo-danger-text:      var(--color-red-500);
+  --dojo-danger-focus:     var(--color-red-500);
+
+  /* ── Semántica de estado: éxito ───────────────────────────────── */
+  --dojo-success:          var(--color-green-600);
+  --dojo-success-bg:       var(--color-green-100);
+
+  /* ── Semántica de estado: advertencia ────────────────────────── */
+  --dojo-warning:          var(--color-amber-600);
+  --dojo-warning-bg:       var(--color-amber-100);
+  --dojo-warning-border:   var(--color-amber-500);
+  --dojo-warning-text:     var(--color-amber-700);
+  --dojo-warning-text-dark: var(--color-amber-800);
+
+  /* ── Token especial para texto sobre fondo oscuro en modo claro ─ */
+  /* e.g. código inline en wiki en modo claro */
+  --dojo-code-accent:      var(--color-amber-300);
+
+  /* ── Superficies y fondos ────────────────────────────────────── */
+  --dojo-bg:               var(--color-slate-100);
+  --dojo-surface:          var(--color-slate-0);
+  --dojo-surface-hover:    var(--color-slate-50);
+  --dojo-border:           var(--color-slate-200);
+
+  /* ── Tipografía ─────────────────────────────────────────────── */
+  --dojo-text-primary:     var(--color-slate-atajo);  /* #172B4D — alto contraste */
+  --dojo-text-secondary:   var(--color-slate-sub);    /* #5E6C84 */
+  --dojo-text-muted:       var(--color-slate-400);
+  --dojo-text-on-primary:  var(--color-white);        /* texto sobre fondos primarios */
+  --dojo-text-on-danger:   var(--color-white);
+
+  /* ── Radios ─────────────────────────────────────────────────── */
+  --dojo-radius:           var(--radius-md);
+  --dojo-radius-sm:        var(--radius-sm);
+  --dojo-radius-lg:        var(--radius-lg);
+
+  /* ── Sombras ────────────────────────────────────────────────── */
+  --dojo-shadow:           var(--shadow-sm);
+  --dojo-shadow-md:        var(--shadow-md);
+
+  /* ── Transiciones ───────────────────────────────────────────── */
+  --dojo-transition:       var(--duration-normal) ease;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MODO OSCURO
+   Sólo se sobreescriben los tokens que cambian según el tema.
+   Los tokens de marca (primary, danger, success, warning) son
+   intencionalamente iguales en ambos modos para mantener contraste
+   WCAG AA sobre los fondos oscuros correspondientes.
+   ══════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  /* ── Superficies y fondos ────────────────────────────────────── */
+  --dojo-bg:               var(--color-slate-900);
+  --dojo-surface:          var(--color-slate-800);
+  --dojo-surface-hover:    var(--color-slate-700);
+  --dojo-border:           var(--color-slate-700);
+
+  /* ── Tipografía ─────────────────────────────────────────────── */
+  --dojo-text-primary:     var(--color-slate-100);
+  --dojo-text-secondary:   var(--color-slate-400);
+  --dojo-text-muted:       var(--color-slate-600);
+
+  /* ── Sombras con mayor opacidad en modo oscuro ───────────────── */
+  --dojo-shadow:           var(--shadow-sm-dark);
+  --dojo-shadow-md:        var(--shadow-md-dark);
+
+  /* ── Advertencia: en oscuro usamos tono claro para mejor lectura */
+  --dojo-warning-text:     var(--color-amber-300);
+  --dojo-warning-text-dark: var(--color-amber-400);
+
+  /* ── código/accent en modo oscuro ───────────────────────────── */
+  --dojo-code-accent:      var(--color-amber-300);
+
+  /* ── primary-light ajustado para fondos oscuros ─────────────── */
+  --dojo-primary-light:    var(--color-blue-900);
+  --dojo-danger-bg:        color-mix(in srgb, var(--color-red-900) 40%, var(--color-slate-800));
+  --dojo-warning-bg:       color-mix(in srgb, var(--color-amber-900) 40%, var(--color-slate-800));
+}

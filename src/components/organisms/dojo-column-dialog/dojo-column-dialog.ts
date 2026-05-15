@@ -242,11 +242,11 @@ export class DojoColumnDialog extends HTMLElement {
       }
       .btn-primary {
         background: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
       }
       .btn-danger {
         background: var(--dojo-danger, #DC2626);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
       }
     `;
     this._shadow.appendChild(style);
