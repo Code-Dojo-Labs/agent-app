@@ -256,7 +256,7 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .close-btn:hover { background: var(--dojo-bg); }
       .close-btn:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -332,11 +332,11 @@ export class DojoTaskDetail extends HTMLElement {
       .title-input:hover { border-color: var(--dojo-border); }
       .title-input:focus {
         outline: none;
-        border-color: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary);
         background: var(--dojo-bg);
       }
       .title-input:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -356,11 +356,11 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .field-select:focus {
         outline: none;
-        border-color: var(--dojo-primary, #1D4ED8);
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dojo-primary, #1D4ED8) 20%, transparent);
+        border-color: var(--dojo-primary);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dojo-primary) 20%, transparent);
       }
       .field-select:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -387,11 +387,11 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .desc-tab.active {
         background: var(--dojo-surface);
-        color: var(--dojo-primary, #1D4ED8);
+        color: var(--dojo-primary);
         font-weight: 600;
       }
       .desc-tab:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: -2px;
       }
       .desc-textarea {
@@ -411,10 +411,10 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .desc-textarea:focus {
         outline: none;
-        border-color: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary);
       }
       .desc-textarea:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
       .desc-preview {
@@ -458,7 +458,7 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .desc-preview ul  { padding-left: 1.25rem; margin: 0.375rem 0; }
       .desc-preview li  { margin-bottom: 0.2rem; }
-      .desc-preview a   { color: var(--dojo-primary, #1D4ED8); }
+      .desc-preview a   { color: var(--dojo-primary); }
 
       /* ── Etiquetas — chips ── */
       .labels-chips {
@@ -508,11 +508,11 @@ export class DojoTaskDetail extends HTMLElement {
         font-family: inherit;
       }
       .add-label-btn:hover {
-        border-color: var(--dojo-primary, #1D4ED8);
-        color: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary);
+        color: var(--dojo-primary);
       }
       .add-label-btn:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -545,7 +545,7 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .labels-picker-opt:hover { background: var(--dojo-bg); }
       .labels-picker-opt:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: -2px;
       }
       .label-option {
@@ -559,7 +559,7 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .label-option:hover { background: var(--dojo-bg); }
       .label-option input[type="checkbox"] {
-        accent-color: var(--dojo-primary, #1D4ED8);
+        accent-color: var(--dojo-primary);
         flex-shrink: 0;
       }
       .label-dot {
@@ -584,7 +584,7 @@ export class DojoTaskDetail extends HTMLElement {
         outline: none;
       }
       .labels-search:focus {
-        border-bottom-color: var(--dojo-primary, #1D4ED8);
+        border-bottom-color: var(--dojo-primary);
         background: var(--dojo-bg);
       }
       .label-create-option {
@@ -594,13 +594,13 @@ export class DojoTaskDetail extends HTMLElement {
         padding: 0.4375rem 0.75rem;
         cursor: pointer;
         font-size: 0.8125rem;
-        color: var(--dojo-primary, #1D4ED8);
+        color: var(--dojo-primary);
         font-weight: 500;
         border-top: 1px solid var(--dojo-border);
       }
       .label-create-option:hover { background: var(--dojo-bg); }
       .label-create-option:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: -2px;
       }
       .label-create-form {
@@ -634,7 +634,7 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .color-swatch.selected,
       .color-swatch:focus-visible {
-        border-color: var(--dojo-text-primary, #111);
+        border-color: var(--dojo-text-primary);
         transform: scale(1.2);
       }
       .label-custom-color-row {
@@ -655,14 +655,14 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .label-error {
         font-size: 0.75rem;
-        color: #EF4444;
+        color: var(--dojo-danger-text);
       }
       .label-contrast-warning {
         font-size: 0.75rem;
-        color: #92400E;
-        background: #FEF3C7;
-        border: 1px solid #F59E0B;
-        border-radius: var(--dojo-radius-sm, 4px);
+        color: var(--dojo-warning-text-dark);
+        background: var(--wiki-note-bg);
+        border: 1px solid var(--dojo-warning-border);
+        border-radius: var(--dojo-radius-sm);
         padding: 0.3rem 0.5rem;
         display: flex;
         flex-direction: column;
@@ -686,16 +686,16 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .label-btn:hover { background: var(--dojo-bg); color: var(--dojo-text-primary); }
       .label-btn-primary {
-        background: var(--dojo-primary, #1D4ED8);
-        border-color: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        background: var(--dojo-primary);
+        border-color: var(--dojo-primary);
+        color: var(--dojo-text-on-primary);
         font-weight: 600;
       }
       .label-btn-primary:hover { opacity: 0.88; }
       .label-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
       .label-btn:focus-visible,
       .label-btn-primary:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -703,8 +703,8 @@ export class DojoTaskDetail extends HTMLElement {
       .label-info-notice {
         padding: 0.375rem 0.75rem;
         font-size: 0.75rem;
-        color: var(--dojo-primary, #1D4ED8);
-        background: color-mix(in srgb, var(--dojo-primary, #1D4ED8) 8%, transparent);
+        color: var(--dojo-primary);
+        background: color-mix(in srgb, var(--dojo-primary) 8%, transparent);
         border-top: 1px solid var(--dojo-border);
         line-height: 1.4;
         margin: 0;
@@ -724,20 +724,20 @@ export class DojoTaskDetail extends HTMLElement {
         gap: 0.375rem;
         padding: 0.4375rem 0.875rem;
         background: transparent;
-        border: 1px solid #EF4444;
-        border-radius: var(--dojo-radius-sm, 4px);
+        border: 1px solid var(--dojo-danger-border);
+        border-radius: var(--dojo-radius-sm);
         font-size: 0.8125rem;
         font-weight: 600;
-        color: #EF4444;
+        color: var(--dojo-danger-text);
         cursor: pointer;
         font-family: inherit;
         transition: background 0.15s, color 0.15s;
       }
       .delete-task-btn:hover {
-        background: #FEE2E2;
+        background: var(--dojo-danger-bg);
       }
       .delete-task-btn:focus-visible {
-        outline: 2px solid #EF4444;
+        outline: 2px solid var(--dojo-danger-focus);
         outline-offset: 2px;
       }
 
@@ -823,7 +823,7 @@ export class DojoTaskDetail extends HTMLElement {
       }
       .subtasks-progress-fill {
         height: 100%;
-        background: var(--dojo-primary, #1D4ED8);
+        background: var(--dojo-primary);
         border-radius: 2px;
         transition: width 0.2s ease;
       }
@@ -846,7 +846,7 @@ export class DojoTaskDetail extends HTMLElement {
       .subtask-item input[type="checkbox"] {
         flex-shrink: 0;
         cursor: pointer;
-        accent-color: var(--dojo-primary, #1D4ED8);
+        accent-color: var(--dojo-primary);
       }
       .subtask-text {
         flex: 1;
@@ -873,10 +873,10 @@ export class DojoTaskDetail extends HTMLElement {
         opacity: 1;
       }
       .subtask-delete-btn:hover {
-        color: #EF4444;
+        color: var(--dojo-danger-text);
       }
       .subtask-delete-btn:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
         opacity: 1;
       }
@@ -897,7 +897,7 @@ export class DojoTaskDetail extends HTMLElement {
         outline: none;
       }
       .subtask-add-input:focus {
-        border-color: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary);
         box-shadow: 0 0 0 2px rgba(29,78,216,.15);
       }
       .subtask-add-btn {
@@ -905,9 +905,9 @@ export class DojoTaskDetail extends HTMLElement {
         font-family: inherit;
         padding: 0.375rem 0.625rem;
         border: 1px solid var(--dojo-border);
-        border-radius: var(--dojo-radius-sm, 4px);
-        background: var(--dojo-primary, #1D4ED8);
-        color: #FFFFFF;
+        border-radius: var(--dojo-radius-sm);
+        background: var(--dojo-primary);
+        color: var(--dojo-text-on-primary);
         cursor: pointer;
         white-space: nowrap;
       }
@@ -915,7 +915,7 @@ export class DojoTaskDetail extends HTMLElement {
         opacity: 0.9;
       }
       .subtask-add-btn:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
     `;

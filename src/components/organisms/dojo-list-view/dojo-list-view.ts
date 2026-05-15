@@ -212,7 +212,7 @@ export class DojoListView extends HTMLElement {
       .filter-chip.active {
         background: var(--dojo-primary, #1D4ED8);
         border-color: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         font-weight: 600;
       }
       .filter-chip:focus-visible {
@@ -428,16 +428,16 @@ export class DojoListView extends HTMLElement {
         font-weight: 600;
         white-space: nowrap;
       }
-      .priority-urgent { background: #fef2f2; color: #dc2626; }
-      .priority-high   { background: #fff7ed; color: #ea580c; }
-      .priority-medium { background: #fffbeb; color: #d97706; }
-      .priority-low    { background: #f0fdf4; color: #16a34a; }
+      .priority-urgent { background: var(--dojo-danger-bg); color: var(--dojo-danger); }
+      .priority-high   { background: var(--dojo-warning-bg); color: var(--dojo-warning); }
+      .priority-medium { background: var(--dojo-warning-bg); color: var(--dojo-warning); }
+      .priority-low    { background: var(--dojo-success-bg); color: var(--dojo-success); }
       /* Compatibilidad modo oscuro via custom props */
       @media (prefers-color-scheme: dark) {
-        .priority-urgent { background: rgba(220,38,38,.15); color: #f87171; }
-        .priority-high   { background: rgba(234,88,12,.15);  color: #fb923c; }
-        .priority-medium { background: rgba(217,119,6,.15);  color: #fbbf24; }
-        .priority-low    { background: rgba(22,163,74,.15);  color: #4ade80; }
+        .priority-urgent { background: color-mix(in srgb, var(--dojo-danger) 15%, transparent); color: var(--dojo-danger-light); }
+        .priority-high   { background: color-mix(in srgb, var(--dojo-warning) 15%, transparent); color: var(--dojo-warning); }
+        .priority-medium { background: color-mix(in srgb, var(--dojo-warning) 15%, transparent); color: var(--dojo-code-accent); }
+        .priority-low    { background: color-mix(in srgb, var(--dojo-success) 15%, transparent); color: var(--dojo-success); }
       }
 
       /* ── Celda: Etiquetas ── */
@@ -480,8 +480,8 @@ export class DojoListView extends HTMLElement {
       /* ── Celda: Vencimiento ── */
       .due-none    { color: var(--dojo-text-secondary); font-size: 0.8rem; }
       .due-normal  { color: var(--dojo-text-secondary); font-size: 0.8rem; }
-      .due-soon    { color: #d97706; font-weight: 600; font-size: 0.8rem; }
-      .due-overdue { color: #dc2626; font-weight: 600; font-size: 0.8rem; }
+      .due-soon    { color: var(--dojo-warning); font-weight: 600; font-size: 0.8rem; }
+      .due-overdue { color: var(--dojo-danger); font-weight: 600; font-size: 0.8rem; }
 
       /* ── Celda: Acciones ── */
       .delete-btn {
@@ -500,9 +500,9 @@ export class DojoListView extends HTMLElement {
         flex-shrink: 0;
       }
       .delete-btn:hover {
-        background: #fef2f2;
-        border-color: #fca5a5;
-        color: #dc2626;
+        background: var(--dojo-danger-bg);
+        border-color: var(--dojo-danger-border);
+        color: var(--dojo-danger);
       }
       .delete-btn:focus-visible {
         outline: 2px solid var(--dojo-primary, #1D4ED8);
@@ -565,7 +565,7 @@ export class DojoListView extends HTMLElement {
         margin-top: 0.5rem;
         padding: 0.4rem 1rem;
         background: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         border: none;
         border-radius: var(--dojo-radius-sm, 4px);
         cursor: pointer;

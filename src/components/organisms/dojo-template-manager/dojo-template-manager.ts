@@ -194,17 +194,17 @@ export class DojoTemplateManager extends HTMLElement {
         transition: opacity 0.15s;
       }
       .btn:hover { opacity: 0.85; }
-      .btn:focus-visible { outline: 2px solid var(--dojo-primary, #1D4ED8); outline-offset: 2px; }
+      .btn:focus-visible { outline: 2px solid var(--dojo-primary); outline-offset: 2px; }
       .btn-icon {
         background: transparent; border: none; cursor: pointer; padding: 0.25rem;
         color: var(--dojo-text-secondary); border-radius: var(--dojo-radius-sm, 4px);
         font-size: 1rem; line-height: 1; font-family: inherit;
       }
       .btn-icon:hover { color: var(--dojo-text-primary); background: var(--dojo-bg); }
-      .btn-icon:focus-visible { outline: 2px solid var(--dojo-primary, #1D4ED8); outline-offset: 2px; }
-      .btn-primary { background: var(--dojo-primary, #1D4ED8); color: #fff; }
+      .btn-icon:focus-visible { outline: 2px solid var(--dojo-primary); outline-offset: 2px; }
+      .btn-primary { background: var(--dojo-primary); color: var(--dojo-text-on-primary); }
       .btn-ghost { background: transparent; border-color: var(--dojo-border); color: var(--dojo-text-secondary); }
-      .btn-danger { background: var(--dojo-danger, #DC2626); color: #fff; }
+      .btn-danger { background: var(--dojo-danger); color: var(--dojo-text-on-primary); }
       .btn-new-template { align-self: flex-start; }
 
       /* ── Lista de templates ── */
@@ -253,12 +253,12 @@ export class DojoTemplateManager extends HTMLElement {
       }
       .field input:focus, .field textarea:focus, .field select:focus {
         outline: none;
-        border-color: var(--dojo-primary, #1D4ED8);
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dojo-primary, #1D4ED8) 20%, transparent);
+        border-color: var(--dojo-primary);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dojo-primary) 20%, transparent);
       }
-      .field input[aria-invalid="true"] { border-color: var(--dojo-danger, #DC2626); }
+      .field input[aria-invalid="true"] { border-color: var(--dojo-danger); }
       .field textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
-      .field-error { font-size: 0.75rem; color: var(--dojo-danger, #DC2626); min-height: 1rem; }
+      .field-error { font-size: 0.75rem; color: var(--dojo-danger); min-height: 1rem; }
 
       /* ── Chips de etiquetas (reutilizado de dojo-task-dialog) ── */
       .labels-chips {
@@ -283,8 +283,8 @@ export class DojoTemplateManager extends HTMLElement {
         color: var(--dojo-text-secondary); background: transparent;
         cursor: pointer; transition: border-color 0.15s, color 0.15s; font-family: inherit;
       }
-      .add-label-btn:hover { border-color: var(--dojo-primary, #1D4ED8); color: var(--dojo-primary, #1D4ED8); }
-      .add-label-btn:focus-visible { outline: 2px solid var(--dojo-primary, #1D4ED8); outline-offset: 2px; }
+      .add-label-btn:hover { border-color: var(--dojo-primary); color: var(--dojo-primary); }
+      .add-label-btn:focus-visible { outline: 2px solid var(--dojo-primary); outline-offset: 2px; }
       .labels-picker {
         border: 1px solid var(--dojo-border);
         border-radius: var(--dojo-radius-sm, 4px);
@@ -300,7 +300,7 @@ export class DojoTemplateManager extends HTMLElement {
         font-size: 0.875rem; transition: background 0.1s;
       }
       .label-option:hover { background: var(--dojo-bg); }
-      .label-option input[type="checkbox"] { accent-color: var(--dojo-primary, #1D4ED8); flex-shrink: 0; width: auto; }
+      .label-option input[type="checkbox"] { accent-color: var(--dojo-primary); flex-shrink: 0; width: auto; }
       .label-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
       /* ── Chips de personas ── */
@@ -324,8 +324,8 @@ export class DojoTemplateManager extends HTMLElement {
         color: var(--dojo-text-secondary); background: transparent;
         cursor: pointer; font-family: inherit;
       }
-      .add-person-btn:hover { border-color: var(--dojo-primary, #1D4ED8); color: var(--dojo-primary, #1D4ED8); }
-      .add-person-btn:focus-visible { outline: 2px solid var(--dojo-primary, #1D4ED8); outline-offset: 2px; }
+      .add-person-btn:hover { border-color: var(--dojo-primary); color: var(--dojo-primary); }
+      .add-person-btn:focus-visible { outline: 2px solid var(--dojo-primary); outline-offset: 2px; }
       .persons-picker {
         border: 1px solid var(--dojo-border); border-radius: var(--dojo-radius-sm, 4px);
         background: var(--dojo-surface); box-shadow: var(--dojo-shadow);
@@ -338,7 +338,7 @@ export class DojoTemplateManager extends HTMLElement {
         font-size: 0.875rem; transition: background 0.1s;
       }
       .person-option:hover { background: var(--dojo-bg); }
-      .person-option input[type="checkbox"] { accent-color: var(--dojo-primary, #1D4ED8); flex-shrink: 0; width: auto; }
+      .person-option input[type="checkbox"] { accent-color: var(--dojo-primary); flex-shrink: 0; width: auto; }
 
       /* ── Subtareas (opcional) ── */
       .subtasks-section { display: flex; flex-direction: column; gap: 0.375rem; }
@@ -358,7 +358,7 @@ export class DojoTemplateManager extends HTMLElement {
         padding: 0; line-height: 1; font-size: 1rem;
         color: var(--dojo-text-secondary); opacity: 0.65; transition: opacity 0.1s;
       }
-      .subtask-remove:hover { opacity: 1; color: var(--dojo-danger, #DC2626); }
+      .subtask-remove:hover { opacity: 1; color: var(--dojo-danger); }
       .subtasks-input-wrapper {
         display: flex; gap: 0.375rem;
       }
@@ -373,13 +373,13 @@ export class DojoTemplateManager extends HTMLElement {
       }
       .subtasks-input-wrapper input:focus {
         outline: none;
-        border-color: var(--dojo-primary, #1D4ED8);
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dojo-primary, #1D4ED8) 20%, transparent);
+        border-color: var(--dojo-primary);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dojo-primary) 20%, transparent);
       }
       .subtasks-add-btn {
         padding: 0.4375rem 0.75rem;
-        background: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        background: var(--dojo-primary);
+        color: var(--dojo-text-on-primary);
         border: none; border-radius: var(--dojo-radius-sm, 4px);
         font-size: 0.875rem; font-weight: 500;
         cursor: pointer; transition: opacity 0.15s;
@@ -399,8 +399,8 @@ export class DojoTemplateManager extends HTMLElement {
       /* ── Confirm delete inline ── */
       .delete-confirm {
         display: none; align-items: center; gap: 0.75rem; flex-wrap: wrap;
-        padding: 0.75rem 1rem; background: color-mix(in srgb, var(--dojo-danger, #DC2626) 10%, var(--dojo-surface));
-        border: 1px solid color-mix(in srgb, var(--dojo-danger, #DC2626) 30%, var(--dojo-border));
+        padding: 0.75rem 1rem; background: color-mix(in srgb, var(--dojo-danger) 10%, var(--dojo-surface));
+        border: 1px solid color-mix(in srgb, var(--dojo-danger) 30%, var(--dojo-border));
         border-radius: var(--dojo-radius-sm, 4px);
       }
       .delete-confirm.visible { display: flex; }

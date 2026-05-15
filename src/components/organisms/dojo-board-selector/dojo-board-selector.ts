@@ -109,11 +109,11 @@ export class DojoBoardSelector extends HTMLElement {
       }
       .board-card:hover {
         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        border-color: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary);
         transform: translateY(-2px);
       }
       .board-card:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -165,11 +165,11 @@ export class DojoBoardSelector extends HTMLElement {
         color: var(--dojo-text-primary);
       }
       .board-action-btn.delete:hover {
-        background: #FEE2E2;
-        color: #EF4444;
+        background: var(--dojo-danger-bg);
+        color: var(--dojo-danger-text);
       }
       .board-action-btn:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
 
@@ -193,11 +193,11 @@ export class DojoBoardSelector extends HTMLElement {
       }
       .new-board-card:hover {
         background: var(--dojo-surface);
-        border-color: var(--dojo-primary, #1D4ED8);
-        color: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary);
+        color: var(--dojo-primary);
       }
       .new-board-card:focus-visible {
-        outline: 2px solid var(--dojo-primary, #1D4ED8);
+        outline: 2px solid var(--dojo-primary);
         outline-offset: 2px;
       }
       .new-board-icon {
@@ -212,7 +212,7 @@ export class DojoBoardSelector extends HTMLElement {
         gap: 0.5rem;
         padding: 1rem;
         background: var(--dojo-surface);
-        border: 2px solid var(--dojo-primary, #1D4ED8);
+        border: 2px solid var(--dojo-primary);
         border-radius: var(--dojo-radius, 6px);
         min-height: 120px;
       }
@@ -227,7 +227,7 @@ export class DojoBoardSelector extends HTMLElement {
         outline: none;
       }
       .inline-input:focus {
-        border-color: var(--dojo-primary, #1D4ED8);
+        border-color: var(--dojo-primary);
       }
       .inline-row {
         display: flex;
@@ -237,8 +237,8 @@ export class DojoBoardSelector extends HTMLElement {
         padding: 0.3125rem 0.75rem;
         border: 1px solid var(--dojo-border);
         border-radius: var(--dojo-radius-sm, 4px);
-        background: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        background: var(--dojo-primary);
+        color: var(--dojo-text-on-primary);
         font-size: 0.8125rem;
         font-family: inherit;
         cursor: pointer;
@@ -305,9 +305,9 @@ export class DojoBoardSelector extends HTMLElement {
         color: var(--dojo-text-primary);
       }
       .delete-confirm-btn {
-        background: #DC2626;
+        background: var(--dojo-danger);
         border: 1px solid transparent;
-        color: #fff;
+        color: var(--dojo-text-on-danger);
         font-weight: 600;
       }
     `;

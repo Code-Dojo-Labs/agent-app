@@ -314,7 +314,7 @@ export class DojoTaskDialog extends HTMLElement {
       }
       .btn-primary {
         background: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
       }
 
       /* ── Etiquetas — US-23 ── */
@@ -494,12 +494,12 @@ export class DojoTaskDialog extends HTMLElement {
       }
       .label-error {
         font-size: 0.75rem;
-        color: #EF4444;
+        color: var(--dojo-danger-text);
       }
       .label-contrast-warning {
         font-size: 0.75rem;
-        color: #92400E;
-        background: #FEF3C7;
+        color: var(--dojo-warning-text-dark);
+        background: var(--wiki-note-bg);
         border: 1px solid #F59E0B;
         border-radius: var(--dojo-radius-sm, 4px);
         padding: 0.3rem 0.5rem;
@@ -527,7 +527,7 @@ export class DojoTaskDialog extends HTMLElement {
       .label-btn-primary {
         background: var(--dojo-primary, #1D4ED8);
         border-color: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         font-weight: 600;
       }
       .label-btn-primary:hover { opacity: 0.88; }
@@ -634,7 +634,7 @@ export class DojoTaskDialog extends HTMLElement {
         border: 1px solid var(--dojo-border);
         border-radius: var(--dojo-radius-sm, 4px);
         background: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         font-size: 0.8125rem;
         font-weight: 600;
         cursor: pointer;

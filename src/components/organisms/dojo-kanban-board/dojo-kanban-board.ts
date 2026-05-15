@@ -342,7 +342,7 @@ export class DojoKanbanBoard extends HTMLElement {
         margin-top: 0.5rem;
         padding: 0.4rem 1rem;
         background: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         border: none;
         border-radius: var(--dojo-radius-sm, 4px);
         cursor: pointer;
@@ -393,7 +393,7 @@ export class DojoKanbanBoard extends HTMLElement {
       .filter-chip.active {
         background: var(--dojo-primary, #1D4ED8);
         border-color: var(--dojo-primary, #1D4ED8);
-        color: #fff;
+        color: var(--dojo-text-on-primary);
         font-weight: 600;
       }
       .filter-chip:focus-visible {
@@ -538,7 +538,7 @@ export class DojoKanbanBoard extends HTMLElement {
       .wip-btn--continue {
         background: var(--dojo-warning, #D97706);
         border: 1px solid transparent;
-        color: #fff;
+        color: var(--dojo-text-on-primary);
       }
     `;
     this._shadow.appendChild(style);

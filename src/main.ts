@@ -21,6 +21,7 @@ import { seedDefaultColumns } from './db/column.repository.js';
 import { initTheme } from './utils/theme.js';
 import { initializeUISync } from './utils/ui-sync.js';
 import { initializeTaskNotifications } from './utils/task-notifications.js';
+import { restoreThemeCustomization } from './components/organisms/dojo-theme-customizer/dojo-theme-customizer.js';
 
 // ── Inicialización ─────────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ async function bootstrap(): Promise<void> {
   try {
     // 1. Inicializar el tema (light/dark/system)
     initTheme();
+    restoreThemeCustomization();
 
     // 2. Abrir (o crear) la base de datos
     await openDatabase();
@@ -54,6 +56,7 @@ async function bootstrap(): Promise<void> {
 
     // 4. Registrar Web Components — US-01 Visualización del tablero Kanban
     await import('./components/organisms/dojo-app/dojo-app.js');
+    await import('./components/organisms/dojo-theme-customizer/dojo-theme-customizer.js');
 
     // 6. Montar la app (el elemento <dojo-app> ya está en el HTML)
     console.info('[Dojo Kanban] App inicializada correctamente.');
@@ -65,7 +68,7 @@ async function bootstrap(): Promise<void> {
     // Será reemplazado por <dojo-error> Web Component cuando esté implementado.
     const errEl = document.createElement('div');
     errEl.setAttribute('role', 'alert');
-    errEl.style.cssText = 'padding:2rem;font-family:system-ui;color:#DC2626;text-align:center';
+    errEl.style.cssText = 'padding:2rem;font-family:system-ui;color:var(--dojo-danger,#DC2626);text-align:center';
 
     const title = document.createElement('h1');
     title.style.cssText = 'margin-bottom:.5rem;font-size:1.25rem';
