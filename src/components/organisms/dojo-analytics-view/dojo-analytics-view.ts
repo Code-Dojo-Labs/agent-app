@@ -320,6 +320,11 @@ export class DojoAnalyticsView extends HTMLElement {
   }
 
   connectedCallback(): void {
+    // Leer el atributo inicial si existe
+    const boardId = this.getAttribute('board-id');
+    if (boardId) {
+      this._boardId = boardId;
+    }
     this._loadData();
   }
 
