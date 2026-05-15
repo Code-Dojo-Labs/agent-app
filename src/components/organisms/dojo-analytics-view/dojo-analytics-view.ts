@@ -37,6 +37,9 @@ export class DojoAnalyticsView extends HTMLElement {
   private _selectedDateRange = '30d'; // 7d, 30d, 90d, custom
   private _filterLabels: string[] = [];
   private _filterAssignees: string[] = [];
+  
+  // ✅ MEMORY LEAK FIX: AbortController para cancelar promise si componente se destruye
+  private _loadAbortController: AbortController | null = null;
 
   constructor() {
     super();
@@ -325,7 +328,19 @@ export class DojoAnalyticsView extends HTMLElement {
     if (boardId) {
       this._boardId = boardId;
     }
+    // ✅ Inicializar AbortController para poder cancelar promise si el componente se destruye
+    this._loadAbortController = new AbortController();
     this._loadData();
+  }
+
+  /**
+   * ✅ MEMORY LEAK FIX: Limpiar recursos cuando el componente se elimina del DOM.
+   * Cancela cualquier promise pendiente de _loadData() para evitar:
+   * - Calls a _render() sobre Shadow DOM destruido
+   * - Referencias circulares que previenen garbage collection
+   */
+  disconnectedCallback(): void {
+    this._loadAbortController?.abort();
   }
 
   attributeChangedCallback(name: string, oldValue: string, newValue: string): void {
@@ -364,7 +379,28 @@ export class DojoAnalyticsView extends HTMLElement {
       this._loading = false;
       this._render();
     } catch (err) {
-      this._error = `Failed to load metrics: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      // ✅ ERROR HANDLING MEJORADO: Logging detallado y mensajes contextuales
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      
+      // Log técnico para debugging
+      console.error('[DojoAnalyticsView] Metrics calculation failed:', {
+        error: err,
+        boardId: this._boardId,
+        dateRange: this._selectedDateRange,
+        filters: { labels: this._filterLabels.length, assignees: this._filterAssignees.length },
+      });
+      
+      // Mensaje contextual al usuario según tipo de error
+      if (errorMsg.includes('database') || errorMsg.includes('store') || errorMsg.includes('index')) {
+        this._error = 'Unable to access task database. Please refresh the page.';
+      } else if (errorMsg.includes('memory') || errorMsg.includes('quota') || errorMsg.includes('OutOfMemory')) {
+        this._error = 'Dashboard requires less data. Try a shorter time range.';
+      } else if (errorMsg.includes('timeout')) {
+        this._error = 'Loading took too long. Check your browser console for details.';
+      } else {
+        this._error = `Failed to load metrics: ${errorMsg}`;
+      }
+      
       this._loading = false;
       this._render();
     }

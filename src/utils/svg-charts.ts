@@ -22,8 +22,16 @@ interface Scale {
 
 /**
  * Crea una escala lineal para mapear valores a píxeles
+ * 
+ * ✅ Maneja caso borde: Si max === min, devuelve función que mapea al centro del rango
+ * para evitar división por cero (Infinity).
  */
 function createScale(min: number, max: number, domainMin: number, domainMax: number): (v: number) => number {
+  if (max === min) {
+    // Caso borde: todos los valores son iguales → devolver centro del rango
+    const center = (domainMin + domainMax) / 2;
+    return () => center;
+  }
   const scale = (domainMax - domainMin) / (max - min);
   return (v) => domainMin + (v - min) * scale;
 }
