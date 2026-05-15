@@ -33,7 +33,9 @@ function parseTimestamp(input: string | number): number {
 
 /**
  * Calcula Cycle Time en horas y días para una tarea
- * Busca evento "status_change" con payload.to === "En progreso" → payload.to === "Hecho"
+ * Busca evento "status_change" donde:
+ * - Inicio: primero evento a "En Progreso", o si no existe, primer evento
+ * - Fin: evento a "Hecho"
  */
 function calculateCycleTime(
   activities: ActivityEvent[],
@@ -42,14 +44,21 @@ function calculateCycleTime(
     (a) => a.type === 'status_change' && a.payload?.to,
   );
 
-  const inProgressEvent = statusChanges.find(
-    (a) => a.payload.to === 'En progreso',
-  );
+  // Buscar evento a "Hecho" (fin del ciclo)
   const doneEvent = statusChanges.find((a) => a.payload.to === 'Hecho');
+  if (!doneEvent?.createdAt) return null;
 
-  if (!inProgressEvent?.createdAt || !doneEvent?.createdAt) return null;
+  // Buscar el evento de inicio: preferentemente "En Progreso", sino el primer cambio de estado
+  let startEvent = statusChanges.find(
+    (a) => a.payload.to === 'En Progreso',
+  );
+  if (!startEvent) {
+    // Si no hay "En Progreso", usar el primer evento (o "Por Hacer")
+    startEvent = statusChanges[0];
+  }
+  if (!startEvent?.createdAt) return null;
 
-  const startTime = parseTimestamp(inProgressEvent.createdAt);
+  const startTime = parseTimestamp(startEvent.createdAt);
   const endTime = parseTimestamp(doneEvent.createdAt);
   const milliseconds = endTime - startTime;
 

@@ -385,10 +385,11 @@ function _isValidColumn(obj: unknown): obj is Column {
   if (obj === null || typeof obj !== 'object') return false;
   const c = obj as Record<string, unknown>;
   return (
-    typeof c.id    === 'string' &&
-    typeof c.name  === 'string' &&
-    typeof c.icon  === 'string' &&
-    typeof c.order === 'number'
+    typeof c.id       === 'string' &&
+    typeof c.boardId  === 'string' &&
+    typeof c.name     === 'string' &&
+    typeof c.icon     === 'string' &&
+    typeof c.order    === 'number'
   );
 }
 
@@ -397,6 +398,7 @@ function _isValidTask(obj: unknown): obj is Task {
   const t = obj as Record<string, unknown>;
   return (
     typeof t.id          === 'string' &&
+    typeof t.boardId     === 'string' &&
     typeof t.title       === 'string' &&
     typeof t.description === 'string' &&
     typeof t.statusId    === 'string' &&
