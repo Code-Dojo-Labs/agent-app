@@ -66,3 +66,26 @@ export async function deleteActivitiesByTaskId(taskId: string): Promise<void> {
 
   await idbTransaction(tx);
 }
+
+/**
+ * Recupera todos los eventos de actividad dentro de un rango de fechas.
+ * Usado para calcular métricas del dashboard (Cycle Time, Throughput, CFD).
+ * 
+ * @param startTime — timestamp en milisegundos (lower bound, inclusive)
+ * @param endTime — timestamp en milisegundos (upper bound, inclusive)
+ * @returns array de eventos ordenados por fecha descendente
+ */
+export async function getActivitiesByDateRange(
+  startTime: number,
+  endTime: number,
+): Promise<ActivityEvent[]> {
+  const { store } = await getStore('activity');
+  const allEvents = await idbRequest<ActivityEvent[]>(store.getAll());
+  
+  const startISO = new Date(startTime).toISOString();
+  const endISO = new Date(endTime).toISOString();
+  
+  return allEvents
+    .filter((event) => event.createdAt >= startISO && event.createdAt <= endISO)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
