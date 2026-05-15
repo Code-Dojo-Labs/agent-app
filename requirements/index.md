@@ -35,6 +35,10 @@ Aplicación web de gestión de tareas tipo Trello con tablero Kanban, orientada 
 | IMP-08 | [improvements-08-modern-card-design.md](./improvements-08-modern-card-design.md) | UI / UX | Rediseño moderno de tarjetas con barra de prioridad, hover y progreso visual |
 | IMP-09 | [improvements-09-avatar-system.md](./improvements-09-avatar-system.md) | UI / Personas | Avatares generativos coloridos con iniciales para personas asignadas |
 | IMP-10 | [improvements-10-smooth-animations.md](./improvements-10-smooth-animations.md) | UI / Motion | Micro-interacciones, toasts de feedback y animaciones de drag & drop |
+| IMP-11 | [improvements-11-supabase-integration.md](./improvements-11-supabase-integration.md) | Backend / Auth | Integración con Supabase **personal (BYOS)**: cada usuario conecta su propio proyecto, modo local offline siempre disponible |
+| IMP-12 | [improvements-12-design-system.md](./improvements-12-design-system.md) | UI / Design System | Design Token System con CSS Custom Properties, temas múltiples y color de acento personalizable |
+| IMP-13 | [improvements-13-wiki-update.md](./improvements-13-wiki-update.md) | Documentación | Actualización del wiki con las 10+ funcionalidades nuevas no documentadas (US-28 a US-37) |
+| IMP-14 | [improvements-14-kanban-metrics-dashboard.md](./improvements-14-kanban-metrics-dashboard.md) | Analytics | Dashboard de métricas Kanban: Cycle Time, Throughput, CFD y tasa de cumplimiento de fechas |
 
 ---
 

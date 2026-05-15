@@ -57,6 +57,14 @@
 | [US-35](./US-35-larger-edit-dialog.md) | Área de edición de tickets al 90% del viewport | UI/UX | Alta | IMP-04 |
 | [US-36](./US-36-task-templates.md) | Templates para la creación de tickets | Gestión de tareas | Media | IMP-05 |
 | [US-37](./US-37-default-columns.md) | Columnas por defecto estandarizadas | Tablero Kanban | Alta | IMP-06 |
+| [US-38](./US-38-svg-icon-system.md) | Sistema de Iconos SVG Personalizado | UI / Design System | Alta | IMP-07 |
+| [US-39](./US-39-modern-card-design.md) | Diseño Moderno de Tarjetas de Tarea | UI / UX | Alta | IMP-08 |
+| [US-40](./US-40-avatar-system.md) | Sistema de Avatares Generativos por Iniciales | UI / Personas | Media | IMP-09 |
+| [US-41](./US-41-smooth-animations.md) | Animaciones y Micro-interacciones Modernas | UI / Motion | Media | IMP-10 |
+| [US-42](./US-42-supabase-integration.md) | Integración con Supabase: Auth y Sincronización | Backend / Auth | Alta | IMP-11 |
+| [US-43](./US-43-design-system-advanced.md) | Design System Avanzado con CSS Tokens y Theming | UI / Design System | Alta | IMP-12 |
+| [US-44](./US-44-wiki-update.md) | Actualización del Wiki: US-28 a US-37 | Documentación | Media | IMP-13 |
+| [US-45](./US-45-kanban-metrics-dashboard.md) | Dashboard de Métricas Kanban (Cycle Time, CFD) | Analytics | Media | IMP-14 |
 
 ---
 

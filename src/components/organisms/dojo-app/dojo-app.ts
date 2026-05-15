@@ -21,6 +21,7 @@ import '../dojo-command-palette/dojo-command-palette.js';
 import '../dojo-board-selector/dojo-board-selector.js';
 import '../dojo-list-view/dojo-list-view.js';
 import '../dojo-template-manager/dojo-template-manager.js';
+import '../dojo-analytics-view/dojo-analytics-view.js';
 import '../../atoms/dojo-theme-toggle/dojo-theme-toggle.js';
 import '../../atoms/dojo-person-avatar/dojo-person-avatar.js';
 import '../../atoms/dojo-avatar-group/dojo-avatar-group.js';
@@ -53,8 +54,8 @@ export class DojoApp extends HTMLElement {
   private _notificationPromptCleanup: (() => void) | null = null;
   /** ID del tablero activo. Si es vacío, se muestra el selector de tableros (US-22). */
   private _activeBoardId = '';
-  /** Modo de vista activo para el tablero: 'kanban' o 'list'. Persiste en localStorage (US-33). */
-  private _boardViewMode: 'kanban' | 'list' = 'kanban';
+  /** Modo de vista activo: 'kanban', 'list' o 'analytics'. Persiste en localStorage (US-33, US-45). */
+  private _boardViewMode: 'kanban' | 'list' | 'analytics' = 'kanban';
   private _pendingTaskLink: { boardId: string; taskId: string } | null = null;
 
   /** Referencia estable para poder eliminar el listener de teclado del diálogo de importación. */
@@ -668,11 +669,21 @@ export class DojoApp extends HTMLElement {
     listViewBtn.setAttribute('aria-label', 'Vista lista de tareas');
     listViewBtn.textContent = '📋 Lista';
 
+    const analyticsViewBtn = document.createElement('button');
+    analyticsViewBtn.className = 'view-toggle-btn' + (this._boardViewMode === 'analytics' ? ' active' : '');
+    analyticsViewBtn.type = 'button';
+    analyticsViewBtn.dataset.mode = 'analytics';
+    analyticsViewBtn.setAttribute('aria-pressed', String(this._boardViewMode === 'analytics'));
+    analyticsViewBtn.setAttribute('aria-label', 'Dashboard de métricas y analytics');
+    analyticsViewBtn.textContent = '📈 Analytics';
+
     kanbanViewBtn.addEventListener('click', () => this._setBoardViewMode('kanban'));
     listViewBtn.addEventListener('click', () => this._setBoardViewMode('list'));
+    analyticsViewBtn.addEventListener('click', () => this._setBoardViewMode('analytics'));
 
     viewToggle.appendChild(kanbanViewBtn);
     viewToggle.appendChild(listViewBtn);
+    viewToggle.appendChild(analyticsViewBtn);
     appHeader.appendChild(viewToggle);
 
     appHeader.appendChild(headerActions);
@@ -741,6 +752,11 @@ export class DojoApp extends HTMLElement {
     const listView = document.createElement('dojo-list-view');
     listView.style.display = 'none';
     boardArea.appendChild(listView);
+
+    // Dashboard de analytics (US-45)
+    const analyticsView = document.createElement('dojo-analytics-view');
+    analyticsView.style.display = 'none';
+    boardArea.appendChild(analyticsView);
     this._shadow.appendChild(boardArea);
 
     // Escuchar selección de tablero (US-22)
@@ -886,12 +902,13 @@ export class DojoApp extends HTMLElement {
     const selector = this._shadow.querySelector('dojo-board-selector') as HTMLElement | null;
     const board    = this._shadow.querySelector('dojo-kanban-board') as HTMLElement | null;
     const listView = this._shadow.querySelector('dojo-list-view') as HTMLElement | null;
+    const analyticsView = this._shadow.querySelector('dojo-analytics-view') as HTMLElement | null;
     const palette  = this._shadow.querySelector('dojo-command-palette') as any;
 
     if (selector) selector.style.display = 'none';
     if (palette) palette.boardId = boardId;
 
-    this._applyBoardViewMode(boardId, board, listView);
+    this._applyBoardViewMode(boardId, board, listView, analyticsView);
   }
 
   private _showBoardSelector(): void {
@@ -984,19 +1001,19 @@ export class DojoApp extends HTMLElement {
     }
   }
 
-  // ── Vista Tablero / Lista (US-33) ──────────────────────────────────────
+  // ── Vista Tablero / Lista (US-33) / Analytics (US-45) ────────────────
 
   /** Carga la preferencia de vista desde localStorage. */
-  private _loadBoardViewPreference(): 'kanban' | 'list' {
+  private _loadBoardViewPreference(): 'kanban' | 'list' | 'analytics' {
     try {
       const stored = localStorage.getItem('dojo:board-view');
-      if (stored === 'list') return 'list';
+      if (stored === 'list' || stored === 'analytics') return stored;
     } catch { /* sin acceso a localStorage */ }
     return 'kanban';
   }
 
   /** Persiste la preferencia de vista en localStorage. */
-  private _saveBoardViewPreference(mode: 'kanban' | 'list'): void {
+  private _saveBoardViewPreference(mode: 'kanban' | 'list' | 'analytics'): void {
     try {
       localStorage.setItem('dojo:board-view', mode);
     } catch { /* sin acceso a localStorage */ }
@@ -1019,6 +1036,7 @@ export class DojoApp extends HTMLElement {
     boardId: string,
     board: HTMLElement | null,
     listView: HTMLElement | null,
+    analyticsView: HTMLElement | null = null,
   ): void {
     if (this._boardViewMode === 'list') {
       if (board)    board.style.display    = 'none';
@@ -1026,8 +1044,17 @@ export class DojoApp extends HTMLElement {
         listView.style.display = '';
         listView.setAttribute('board-id', boardId);
       }
+      if (analyticsView) analyticsView.style.display = 'none';
+    } else if (this._boardViewMode === 'analytics') {
+      if (board) board.style.display = 'none';
+      if (listView) listView.style.display = 'none';
+      if (analyticsView) {
+        analyticsView.style.display = '';
+        analyticsView.setAttribute('board-id', boardId);
+      }
     } else {
       if (listView) listView.style.display = 'none';
+      if (analyticsView) analyticsView.style.display = 'none';
       if (board) {
         board.style.display = '';
         board.setAttribute('board-id', boardId);
@@ -1039,7 +1066,7 @@ export class DojoApp extends HTMLElement {
    * Cambia el modo de vista del tablero y actualiza la UI.
    * Persiste la preferencia en localStorage.
    */
-  private _setBoardViewMode(mode: 'kanban' | 'list'): void {
+  private _setBoardViewMode(mode: 'kanban' | 'list' | 'analytics'): void {
     if (this._boardViewMode === mode) return;
     this._boardViewMode = mode;
     this._saveBoardViewPreference(mode);
@@ -1048,7 +1075,8 @@ export class DojoApp extends HTMLElement {
     if (!this._activeBoardId) return; // sin tablero activo, nada que cambiar
     const board    = this._shadow.querySelector('dojo-kanban-board') as HTMLElement | null;
     const listView = this._shadow.querySelector('dojo-list-view') as HTMLElement | null;
-    this._applyBoardViewMode(this._activeBoardId, board, listView);
+    const analyticsView = this._shadow.querySelector('dojo-analytics-view') as HTMLElement | null;
+    this._applyBoardViewMode(this._activeBoardId, board, listView, analyticsView);
   }
 
   private _readPendingTaskLink(): { boardId: string; taskId: string } | null {
