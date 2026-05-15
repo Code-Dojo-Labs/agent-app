@@ -14,10 +14,10 @@ import type {
   MetricsFilter,
   MetricsDashboardData,
 } from '../types/metrics';
-import type { Task, ActivityEvent } from '../types/models';
-import { getAllTasks, getTaskById } from '../db/task.repository';
-import { getActivitiesByDateRange } from '../db/activity.repository';
-import { getAllColumns } from '../db/column.repository';
+import type { Task, ActivityEvent } from '../types/models.js';
+import { getAllTasks } from '../db/task.repository.js';
+import { getActivitiesByDateRange } from '../db/activity.repository.js';
+import { getAllColumns } from '../db/column.repository.js';
 
 // ============================================================================
 // PARSERS & HELPERS

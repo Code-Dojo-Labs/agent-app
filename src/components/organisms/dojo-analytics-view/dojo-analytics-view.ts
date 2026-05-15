@@ -16,13 +16,13 @@
  * ✓ Render <2s con 500+ tareas
  */
 
-import { calculateMetricsDashboard } from '../../../utils/metrics-calculator';
+import { calculateMetricsDashboard } from '../../../utils/metrics-calculator.js';
 import {
   generateCycleTimeScatterChart,
   generateThroughputBarChart,
   generateCumulativeFlowDiagram,
-} from '../../../utils/svg-charts';
-import type { MetricsFilter, MetricsDashboardData } from '../../../types/metrics';
+} from '../../../utils/svg-charts.js';
+import type { MetricsFilter, MetricsDashboardData } from '../../../types/metrics.js';
 
 export class DojoAnalyticsView extends HTMLElement {
   static readonly TAG = 'dojo-analytics-view';
