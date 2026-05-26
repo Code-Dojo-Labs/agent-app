@@ -65,6 +65,7 @@
 | [US-43](./US-43-design-system-advanced.md) | Design System Avanzado con CSS Tokens y Theming | UI / Design System | Alta | IMP-12 |
 | [US-44](./US-44-wiki-update.md) | Actualización del Wiki: US-28 a US-37 | Documentación | Media | IMP-13 |
 | [US-45](./US-45-kanban-metrics-dashboard.md) | Dashboard de Métricas Kanban (Cycle Time, CFD) | Analytics | Media | IMP-14 |
+| [US-46](./US-46-column-auto-order.md) | Auto-orden por columna en tareas movidas | Tablero Kanban | Alta | IMP-15 |
 
 ---
 

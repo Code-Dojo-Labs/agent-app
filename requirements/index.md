@@ -39,6 +39,7 @@ Aplicación web de gestión de tareas tipo Trello con tablero Kanban, orientada 
 | IMP-12 | [improvements-12-design-system.md](./improvements-12-design-system.md) | UI / Design System | Design Token System con CSS Custom Properties, temas múltiples y color de acento personalizable |
 | IMP-13 | [improvements-13-wiki-update.md](./improvements-13-wiki-update.md) | Documentación | Actualización del wiki con las 10+ funcionalidades nuevas no documentadas (US-28 a US-37) |
 | IMP-14 | [improvements-14-kanban-metrics-dashboard.md](./improvements-14-kanban-metrics-dashboard.md) | Analytics | Dashboard de métricas Kanban: Cycle Time, Throughput, CFD y tasa de cumplimiento de fechas |
+| IMP-15 | [improvements-15-column-auto-order.md](./improvements-15-column-auto-order.md) | Tablero Kanban | Auto-orden por columna (menor a mayor) configurable por el usuario |
 
 ---
 
