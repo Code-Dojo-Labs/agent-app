@@ -8,6 +8,7 @@
 import { idbRequest, idbTransaction, getStore } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
 import { emitSync } from '../utils/broadcast-sync.js';
+import { syncUpsert, syncDelete } from './supabase-sync.js';
 import type { Board } from '../types/models.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
@@ -46,6 +47,8 @@ export async function createBoard(input: CreateBoardInput): Promise<Board> {
 
   // Emitir evento de sincronización (US-30)
   emitSync('board:created', board.id, board);
+  // Replicar en Supabase (US-42)
+  syncUpsert('boards', board);
 
   return board;
 }
@@ -66,6 +69,8 @@ export async function updateBoard(id: string, changes: UpdateBoardInput): Promis
 
   // Emitir evento de sincronización (US-30)
   emitSync('board:updated', updated.id, updated);
+  // Replicar en Supabase (US-42)
+  syncUpsert('boards', updated);
 
   return updated;
 }
@@ -81,4 +86,6 @@ export async function deleteBoard(id: string): Promise<void> {
 
   // Emitir evento de sincronización (US-30)
   emitSync('board:deleted', id);
+  // Replicar en Supabase (US-42)
+  syncDelete('boards', id);
 }

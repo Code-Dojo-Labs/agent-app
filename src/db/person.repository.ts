@@ -9,6 +9,7 @@
 import { idbRequest, idbTransaction, getStore } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
 import { emitSync } from '../utils/broadcast-sync.js';
+import { syncUpsert, syncDelete } from './supabase-sync.js';
 import type { Person } from '../types/models.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
@@ -86,6 +87,8 @@ export async function createPerson(input: CreatePersonInput): Promise<Person> {
 
   // Emitir evento de sincronización (US-30)
   emitSync('person:created', person.id, person);
+  // Replicar en Supabase (US-42)
+  syncUpsert('persons', person);
 
   return person;
 }
@@ -111,6 +114,8 @@ export async function updatePerson(id: string, changes: UpdatePersonInput): Prom
 
   // Emitir evento de sincronización (US-30)
   emitSync('person:updated', updated.id, updated);
+  // Replicar en Supabase (US-42)
+  syncUpsert('persons', updated);
 
   return updated;
 }
@@ -153,6 +158,8 @@ export async function deletePerson(id: string): Promise<void> {
 
     // Emitir evento de eliminación de persona
     emitSync('person:deleted', id);
+    // Replicar en Supabase (US-42)
+    syncDelete('persons', id);
     
   } catch (error) {
     console.error('Error eliminando persona:', error);
