@@ -15,7 +15,8 @@ Ve a **Ajustes → Plantillas** para ver, crear, editar y eliminar tus plantilla
    - **Prioridad** *(opcional)* — valor por defecto al aplicar la plantilla.
    - **Etiquetas** *(opcional)* — etiquetas preseleccionadas.
    - **Asignados** *(opcional)* — personas asignadas por defecto.
-3. Guarda. La plantilla se persiste en IndexedDB.
+   - **Subtareas** *(opcional)* — lista de subtareas predefinidas que se insertarán automáticamente en cada tarea creada con la plantilla.
+3. Guarda. La plantilla se persiste en IndexedDB y se sincroniza a la nube si tienes el [modo nube](./17-sincronizacion-nube.md) activo.
 
 ```
 ┌───────────────────────────────────────┐
@@ -44,6 +45,10 @@ Ve a **Ajustes → Plantillas** para ver, crear, editar y eliminar tus plantilla
 
 Desde **Ajustes → Plantillas**, cada entrada tiene los botones **Editar** y **Eliminar**. La eliminación requiere confirmación y no afecta a las tareas ya creadas con esa plantilla.
 
+## Exportar e importar plantillas
+
+Las plantillas se incluyen automáticamente en el archivo JSON al usar **📤 Exportar**. Al importar un archivo que contiene plantillas, se restauran junto con el resto de datos.
+
 ## FAQ
 
 **¿Las plantillas se aplican a todos los tableros?**  
@@ -54,3 +59,6 @@ Aún no. Por ahora las plantillas se crean desde cero en Ajustes. Crear plantill
 
 **¿Cuántas plantillas puedo crear?**  
 No hay límite definido.
+
+**¿Las plantillas se sincronizan entre dispositivos?**  
+Sí, si tienes el [modo nube](./17-sincronizacion-nube.md) activo, las plantillas se sincronizan a Supabase al crearlas, editarlas o eliminarlas.
