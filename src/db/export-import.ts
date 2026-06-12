@@ -11,7 +11,7 @@
  */
 
 import { openDatabase, idbRequest, idbTransaction } from './database.js';
-import type { Column, Task, Label, ActivityEvent, Board, Project, Person } from '../types/models.js';
+import type { Column, Task, Label, ActivityEvent, Board, Project, Person, TaskTemplate } from '../types/models.js';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,7 @@ export interface BoardExport {
   boards?: Board[];
   projects?: Project[];
   persons?: Person[];
+  taskTemplates?: TaskTemplate[];
 }
 
 /** Resultado de la validación de un archivo importado. */
@@ -59,16 +60,18 @@ export async function exportBoardData(): Promise<BoardExport> {
   const storeNames = ['columns', 'tasks', 'labels'] as const;
   // Incluir activity si el store existe (DB v2+)
   const allNames = db.objectStoreNames;
-  const hasActivity = allNames.contains('activity');
-  const hasBoards   = allNames.contains('boards');
-  const hasProjects = allNames.contains('projects');
-  const hasPersons  = allNames.contains('persons');
+  const hasActivity      = allNames.contains('activity');
+  const hasBoards        = allNames.contains('boards');
+  const hasProjects      = allNames.contains('projects');
+  const hasPersons       = allNames.contains('persons');
+  const hasTaskTemplates = allNames.contains('taskTemplates');
   const txStores = [
     ...storeNames,
-    ...(hasActivity ? ['activity'] : []),
-    ...(hasBoards   ? ['boards']   : []),
-    ...(hasProjects ? ['projects'] : []),
-    ...(hasPersons  ? ['persons']  : []),
+    ...(hasActivity      ? ['activity']      : []),
+    ...(hasBoards        ? ['boards']        : []),
+    ...(hasProjects      ? ['projects']      : []),
+    ...(hasPersons       ? ['persons']       : []),
+    ...(hasTaskTemplates ? ['taskTemplates'] : []),
   ];
   const tx = db.transaction(txStores, 'readonly');
   const columns  = await idbRequest<Column[]>(tx.objectStore('columns').getAll());
@@ -86,6 +89,9 @@ export async function exportBoardData(): Promise<BoardExport> {
   const persons = hasPersons
     ? await idbRequest<Person[]>(tx.objectStore('persons').getAll())
     : [];
+  const taskTemplates = hasTaskTemplates
+    ? await idbRequest<TaskTemplate[]>(tx.objectStore('taskTemplates').getAll())
+    : [];
 
   return {
     version:    CURRENT_VERSION,
@@ -96,7 +102,8 @@ export async function exportBoardData(): Promise<BoardExport> {
     activity:   activity.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     boards:     boards.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     projects:   projects.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    persons:    persons.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    persons:       persons.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    taskTemplates: taskTemplates.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
   };
 }
 
@@ -260,18 +267,33 @@ export function validateImportData(raw: unknown): ValidateResult {
     persons = obj.persons as Person[];
   }
 
+  // taskTemplates (opcional, US-36)
+  let taskTemplates: TaskTemplate[] | undefined = undefined;
+  if (obj.taskTemplates !== undefined) {
+    if (!Array.isArray(obj.taskTemplates)) {
+      return { ok: false, message: 'La colección opcional "taskTemplates" tiene un formato inválido.' };
+    }
+    for (const tmpl of obj.taskTemplates) {
+      if (!_isValidTaskTemplate(tmpl)) {
+        return { ok: false, message: 'Uno o más templates tienen un formato inválido.' };
+      }
+    }
+    taskTemplates = obj.taskTemplates as TaskTemplate[];
+  }
+
   return {
     ok: true,
     data: {
-      version:    obj.version as number,
-      exportedAt: obj.exportedAt as string,
-      columns:    obj.columns as Column[],
-      tasks:      obj.tasks as Task[],
-      labels:     obj.labels as Label[],
+      version:       obj.version as number,
+      exportedAt:    obj.exportedAt as string,
+      columns:       obj.columns as Column[],
+      tasks:         obj.tasks as Task[],
+      labels:        obj.labels as Label[],
       activity,
       boards,
       projects,
       persons,
+      taskTemplates,
     },
   };
 }
@@ -284,16 +306,18 @@ export function validateImportData(raw: unknown): ValidateResult {
 export async function importBoardData(data: BoardExport): Promise<void> {
   const db = await openDatabase();
   const allNames = db.objectStoreNames;
-  const hasActivity = allNames.contains('activity');
-  const hasBoards   = allNames.contains('boards');
-  const hasProjects = allNames.contains('projects');
-  const hasPersons  = allNames.contains('persons');
+  const hasActivity      = allNames.contains('activity');
+  const hasBoards        = allNames.contains('boards');
+  const hasProjects      = allNames.contains('projects');
+  const hasPersons       = allNames.contains('persons');
+  const hasTaskTemplates = allNames.contains('taskTemplates');
   const storeNames = [
     'columns', 'tasks', 'labels',
-    ...(hasActivity ? ['activity'] : []),
-    ...(hasBoards   ? ['boards']   : []),
-    ...(hasProjects ? ['projects'] : []),
-    ...(hasPersons  ? ['persons']  : []),
+    ...(hasActivity      ? ['activity']      : []),
+    ...(hasBoards        ? ['boards']        : []),
+    ...(hasProjects      ? ['projects']      : []),
+    ...(hasPersons       ? ['persons']       : []),
+    ...(hasTaskTemplates ? ['taskTemplates'] : []),
   ];
   const tx = db.transaction(storeNames, 'readwrite');
 
@@ -381,6 +405,13 @@ export async function importBoardData(data: BoardExport): Promise<void> {
     const personStore = tx.objectStore('persons');
     queueRequest(personStore.clear(), 'No se pudo limpiar persons');
     for (const person of data.persons) queueRequest(personStore.put(person), 'No se pudo insertar una persona');
+  }
+
+  // 7. Importar templates si el campo está explícitamente en el archivo (US-36).
+  if (hasTaskTemplates && data.taskTemplates !== undefined) {
+    const tmplStore = tx.objectStore('taskTemplates');
+    queueRequest(tmplStore.clear(), 'No se pudo limpiar taskTemplates');
+    for (const tmpl of data.taskTemplates) queueRequest(tmplStore.put(tmpl), 'No se pudo insertar un template');
   }
 
   try {
@@ -485,5 +516,15 @@ function _isValidPerson(obj: unknown): obj is Person {
     typeof p.name      === 'string' &&
     typeof p.avatar    === 'string' &&
     typeof p.createdAt === 'string'
+  );
+}
+
+function _isValidTaskTemplate(obj: unknown): obj is TaskTemplate {
+  if (obj === null || typeof obj !== 'object') return false;
+  const t = obj as Record<string, unknown>;
+  return (
+    typeof t.id        === 'string' && t.id.length > 0 &&
+    typeof t.name      === 'string' && t.name.length > 0 &&
+    typeof t.createdAt === 'string'
   );
 }

@@ -8,6 +8,7 @@
 import { idbRequest, idbTransaction, getStore, openDatabase } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
 import { emitSync } from '../utils/broadcast-sync.js';
+import { syncUpsert, syncDelete } from './supabase-sync.js';
 import type { Task, Priority } from '../types/models.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
@@ -79,6 +80,8 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
 
   // Emitir evento de sincronización (US-30)
   emitSync('task:created', task.id, task);
+  // Replicar en Supabase (US-42)
+  syncUpsert('tasks', task);
 
   return task;
 }
@@ -105,6 +108,8 @@ export async function updateTask(id: string, changes: UpdateTaskInput): Promise<
 
   // Emitir evento de sincronización (US-30)
   emitSync('task:updated', updated.id, updated);
+  // Replicar en Supabase (US-42)
+  syncUpsert('tasks', updated);
 
   return updated;
 }
@@ -117,6 +122,8 @@ export async function deleteTask(id: string): Promise<void> {
 
   // Emitir evento de sincronización (US-30)
   emitSync('task:deleted', id);
+  // Replicar en Supabase (US-42)
+  syncDelete('tasks', id);
 }
 
 /**

@@ -9,6 +9,7 @@
 import { idbRequest, idbTransaction, getStore, openDatabase } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
 import { emitSync } from '../utils/broadcast-sync.js';
+import { syncUpsert, syncDelete } from './supabase-sync.js';
 import { DEFAULT_LABELS } from '../types/models.js';
 import type { Label, Task } from '../types/models.js';
 
@@ -58,6 +59,8 @@ export async function createLabel(input: CreateLabelInput): Promise<Label> {
 
   // Emitir evento de sincronización (US-30)
   emitSync('label:created', label.id, label);
+  // Replicar en Supabase (US-42)
+  syncUpsert('labels', label);
 
   return label;
 }
@@ -84,6 +87,8 @@ export async function updateLabel(id: string, changes: UpdateLabelInput): Promis
 
   // Emitir evento de sincronización (US-30)
   emitSync('label:updated', updated.id, updated);
+  // Replicar en Supabase (US-42)
+  syncUpsert('labels', updated);
 
   return updated;
 }
@@ -127,6 +132,8 @@ export async function deleteLabel(id: string): Promise<void> {
 
   // Emitir evento de sincronización (US-30)
   emitSync('label:deleted', id);
+  // Replicar en Supabase (US-42)
+  syncDelete('labels', id);
 }
 
 /**
