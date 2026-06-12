@@ -3642,3 +3642,147 @@ Cada página sigue el patrón:
 ### Resultado
 
 El wiki pasa de 7 a 16 páginas, cubriendo todas las funcionalidades hasta US-37. El índice centralizado en `docs/wiki/index.md` sirve como punto de entrada navegable.
+
+---
+
+## Paso 35 — Corrección de Export/Import: inclusión de `taskTemplates` (Issue #103)
+
+> **Fecha:** 2026-06-09
+> **Rama:** `feat/103-supabase-integration`
+> **Agentes:** `builder` + `documentalista`
+
+### Problema detectado
+
+Al exportar los datos de la app (US-19), el JSON de salida no incluía los templates de tareas (`taskTemplates`). El store existía en IndexedDB desde US-36 pero `exportBoardData()` no lo leía.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/db/export-import.ts` | Añadido `taskTemplates` al export, import, validación y helper `_isValidTaskTemplate()` |
+
+### Decisiones técnicas
+
+- **Retrocompatibilidad**: el campo `taskTemplates` es opcional en `BoardExport`. Archivos exportados antes de este fix se importan sin error.
+- **Validación mínima**: `_isValidTaskTemplate()` solo requiere `id`, `name` y `createdAt` — los demás campos son opcionales por diseño del modelo.
+- **Orden de importación**: los templates no tienen FK hacia otras tablas, por lo que se importan en cualquier posición sin riesgo de constraint error.
+
+### Patrón seguido
+
+```ts
+// 1. Detectar store dinámicamente (igual que boards, projects, persons)
+const hasTaskTemplates = allNames.contains('taskTemplates');
+
+// 2. Incluirlo en la transacción readonly
+const txStores = [...storeNames, ...(hasTaskTemplates ? ['taskTemplates'] : [])];
+
+// 3. Leerlo y agregarlo al objeto de retorno
+const taskTemplates = hasTaskTemplates
+  ? await idbRequest<TaskTemplate[]>(tx.objectStore('taskTemplates').getAll())
+  : [];
+
+return { ...otrosCampos, taskTemplates };
+```
+
+---
+
+## Paso 36 — Corrección de CRUD: proyectos, etiquetas y templates sin sincronía Supabase (Issue #103)
+
+> **Fecha:** 2026-06-09
+> **Rama:** `feat/103-supabase-integration`
+> **Agentes:** `builder` + `documentalista`
+
+### Problema detectado
+
+Al revisar el código tras la integración de Supabase (US-42), se identificaron tres repositorios con sincronización incompleta:
+
+| Repositorio | Operación faltante |
+|-------------|-------------------|
+| `label.repository.ts` | `deleteLabel` no llamaba `syncDelete` |
+| `project.repository.ts` | No importaba `supabase-sync`; create/update/delete sin sync |
+| `template.repository.ts` | No importaba `supabase-sync`; create/update/delete sin sync |
+
+Adicionalmente, `supabase-sync.ts` no tenía mapper para `taskTemplates` y no lo incluía en la sincronización inicial (`syncAllLocalToSupabase`).
+
+### Archivos modificados
+
+| Archivo | Cambios |
+|---------|---------|
+| `src/db/label.repository.ts` | `syncDelete('labels', id)` en `deleteLabel` |
+| `src/db/project.repository.ts` | Import de `emitSync`, `syncUpsert`, `syncDelete`; llamadas en create/update/delete |
+| `src/db/template.repository.ts` | Import de `syncUpsert`, `syncDelete`; llamadas en create/update/delete |
+| `src/db/supabase-sync.ts` | Mapper `taskTemplates`, inclusión en `syncAllLocalToSupabase` |
+
+### Patrón estándar de repositorio con sync
+
+Todo repositorio que persiste en IndexedDB **debe** seguir este patrón tras la escritura:
+
+```ts
+// create
+emitSync('entity:created', entity.id, entity);
+syncUpsert('tableName', entity);
+
+// update
+emitSync('entity:updated', id, updated);
+syncUpsert('tableName', updated);
+
+// delete
+emitSync('entity:deleted', id);
+syncDelete('tableName', id);
+```
+
+---
+
+## Paso 37 — Corrección de tabla Supabase para `task_templates` + mapeo de nombre (Issue #103)
+
+> **Fecha:** 2026-06-09
+> **Rama:** `feat/103-supabase-integration`
+> **Agentes:** `builder` + `documentalista`
+
+### Problema detectado
+
+Al crear un template la consola reportaba:
+
+```
+XHR POST https://...supabase.co/rest/v1/taskTemplates  → 404
+Could not find the table 'public.taskTemplates' in the schema cache
+```
+
+Dos causas:
+
+1. **Nombre incorrecto**: el código enviaba `taskTemplates` (camelCase) pero Supabase espera `task_templates` (snake_case).
+2. **Columna faltante**: la tabla `task_templates` existía en Supabase (de una migración previa) pero le faltaba la columna `person_ids`.
+
+### Solución
+
+#### 1. Mapeo de nombres store → tabla Supabase en `supabase-sync.ts`
+
+```ts
+/** Mapeo de nombres de store IndexedDB → nombre real de tabla en Supabase. */
+const TABLE_NAMES: Record<string, string> = {
+  taskTemplates: 'task_templates',
+};
+
+function toTableName(store: string): string {
+  return TABLE_NAMES[store] ?? store;
+}
+```
+
+`syncUpsert`, `syncDelete` y `syncAllLocalToSupabase` ahora llaman a `toTableName(store)` antes de hacer el request HTTP.
+
+#### 2. Migración en Supabase (via MCP)
+
+```sql
+ALTER TABLE public.task_templates
+  ADD COLUMN IF NOT EXISTS person_ids UUID[] NOT NULL DEFAULT '{}';
+```
+
+### ADR: Convención de nombres
+
+> **Decisión**: Los stores de IndexedDB usan `camelCase` (convención JS). Las tablas de Supabase usan `snake_case` (convención PostgreSQL). El objeto `TABLE_NAMES` en `supabase-sync.ts` es la única fuente de verdad para traducir nombres cuando difieren. Todos los stores cuyo nombre coincide (e.g. `tasks`, `boards`, `columns`, `labels`, `persons`, `projects`) no necesitan entrada en `TABLE_NAMES`.
+
+### Resultado
+
+- Templates se crean, editan y eliminan correctamente sincronizando a Supabase.
+- La sincronización inicial (`syncAllLocalToSupabase`) sube los templates existentes al hacer login.
+- El export/import incluye templates correctamente.

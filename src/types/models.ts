@@ -33,7 +33,7 @@ export interface Task {
   projectId: string;
   /** Identificador legible del proyecto, ej. "WEB-005" (US-26). */
   taskNumber: string;
-  /** Título visible de la tarea. Máx. 120 caracteres. */
+  /** Título visible de la tarea. Máx. 250 caracteres. */
   title: string;
   /** Descripción en formato Markdown. Puede estar vacío. */
   description: string;
@@ -83,12 +83,12 @@ export interface Column {
 
 /** Columnas por defecto que se insertan al inicializar la base de datos (US-37). */
 export const DEFAULT_COLUMNS: Omit<Column, 'id' | 'boardId'>[] = [
-  { name: 'Backlog',      icon: '📋', order: 0, isDefault: true },
-  { name: 'Por Hacer',    icon: '🔲', order: 1, isDefault: true },
-  { name: 'En Progreso',  icon: '🔄', order: 2, isDefault: true },
-  { name: 'En Revisión',  icon: '🔍', order: 3, isDefault: true },
-  { name: 'Hecho',        icon: '✅', order: 4, isDefault: true },
-  { name: 'Bloqueado',    icon: '🚫', order: 5, isDefault: true },
+  { name: 'BACKLOG',      icon: '📋', order: 0, isDefault: true },
+  { name: 'POR HACER',    icon: '🔲', order: 1, isDefault: true },
+  { name: 'EN PROGRESO',  icon: '🔄', order: 2, isDefault: true },
+  { name: 'EN REVISIÓN',  icon: '🔍', order: 3, isDefault: true },
+  { name: 'HECHO',        icon: '✅', order: 4, isDefault: true },
+  { name: 'BLOQUEADO',    icon: '🚫', order: 5, isDefault: true },
 ];
 
 // ── Board (US-22) ──────────────────────────────────────────────────────────
@@ -148,14 +148,14 @@ export interface Label {
 
 /** Etiquetas por defecto que se insertan al inicializar la base de datos. */
 export const DEFAULT_LABELS: Omit<Label, 'id'>[] = [
-  { name: 'Bug',             color: '#B91C1C' },
-  { name: 'Feature',         color: '#1D4ED8' },
-  { name: 'Mejora',          color: '#15803D' },
-  { name: 'Documentación',   color: '#6D28D9' },
-  { name: 'Diseño',          color: '#BE185D' },
-  { name: 'Investigación',   color: '#B45309' },
-  { name: 'Testing',         color: '#0E7490' },
-  { name: 'Infraestructura', color: '#374151' },
+  { name: '🐞 BUG',             color: '#B91C1C' },
+  { name: '✨ FEATURE',         color: '#1D4ED8' },
+  { name: '⚡ MEJORA',          color: '#15803D' },
+  { name: '📄 DOCUMENTACIÓN',   color: '#6D28D9' },
+  { name: '🎨 DISEÑO',          color: '#BE185D' },
+  { name: '🔍 INVESTIGACIÓN',   color: '#B45309' },
+  { name: '🧪 TESTING',         color: '#0E7490' },
+  { name: '🏗️ INFRAESTRUCTURA', color: '#374151' },
 ];
 
 // ── ActivityEvent (US-20) ──────────────────────────────────────────────────

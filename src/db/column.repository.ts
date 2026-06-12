@@ -8,6 +8,7 @@
 import { idbRequest, idbTransaction, getStore } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
 import { emitSync } from '../utils/broadcast-sync.js';
+import { syncUpsert, syncDelete } from './supabase-sync.js';
 import { DEFAULT_COLUMNS } from '../types/models.js';
 import type { Column } from '../types/models.js';
 
@@ -52,6 +53,8 @@ export async function createColumn(input: CreateColumnInput): Promise<Column> {
 
   // Emitir evento de sincronización (US-30)
   emitSync('column:created', column.id, column);
+  // Replicar en Supabase (US-42)
+  syncUpsert('columns', column);
 
   return column;
 }
@@ -72,6 +75,8 @@ export async function updateColumn(id: string, changes: UpdateColumnInput): Prom
 
   // Emitir evento de sincronización (US-30)
   emitSync('column:updated', updated.id, updated);
+  // Replicar en Supabase (US-42)
+  syncUpsert('columns', updated);
 
   return updated;
 }
@@ -87,6 +92,8 @@ export async function deleteColumn(id: string): Promise<void> {
 
   // Emitir evento de sincronización (US-30)
   emitSync('column:deleted', id);
+  // Replicar en Supabase (US-42)
+  syncDelete('columns', id);
 }
 
 /**

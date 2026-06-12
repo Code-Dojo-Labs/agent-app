@@ -20,3 +20,4 @@ Bienvenido a la documentación de **Dojo Kanban**. Usa el índice lateral para n
 14. [Modal ampliado de edición](./14-modal-edicion.md)
 15. [Plantillas de tareas](./15-templates-tareas.md)
 16. [Columnas por defecto](./16-columnas-defecto.md)
+17. [Sincronización en la nube (BYOS)](./17-sincronizacion-nube.md)

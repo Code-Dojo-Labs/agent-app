@@ -8,6 +8,8 @@
 
 import { idbRequest, idbTransaction, getStore, openDatabase } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
+import { emitSync } from '../utils/broadcast-sync.js';
+import { syncUpsert, syncDelete } from './supabase-sync.js';
 import type { Project } from '../types/models.js';
 import { DEFAULT_PROJECT_NAME, DEFAULT_PROJECT_PREFIX } from '../types/models.js';
 
@@ -76,6 +78,10 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
   const { store, tx } = await getStore('projects', 'readwrite');
   store.add(project);
   await idbTransaction(tx);
+
+  emitSync('project:created', project.id, project);
+  syncUpsert('projects', project);
+
   return project;
 }
 
@@ -99,6 +105,10 @@ export async function updateProject(id: string, changes: UpdateProjectInput): Pr
   const { store, tx } = await getStore('projects', 'readwrite');
   store.put(updated);
   await idbTransaction(tx);
+
+  emitSync('project:updated', id, updated);
+  syncUpsert('projects', updated);
+
   return updated;
 }
 
@@ -138,6 +148,9 @@ export async function deleteProject(id: string): Promise<void> {
   // Eliminar el proyecto
   projectStore.delete(id);
   await idbTransaction(tx);
+
+  emitSync('project:deleted', id);
+  syncDelete('projects', id);
 }
 
 /**

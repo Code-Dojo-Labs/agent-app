@@ -7,6 +7,7 @@
 import { idbRequest, idbTransaction, getStore } from './database.js';
 import { generateUUID } from '../utils/uuid.js';
 import { emitSync } from '../utils/broadcast-sync.js';
+import { syncUpsert, syncDelete } from './supabase-sync.js';
 import type { TaskTemplate } from '../types/models.js';
 
 type CreateTemplateInput = Omit<TaskTemplate, 'id' | 'createdAt'>;
@@ -51,6 +52,7 @@ export async function createTemplate(input: CreateTemplateInput): Promise<TaskTe
   await idbTransaction(tx);
 
   emitSync('template:created', template.id, template);
+  syncUpsert('taskTemplates', template);
   return template;
 }
 
@@ -79,6 +81,7 @@ export async function updateTemplate(id: string, changes: UpdateTemplateInput): 
   await idbTransaction(tx);
 
   emitSync('template:updated', id, updated);
+  syncUpsert('taskTemplates', updated);
   return updated;
 }
 
@@ -95,4 +98,5 @@ export async function deleteTemplate(id: string): Promise<void> {
   await idbTransaction(tx);
 
   emitSync('template:deleted', id, { id });
+  syncDelete('taskTemplates', id);
 }

@@ -801,6 +801,12 @@ export class DojoApp extends HTMLElement {
       (board as any).openCreateTaskWithTitle?.(title);
     });
 
+    // Ejecutar comando desde la paleta (US-46)
+    this._shadow.addEventListener('dojo:palette-command', (e: Event) => {
+      const { commandId } = (e as CustomEvent).detail as { commandId: string };
+      this._executePaletteCommand(commandId, board, labelMgr, projectMgr, personMgr, templateMgr, wiki);
+    });
+
     // Invalidar caché de la paleta cuando las tareas cambian
     const invalidatePalette = (): void => {
       (palette as any).invalidateCache?.();
@@ -1150,6 +1156,72 @@ export class DojoApp extends HTMLElement {
     this._toastTimer = setTimeout(() => {
       toast.classList.remove('visible');
     }, 3500);
+  }
+
+  /**
+   * Ejecuta un comando despachado por la paleta de comandos (US-46).
+   * Mapea commandId → acción de la aplicación.
+   */
+  private _executePaletteCommand(
+    commandId: string,
+    board: HTMLElement,
+    labelMgr: HTMLElement,
+    projectMgr: HTMLElement,
+    personMgr: HTMLElement,
+    templateMgr: HTMLElement,
+    wiki: HTMLElement,
+  ): void {
+    switch (commandId) {
+      case 'board:new-task':
+        (board as any).openCreateTaskWithTitle?.('');
+        break;
+      case 'board:selector':
+        this._showBoardSelector();
+        break;
+      case 'board:export':
+        void this._handleExport();
+        break;
+      case 'board:import': {
+        // Abrir selector de archivo de importación
+        const fileInput = this._shadow.querySelector<HTMLInputElement>('.import-input');
+        fileInput?.click();
+        break;
+      }
+      case 'view:kanban':
+        this._setBoardViewMode('kanban');
+        break;
+      case 'view:list':
+        this._setBoardViewMode('list');
+        break;
+      case 'view:analytics':
+        this._setBoardViewMode('analytics');
+        break;
+      case 'task:new':
+        (board as any).openCreateTaskWithTitle?.('');
+        break;
+      case 'task:templates':
+        (templateMgr as HTMLElement & { open(): void }).open();
+        break;
+      case 'config:labels':
+        (labelMgr as any).show();
+        break;
+      case 'config:projects':
+        (projectMgr as any).show();
+        break;
+      case 'config:people':
+        (personMgr as any).show();
+        break;
+      case 'config:theme': {
+        const themeCustomizer = this._shadow.querySelector<HTMLElement & { show(): void }>('dojo-theme-customizer');
+        themeCustomizer?.show?.();
+        break;
+      }
+      case 'config:wiki':
+        (wiki as any).show?.();
+        break;
+      default:
+        console.warn('[DojoApp] Comando de paleta desconocido:', commandId);
+    }
   }
 }
 

@@ -1032,7 +1032,7 @@ export class DojoTaskDetail extends HTMLElement {
     input.id        = 'detail-title';
     input.className = 'title-input';
     input.type      = 'text';
-    input.maxLength = 120;
+    input.maxLength = 250;
     input.value     = task.title;
     input.setAttribute('aria-required', 'true');
     input.setAttribute('aria-label', 'Título de la tarea');

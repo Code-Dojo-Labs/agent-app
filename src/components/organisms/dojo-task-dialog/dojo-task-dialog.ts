@@ -785,8 +785,8 @@ export class DojoTaskDialog extends HTMLElement {
 
     const draftSubtasks: Subtask[] = [];
 
-    // ── Campo: Título (obligatorio, máx 120) ───────────────────────────────
-    const MAX_TITLE = 120;
+    // ── Campo: Título (obligatorio, máx 250) ───────────────────────────────
+    const MAX_TITLE = 250;
     const titleField = document.createElement('div');
     titleField.className = 'field';
 

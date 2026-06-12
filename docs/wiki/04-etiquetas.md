@@ -29,7 +29,7 @@ Puedes asignar **múltiples etiquetas** a la misma tarea.
 
 1. Abre **🏷️ Gestionar etiquetas**.
 2. Haz clic en el ícono de eliminación 🗑️.
-3. Confirma en el diálogo — la etiqueta se retirará de todas las tareas asociadas.
+3. Confirma en el diálogo — la etiqueta se retirará de todas las tareas asociadas y se eliminará de la nube si tienes el [modo nube](./17-sincronizacion-nube.md) activo.
 
 ## Etiquetas por defecto
 
