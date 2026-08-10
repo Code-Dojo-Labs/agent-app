@@ -1,10 +1,10 @@
 /**
  * dojo-label-manager — Organismo
  *
- * Panel lateral para gestionar las etiquetas existentes.
- * Permite editar el nombre y el color de cualquier etiqueta.
- * Los cambios se persisten en IndexedDB y se propagan al tablero
- * mediante el evento `dojo:label-updated`.
+ * Panel lateral para gestionar las etiquetas de forma independiente (IMP-19).
+ * Permite crear, editar y eliminar etiquetas sin necesidad de crear una tarea,
+ * agrupándolas en "En uso" / "Sin usar" con el conteo de tareas asociadas.
+ * Los cambios se persisten en IndexedDB y se propagan al tablero mediante eventos.
  *
  * ## API pública
  * | Método  | Descripción                                        |
@@ -15,7 +15,9 @@
  * ## Eventos despachados
  * | Nombre              | Detalle       | Descripción                         |
  * |---------------------|---------------|-------------------------------------|
+ * | dojo:label-created  | { label }     | Etiqueta creada en IndexedDB        |
  * | dojo:label-updated  | { label }     | Etiqueta actualizada en IndexedDB   |
+ * | dojo:label-deleted  | { labelId }   | Etiqueta eliminada de IndexedDB     |
  *
  * ## Atributos observados
  * | Atributo | Valores      | Descripción        |
@@ -28,7 +30,7 @@
  */
 
 import type { Label } from '../../../types/models.js';
-import { getAllLabels, updateLabel, deleteLabel, countTasksByLabelId } from '../../../db/label.repository.js';
+import { getAllLabels, createLabel, updateLabel, deleteLabel, countTasksByLabelId } from '../../../db/label.repository.js';
 import { meetsWcagAA, suggestAccessibleColor } from '../../../utils/contrast.js';
 
 // ── Paleta de colores WCAG AA (contraste ≥ 4.5:1 con #FFFFFF) — US-13 ─────
@@ -53,6 +55,7 @@ export class DojoLabelManager extends HTMLElement {
 
   private _shadow: ShadowRoot;
   private _labels: Label[] = [];
+  private _labelCounts: Map<string, number> = new Map();
   private _editingId: string | null = null;
   private _deletingId: string | null = null;
   private _deletingAffectedCount: number = 0;
@@ -89,6 +92,7 @@ export class DojoLabelManager extends HTMLElement {
   async show(): Promise<void> {
     this._labels = await getAllLabels();
     this._labels.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+    await this._loadLabelCounts();
     this._editingId  = null;
     this._deletingId = null;
     this.setAttribute('open', '');
@@ -102,6 +106,12 @@ export class DojoLabelManager extends HTMLElement {
     this.removeAttribute('open');
     this._editingId  = null;
     this._deletingId = null;
+  }
+
+  /** Recalcula cuántas tareas usan cada etiqueta, para agrupar "En uso" / "Sin usar" (IMP-19). */
+  private async _loadLabelCounts(): Promise<void> {
+    const counts = await Promise.all(this._labels.map(l => countTasksByLabelId(l.id)));
+    this._labelCounts = new Map(this._labels.map((l, i) => [l.id, counts[i]]));
   }
 
   // ── Render base ──────────────────────────────────────────────────────────
@@ -189,6 +199,73 @@ export class DojoLabelManager extends HTMLElement {
         color: var(--dojo-text-secondary);
         text-align: center;
         margin: 0;
+      }
+
+      /* Formulario de creación de etiqueta (IMP-19) */
+      .create-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem 1rem;
+        border-bottom: 1px solid var(--dojo-border);
+        background: var(--dojo-bg);
+      }
+      .create-form-title {
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: var(--dojo-text-primary);
+        margin: 0 0 0.125rem;
+      }
+      .create-preview-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        color: var(--dojo-text-secondary);
+      }
+      .create-preview-chip {
+        display: inline-block;
+        padding: 0.1875rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #FFFFFF;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .create-btn {
+        align-self: flex-start;
+      }
+
+      /* Encabezados de grupo "En uso" / "Sin usar" */
+      .group-heading {
+        margin: 0;
+        padding: 0.5rem 1.25rem 0.25rem;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        color: var(--dojo-text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .unused-group summary.unused-summary {
+        cursor: pointer;
+        list-style: none;
+      }
+      .unused-group summary.unused-summary::-webkit-details-marker { display: none; }
+      .unused-group summary.unused-summary::before {
+        content: '▸ ';
+      }
+      .unused-group[open] summary.unused-summary::before {
+        content: '▾ ';
+      }
+
+      /* Contador de uso junto al nombre */
+      .label-count {
+        font-size: 0.75rem;
+        font-weight: 400;
+        color: var(--dojo-text-secondary);
       }
 
       /* Lista de etiquetas */
@@ -542,23 +619,252 @@ export class DojoLabelManager extends HTMLElement {
     if (!content) return;
     content.innerHTML = '';
 
+    content.appendChild(this._buildCreateForm());
+
     if (this._labels.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'empty-state';
-      empty.textContent = 'No hay etiquetas. Crea una desde el panel de detalle de una tarea.';
+      empty.textContent = 'No hay etiquetas todavía. Crea la primera con el formulario de arriba.';
       content.appendChild(empty);
       return;
     }
 
-    const list = document.createElement('ul');
-    list.className = 'label-list';
-    list.setAttribute('role', 'list');
+    const used   = this._labels.filter(l => (this._labelCounts.get(l.id) ?? 0) > 0);
+    const unused = this._labels.filter(l => (this._labelCounts.get(l.id) ?? 0) === 0);
 
-    for (const label of this._labels) {
-      list.appendChild(this._buildLabelRow(label));
+    if (used.length > 0) {
+      content.appendChild(this._buildGroupHeading(`En uso (${used.length})`));
+      const list = document.createElement('ul');
+      list.className = 'label-list';
+      list.setAttribute('role', 'list');
+      for (const label of used) list.appendChild(this._buildLabelRow(label));
+      content.appendChild(list);
     }
 
-    content.appendChild(list);
+    if (unused.length > 0) {
+      const details = document.createElement('details');
+      details.className = 'unused-group';
+
+      const summary = document.createElement('summary');
+      summary.className = 'unused-summary';
+      summary.textContent = `Sin usar (${unused.length})`;
+      details.appendChild(summary);
+
+      const list = document.createElement('ul');
+      list.className = 'label-list';
+      list.setAttribute('role', 'list');
+      for (const label of unused) list.appendChild(this._buildLabelRow(label));
+      details.appendChild(list);
+
+      content.appendChild(details);
+    }
+  }
+
+  /** Construye el encabezado de un grupo ("En uso (N)" / "Sin usar (N)"). */
+  private _buildGroupHeading(text: string): HTMLElement {
+    const heading = document.createElement('p');
+    heading.className = 'group-heading';
+    heading.textContent = text;
+    return heading;
+  }
+
+  /** Construye el formulario para crear una nueva etiqueta sin salir del panel (IMP-19). */
+  private _buildCreateForm(): HTMLElement {
+    const form = document.createElement('div');
+    form.className = 'create-form';
+
+    const title = document.createElement('h3');
+    title.className = 'create-form-title';
+    title.textContent = 'Nueva etiqueta';
+    form.appendChild(title);
+
+    // Nombre
+    const nameSection = document.createElement('label');
+    nameSection.className = 'edit-form-label';
+    nameSection.textContent = 'Nombre';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'edit-name-input';
+    nameInput.maxLength = 30;
+    nameInput.placeholder = 'Ej. Urgente';
+    nameInput.setAttribute('aria-label', 'Nombre de la nueva etiqueta');
+    nameSection.appendChild(nameInput);
+    form.appendChild(nameSection);
+
+    // Color — título
+    const colorTitle = document.createElement('div');
+    colorTitle.className = 'edit-form-label';
+    colorTitle.textContent = 'Color';
+    form.appendChild(colorTitle);
+
+    let pendingColor: string = PRESET_COLORS[0];
+
+    const palette = document.createElement('div');
+    palette.className = 'edit-color-palette';
+
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.className = 'edit-color-input';
+    colorInput.value = pendingColor;
+    colorInput.setAttribute('aria-label', 'Color personalizado');
+
+    for (let i = 0; i < PRESET_COLORS.length; i++) {
+      const c = PRESET_COLORS[i];
+      const swatch = document.createElement('button');
+      swatch.type = 'button';
+      swatch.className = 'color-swatch' + (pendingColor === c ? ' selected' : '');
+      swatch.style.backgroundColor = c;
+      swatch.setAttribute('aria-label', `Color ${PRESET_COLOR_NAMES[i]}`);
+      swatch.setAttribute('title', PRESET_COLOR_NAMES[i]);
+      swatch.dataset['color'] = c;
+      swatch.addEventListener('click', () => {
+        pendingColor = c;
+        colorInput.value = c;
+        palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
+          s.classList.toggle('selected', s.dataset['color'] === c);
+        });
+        updatePreview();
+        updateContrastWarning(pendingColor);
+      });
+      palette.appendChild(swatch);
+    }
+
+    colorInput.addEventListener('input', () => {
+      pendingColor = colorInput.value;
+      palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
+        s.classList.toggle('selected', s.dataset['color'] === pendingColor);
+      });
+      updatePreview();
+      updateContrastWarning(pendingColor);
+    });
+
+    form.appendChild(palette);
+
+    // Fila de color personalizado
+    const customRow = document.createElement('div');
+    customRow.className = 'edit-custom-color-row';
+    const customLabel = document.createElement('span');
+    customLabel.textContent = 'Personalizado:';
+    customRow.appendChild(customLabel);
+    customRow.appendChild(colorInput);
+    form.appendChild(customRow);
+
+    // Vista previa en tiempo real
+    const previewRow = document.createElement('div');
+    previewRow.className = 'create-preview-row';
+    const previewCaption = document.createElement('span');
+    previewCaption.textContent = 'Vista previa:';
+    const previewChip = document.createElement('span');
+    previewChip.className = 'create-preview-chip';
+    previewRow.appendChild(previewCaption);
+    previewRow.appendChild(previewChip);
+    form.appendChild(previewRow);
+
+    const updatePreview = (): void => {
+      previewChip.textContent = nameInput.value.trim() || 'Etiqueta';
+      previewChip.style.backgroundColor = pendingColor;
+    };
+
+    // Advertencia de contraste WCAG (US-13)
+    const contrastWarning = document.createElement('div');
+    contrastWarning.className = 'edit-contrast-warning';
+    contrastWarning.setAttribute('role', 'alert');
+    contrastWarning.style.display = 'none';
+    form.appendChild(contrastWarning);
+
+    // Mensaje de error
+    const errorEl = document.createElement('p');
+    errorEl.className = 'edit-error';
+    errorEl.setAttribute('role', 'alert');
+    errorEl.style.display = 'none';
+    form.appendChild(errorEl);
+
+    const createBtn = document.createElement('button');
+    createBtn.type = 'button';
+    createBtn.className = 'edit-btn-primary create-btn';
+    createBtn.textContent = 'Crear etiqueta';
+    createBtn.disabled = true;
+
+    const updateContrastWarning = (color: string): void => {
+      const isPreset = (PRESET_COLORS as readonly string[]).includes(color);
+      if (isPreset || meetsWcagAA('#FFFFFF', color)) {
+        contrastWarning.style.display = 'none';
+        createBtn.disabled = !nameInput.value.trim();
+        return;
+      }
+      const suggested = suggestAccessibleColor(color, '#FFFFFF');
+      contrastWarning.innerHTML = '';
+      const msg = document.createElement('span');
+      msg.textContent = 'El color no tiene suficiente contraste con texto blanco (mínimo 4.5:1 WCAG AA).';
+      contrastWarning.appendChild(msg);
+
+      const suggestionRow = document.createElement('span');
+      suggestionRow.className = 'edit-contrast-suggestion';
+      const swatch = document.createElement('span');
+      swatch.className = 'edit-contrast-swatch';
+      swatch.style.backgroundColor = suggested;
+      swatch.setAttribute('aria-hidden', 'true');
+      const applyBtn = document.createElement('button');
+      applyBtn.className = 'edit-contrast-apply';
+      applyBtn.type = 'button';
+      applyBtn.textContent = `Usar versión accesible (${suggested})`;
+      applyBtn.addEventListener('click', () => {
+        pendingColor = suggested;
+        colorInput.value = suggested;
+        palette.querySelectorAll<HTMLButtonElement>('.color-swatch').forEach(s => {
+          s.classList.toggle('selected', s.dataset['color'] === suggested);
+        });
+        updatePreview();
+        updateContrastWarning(suggested);
+      });
+      suggestionRow.appendChild(swatch);
+      suggestionRow.appendChild(applyBtn);
+      contrastWarning.appendChild(suggestionRow);
+      contrastWarning.style.display = '';
+      createBtn.disabled = true;
+    };
+
+    nameInput.addEventListener('input', () => {
+      updatePreview();
+      errorEl.style.display = 'none';
+      if (contrastWarning.style.display === 'none') {
+        createBtn.disabled = !nameInput.value.trim();
+      }
+    });
+
+    createBtn.addEventListener('click', async () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        errorEl.textContent = 'El nombre no puede estar vacío.';
+        errorEl.style.display = '';
+        return;
+      }
+      createBtn.disabled = true;
+      createBtn.textContent = '…';
+      try {
+        const label = await createLabel({ name, color: pendingColor });
+        this._labels = [...this._labels, label].sort((a, b) =>
+          a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+        );
+        this._labelCounts.set(label.id, 0);
+        this._buildContent();
+        this.dispatchEvent(new CustomEvent('dojo:label-created', {
+          bubbles: true, composed: true,
+          detail: { label },
+        }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Error al crear la etiqueta';
+        errorEl.textContent = msg;
+        errorEl.style.display = '';
+        createBtn.disabled = false;
+        createBtn.textContent = 'Crear etiqueta';
+      }
+    });
+
+    form.appendChild(createBtn);
+    updatePreview();
+
+    return form;
   }
 
   private _buildLabelRow(label: Label): HTMLLIElement {
@@ -576,10 +882,20 @@ export class DojoLabelManager extends HTMLElement {
       dot.style.backgroundColor = label.color;
       dot.setAttribute('aria-hidden', 'true');
 
+      const count = this._labelCounts.get(label.id) ?? 0;
+
       const nameEl = document.createElement('span');
       nameEl.className = 'label-name';
       nameEl.textContent = label.name;
       nameEl.setAttribute('title', label.name);
+
+      if (count > 0) {
+        const countEl = document.createElement('span');
+        countEl.className = 'label-count';
+        countEl.textContent = ` (${count})`;
+        countEl.setAttribute('aria-label', `Usada en ${count} ${count === 1 ? 'tarea' : 'tareas'}`);
+        nameEl.appendChild(countEl);
+      }
 
       const editBtn = document.createElement('button');
       editBtn.className = 'edit-btn';
