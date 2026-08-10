@@ -10,6 +10,7 @@
     "dev": "tsc --watch & python3 -m http.server 3001 --directory dist"
   },
   "devDependencies": {
+    "standard-version": "^9.5.0",
     "typescript": "^5.4.0"
   }
 }
