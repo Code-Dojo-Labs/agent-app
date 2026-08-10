@@ -3,6 +3,7 @@
 > **Una aplicación Kanban moderna construida con Web Components nativos y cero dependencias**
 
 [![🌐 Demo en vivo](https://img.shields.io/badge/🌐_Demo-En_vivo-blue?style=for-the-badge)](https://code-dojo-labs.github.io/agent-app/)
+[![Version](https://img.shields.io/github/package-json/v/Code-Dojo-Labs/agent-app/init?style=for-the-badge&label=version&color=brightgreen)](https://github.com/Code-Dojo-Labs/agent-app/blob/init/package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Web Components](https://img.shields.io/badge/Web_Components-29ABE2?style=for-the-badge&logo=webcomponents.org&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/Web_Components)
 [![Zero Dependencies](https://img.shields.io/badge/Zero_Dependencies-✨-green?style=for-the-badge)]()
