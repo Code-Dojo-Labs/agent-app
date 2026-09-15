@@ -133,7 +133,8 @@ export class DojoIcon extends HTMLElement {
 
     // Crear elemento use que referencia el símbolo del sprite
     const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-    use.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', `/icons/sprite.svg#icon-${this.name}`);
+    const path = document.location.pathname;
+    use.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', `${path}icons/sprite.svg#icon-${this.name}`);
     
     svg.appendChild(use);
     this._shadow.appendChild(svg);

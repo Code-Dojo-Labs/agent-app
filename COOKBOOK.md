@@ -46,6 +46,7 @@
    - [Paso 32 — Sistema de asignación de personas completo (US-29 / Issue #47)](#paso-32--sistema-de-asignación-de-personas-completo-us-29--issue-47)
    - [Paso 33 — Mapa Completo de la Base de Datos (IndexedDB)](#paso-33---mapa-completo-de-la-base-de-datos-indexeddb--ejemplo-de-base-llena)
    - [Paso 34 — Actualización del Wiki: US-28 a US-37 (Issue #100)](#paso-34--actualización-del-wiki-us-28-a-us-37-issue-100)
+   - [Paso 38 — Gestión independiente de etiquetas: crear y agrupar por uso (IMP-19 / Issue #121)](#paso-38--gestión-independiente-de-etiquetas-crear-y-agrupar-por-uso-imp-19--issue-121)
 
 ---
 
@@ -3786,3 +3787,125 @@ ALTER TABLE public.task_templates
 - Templates se crean, editan y eliminan correctamente sincronizando a Supabase.
 - La sincronización inicial (`syncAllLocalToSupabase`) sube los templates existentes al hacer login.
 - El export/import incluye templates correctamente.
+
+---
+
+## Paso 38 — Gestión independiente de etiquetas: crear y agrupar por uso (IMP-19 / Issue #121)
+
+> **Fecha:** 2026-08-10
+> **Rama:** `feat/121-label-manager`
+> **Agentes:** `gitjmz` (preparación de rama) → `builder` (implementación) → `documentalista` (este registro)
+> **Issue:** [#121](https://github.com/Code-Dojo-Labs/agent-app/issues/121) — `feat: Gestión independiente de etiquetas — label manager (IMP-19)`
+> **Pull Request:** [#125](https://github.com/Code-Dojo-Labs/agent-app/pull/125)
+
+### Contexto
+
+Como continuación del roadmap de mejoras planificado en `requirements/improvements-17-filter-combo-multiselect.md` a `improvements-21-supabase-data-sync.md`, se crearon 5 issues en GitHub (#120 a #124) para IMP-17..IMP-21. Este paso documenta la resolución del primero de ellos a implementarse: **IMP-19**.
+
+### 1. Preparación de la rama (`gitjmz`)
+
+Siguiendo la convención `[tipo]/[id-issue]-[nombre-descriptivo]` definida en [`agents/gitjmz.md`](./agents/gitjmz.md):
+
+```bash
+git checkout init
+git pull origin init
+git checkout -b feat/121-label-manager
+```
+
+Auditoría de seguridad previa al commit (sin `.env`, sin `node_modules`, sin archivos temporales) — verificada con `git status` antes de cada commit.
+
+### 2. Diagnóstico (`builder`)
+
+Antes de crear archivos nuevos, se auditó el código existente para evitar duplicar trabajo:
+
+- Ya existía `src/components/organisms/dojo-label-manager/dojo-label-manager.ts`, un panel lateral (patrón compartido con `dojo-person-manager`, `dojo-project-manager`, `dojo-template-manager`) que permitía **editar** y **eliminar** etiquetas (con confirmación y conteo de tareas afectadas), implementado en US-11/US-12.
+- **No existía** una forma de **crear** una etiqueta desde este panel (solo desde el diálogo de creación/edición de tarea) ni una agrupación por uso.
+- **Decisión de arquitectura:** en lugar de crear una página nueva con router (`label-manager-page.ts` + ruta `/labels` como sugería el requerimiento original), se extendió el panel lateral existente, manteniendo consistencia con el resto de "gestores" de la aplicación (todos son paneles `dojo-*-manager` montados directamente en `dojo-app`, sin sistema de rutas en el proyecto).
+
+### 3. Implementación
+
+#### a) Formulario de creación inline (`dojo-label-manager.ts`)
+
+Se añadió `_buildCreateForm()`, reutilizando la paleta de 10 colores WCAG AA (`PRESET_COLORS`) y la validación de contraste (`meetsWcagAA`, `suggestAccessibleColor`) ya usadas en el formulario de edición:
+
+```ts
+createBtn.addEventListener('click', async () => {
+  const name = nameInput.value.trim();
+  const label = await createLabel({ name, color: pendingColor });
+  this._labels = [...this._labels, label].sort((a, b) =>
+    a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+  );
+  this._labelCounts.set(label.id, 0);
+  this._buildContent();
+  this.dispatchEvent(new CustomEvent('dojo:label-created', {
+    bubbles: true, composed: true, detail: { label },
+  }));
+});
+```
+
+Incluye vista previa en vivo (chip con el color y nombre actuales) y bloquea el botón "Crear" si el color no cumple el contraste mínimo 4.5:1 (igual que en edición).
+
+#### b) Agrupación "En uso" / "Sin usar"
+
+`show()` ahora precalcula el conteo de tareas por etiqueta (`_loadLabelCounts()`, usando `countTasksByLabelId` en paralelo con `Promise.all`) y `_buildContent()` separa el listado en dos secciones:
+
+```ts
+const used   = this._labels.filter(l => (this._labelCounts.get(l.id) ?? 0) > 0);
+const unused = this._labels.filter(l => (this._labelCounts.get(l.id) ?? 0) === 0);
+```
+
+- **"En uso (N)"**: lista siempre visible, cada fila muestra `Nombre (conteo)`.
+- **"Sin usar (N)"**: envuelta en `<details>/<summary>` nativo (colapsable sin JS adicional).
+
+#### c) Propagación al tablero sin recargar
+
+El panel se monta en `dojo-app` fuera del árbol de sombra de `dojo-kanban-board`, por lo que el evento `dojo:label-created` no llega al listener interno del tablero (`_handleLabelCreated`, agregado en su propio `shadowRoot`). Se resolvió exponiendo un método público nuevo:
+
+```ts
+// dojo-kanban-board.ts
+addLabel(label: Label): void {
+  if (!this._labels.find(l => l.id === label.id)) {
+    this._labels = [...this._labels, label].sort(/* ... */);
+    this._rebuildLabelFilterChips();
+  }
+}
+```
+
+`_handleLabelCreated` (el listener interno existente) ahora delega en `addLabel()` para no duplicar lógica. En `dojo-app.ts` se agregó el listener que conecta ambos:
+
+```ts
+this._shadow.addEventListener('dojo:label-created', (e: Event) => {
+  const { label } = (e as CustomEvent).detail as { label: Label };
+  (board as any).addLabel?.(label);
+});
+```
+
+### 4. Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `src/components/organisms/dojo-label-manager/dojo-label-manager.ts` | `_buildCreateForm()`, agrupación "En uso"/"Sin usar", conteo por etiqueta, evento `dojo:label-created` |
+| `src/components/organisms/dojo-kanban-board/dojo-kanban-board.ts` | Método público `addLabel()` (refactor de `_handleLabelCreated`) |
+| `src/components/organisms/dojo-app/dojo-app.ts` | Listener `dojo:label-created` → `board.addLabel()` |
+
+### 5. Validación
+
+```bash
+npm run build   # tsc — sin errores
+```
+
+### 6. Flujo de Git (`gitjmz`)
+
+```bash
+git add -A
+git commit -m "feat(label-manager): crear etiquetas y agrupar por uso en el gestor independiente"
+git push -u origin feat/121-label-manager
+```
+
+Pull Request #125 abierto contra `init`, con descripción técnica, checklist de criterios de aceptación y `Closes #121`. Se solicitó revisión automática de GitHub Copilot. **El merge queda pendiente de aprobación humana**, conforme a las restricciones de `gitjmz` (prohibido hacer merge de forma autónoma).
+
+### Resultado
+
+- Las etiquetas se pueden crear, editar y eliminar desde un único panel, sin necesidad de abrir una tarea.
+- El listado distingue de un vistazo qué etiquetas están activas y cuáles son candidatas a limpieza.
+- Cero dependencias nuevas; se reutilizó al 100% el sistema de colores/contraste WCAG ya existente.

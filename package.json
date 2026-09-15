@@ -1,15 +1,19 @@
 {
   "name": "agent-app",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Kanban To-Do List — Zero Dependencies, Web APIs nativas",
   "type": "module",
   "scripts": {
     "build": "tsc && cp public/index.html dist/index.html && cp public/manifest.json dist/manifest.json && mkdir -p dist/icons && cp -r public/icons/. dist/icons/ && mkdir -p dist/styles/tokens && cp -r public/styles/. dist/styles/ && sed \"s/CACHE_VERSION = 'v[^']*'/CACHE_VERSION = 'v$(date +%Y%m%d%H%M%S)'/\" public/sw.js > dist/sw.js",
     "watch": "tsc --watch",
     "serve": "python3 -m http.server 3001 --directory dist",
-    "dev": "tsc --watch & python3 -m http.server 3001 --directory dist"
+    "dev": "tsc --watch & python3 -m http.server 3001 --directory dist",
+    "pre:release": "standard-version --dry-run",
+    "release": "standard-version",
+    "release:beta": "standard-version --prerelease beta"
   },
   "devDependencies": {
+    "standard-version": "^9.5.0",
     "typescript": "^5.4.0"
   }
 }

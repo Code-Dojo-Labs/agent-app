@@ -829,6 +829,12 @@ export class DojoApp extends HTMLElement {
       (board as any)._loadBoard?.();
     });
 
+    // Cuando se crea una etiqueta desde el gestor independiente, propagar al tablero (IMP-19)
+    this._shadow.addEventListener('dojo:label-created', (e: Event) => {
+      const { label } = (e as CustomEvent).detail as { label: Label };
+      (board as any).addLabel?.(label);
+    });
+
     // Cuando se actualiza una etiqueta, propagar al tablero para refrescar los chips
     this._shadow.addEventListener('dojo:label-updated', (e: Event) => {
       const { label } = (e as CustomEvent).detail as { label: Label };

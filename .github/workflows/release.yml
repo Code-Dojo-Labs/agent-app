@@ -1,0 +1,48 @@
+# Ejecuta `npm run release` (standard-version) cada vez que un Pull Request
+# se mergea a la rama `init`: bump de versión en package.json, actualización
+# de CHANGELOG.md, commit "chore(release): vX.Y.Z" y tag, empujados a `init`.
+name: Release on PR merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: ["init"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-init
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout init
+        uses: actions/checkout@v4
+        with:
+          ref: init
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run release (standard-version)
+        run: npm run release
+
+      - name: Push release commit and tag
+        run: git push --follow-tags origin init

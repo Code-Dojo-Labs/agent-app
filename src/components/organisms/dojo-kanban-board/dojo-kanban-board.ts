@@ -1133,6 +1133,15 @@ export class DojoKanbanBoard extends HTMLElement {
   /** Añade una etiqueta recién creada al caché local para que los chips se muestren sin recargar (US-10). */
   private _handleLabelCreated(e: CustomEvent): void {
     const { label } = e.detail as { label: Label };
+    this.addLabel(label);
+  }
+
+  /**
+   * Añade una etiqueta recién creada al caché local y refresca los chips de filtro.
+   * Llamado tanto por eventos internos (task-dialog/task-detail) como por dojo-app
+   * tras recibir `dojo:label-created` desde dojo-label-manager (IMP-19).
+   */
+  addLabel(label: Label): void {
     if (!this._labels.find(l => l.id === label.id)) {
       this._labels = [...this._labels, label].sort((a, b) =>
         a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })

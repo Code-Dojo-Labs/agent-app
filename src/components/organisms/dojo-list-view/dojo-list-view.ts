@@ -34,6 +34,7 @@ import { getDueStatus, formatRelativeDate } from '../../../utils/date.js';
 import { pickTextColor } from '../../../utils/contrast.js';
 import '../dojo-task-detail/dojo-task-detail.js';
 import '../dojo-delete-confirm-dialog/dojo-delete-confirm-dialog.js';
+import { DojoFilterBar } from '../dojo-filter-bar/filter-bar.js';
 
 // ── Tipos internos ─────────────────────────────────────────────────────────
 
@@ -86,12 +87,7 @@ export class DojoListView extends HTMLElement {
   private _sortDir: SortDir = 'asc';
 
   // Referencias UI de la barra de filtros
-  private _filterToggleBtn: HTMLButtonElement | null = null;
-  private _filterBarContent: HTMLElement | null = null;
-  private _filterSearchInput: HTMLInputElement | null = null;
-  private _filterClearAllBtn: HTMLButtonElement | null = null;
-  private _filterLabelSection: HTMLElement | null = null;
-  private _filterLabelChipsContainer: HTMLElement | null = null;
+  private _filterBar: DojoFilterBar | null = null;
 
   constructor() {
     super();
@@ -647,218 +643,74 @@ export class DojoListView extends HTMLElement {
   // ── Barra de filtros ──────────────────────────────────────────────────────
 
   private _buildFilterBar(): HTMLElement {
-    const FILTER_PRIORITIES: { value: Priority; icon: string; label: string }[] = [
-      { value: 'low',    icon: '⬇️', label: 'Baja'    },
-      { value: 'medium', icon: '➡️', label: 'Media'   },
-      { value: 'high',   icon: '⬆️', label: 'Alta'    },
-      { value: 'urgent', icon: '🔥', label: 'Urgente' },
-    ];
-
-    const bar = document.createElement('div');
-    bar.className = 'filter-bar';
-    bar.setAttribute('role', 'toolbar');
-    bar.setAttribute('aria-label', 'Filtros de la vista lista');
-
-    const toggleBtn = document.createElement('button');
-    toggleBtn.className = 'filter-toggle-btn';
-    toggleBtn.type = 'button';
-    toggleBtn.setAttribute('aria-expanded', 'true');
-    toggleBtn.textContent = 'Filtros';
-    this._filterToggleBtn = toggleBtn;
-    bar.appendChild(toggleBtn);
-
-    const content = document.createElement('div');
-    content.className = 'filter-content';
-    this._filterBarContent = content;
-    bar.appendChild(content);
-
-    // Input de búsqueda
-    const searchInput = document.createElement('input');
-    searchInput.type = 'search';
-    searchInput.className = 'filter-search';
-    searchInput.placeholder = 'Buscar…';
-    searchInput.setAttribute('aria-label', 'Buscar tareas por título o descripción');
-    this._filterSearchInput = searchInput;
-    content.appendChild(searchInput);
-
-    // Separador
-    const sep1 = document.createElement('div');
-    sep1.className = 'filter-sep';
-    sep1.setAttribute('aria-hidden', 'true');
-    content.appendChild(sep1);
-
-    // Chips de prioridad
-    const priorityLabel = document.createElement('span');
-    priorityLabel.className = 'filter-label';
-    priorityLabel.textContent = 'Prioridad:';
-    content.appendChild(priorityLabel);
-
-    for (const p of FILTER_PRIORITIES) {
-      const btn = document.createElement('button');
-      btn.className = 'filter-chip';
-      btn.type = 'button';
-      btn.setAttribute('aria-pressed', 'false');
-      btn.setAttribute('data-priority', p.value);
-      btn.textContent = `${p.icon} ${p.label}`;
-      btn.addEventListener('click', () => {
-        const isActive = this._selectedPriorities.has(p.value);
-        if (isActive) {
-          this._selectedPriorities.delete(p.value);
-          btn.classList.remove('active');
-          btn.setAttribute('aria-pressed', 'false');
-        } else {
-          this._selectedPriorities.add(p.value);
-          btn.classList.add('active');
-          btn.setAttribute('aria-pressed', 'true');
-        }
+    this._filterBar = document.createElement('dojo-filter-bar') as DojoFilterBar;
+    
+    // Escuchar cambios en filtros de prioridad
+    this._filterBar.addEventListener('dojo:filter-changed', (evt: Event) => {
+      const event = evt as CustomEvent;
+      const { type, selectedIds } = event.detail;
+      
+      if (type === 'priority') {
+        this._selectedPriorities = new Set(selectedIds as Priority[]);
         this._activeFilter = {
           ...this._activeFilter,
           priorities: this._selectedPriorities.size > 0 ? [...this._selectedPriorities] : undefined,
         };
-        this._updateClearAllVisibility();
-        this._renderTable();
-      });
-      content.appendChild(btn);
-    }
-
-    // Sección de etiquetas (dinámica)
-    const labelSection = document.createElement('div');
-    labelSection.style.display = 'none';
-    this._filterLabelSection = labelSection;
-
-    const sep2 = document.createElement('div');
-    sep2.className = 'filter-sep';
-    sep2.setAttribute('aria-hidden', 'true');
-    labelSection.appendChild(sep2);
-
-    const labelsLabelEl = document.createElement('span');
-    labelsLabelEl.className = 'filter-label';
-    labelsLabelEl.textContent = 'Etiquetas:';
-    labelSection.appendChild(labelsLabelEl);
-
-    const labelChipsContainer = document.createElement('div');
-    labelChipsContainer.className = 'filter-chips-group';
-    this._filterLabelChipsContainer = labelChipsContainer;
-    labelSection.appendChild(labelChipsContainer);
-    content.appendChild(labelSection);
-
-    // Botón "Limpiar filtros"
-    const clearAllBtn = document.createElement('button');
-    clearAllBtn.className = 'filter-clear';
-    clearAllBtn.type = 'button';
-    clearAllBtn.textContent = '✕ Limpiar filtros';
-    clearAllBtn.setAttribute('aria-label', 'Limpiar todos los filtros activos');
-    clearAllBtn.style.display = 'none';
-    this._filterClearAllBtn = clearAllBtn;
-    clearAllBtn.addEventListener('click', () => this._clearAllFilters());
-    content.appendChild(clearAllBtn);
-
-    // Toggle colapsar/expandir
-    toggleBtn.addEventListener('click', () => {
-      const isCollapsed = content.classList.contains('collapsed');
-      content.classList.toggle('collapsed');
-      toggleBtn.setAttribute('aria-expanded', String(isCollapsed));
-      this._updateClearAllVisibility();
+      } else if (type === 'labels') {
+        this._selectedLabelIds = new Set(selectedIds);
+        this._activeFilter = {
+          ...this._activeFilter,
+          labelIds: this._selectedLabelIds.size > 0 ? [...this._selectedLabelIds] : undefined,
+        };
+      }
+      
+      this._renderTable();
+    });
+    
+    // Escuchar cambios en búsqueda
+    this._filterBar.addEventListener('dojo:search-changed', (evt: Event) => {
+      const event = evt as CustomEvent;
+      const { searchText } = event.detail;
+      this._activeFilter = {
+        ...this._activeFilter,
+        searchText: searchText.trim() || undefined,
+      };
+      this._renderTable();
+    });
+    
+    // Escuchar limpieza de filtros
+    this._filterBar.addEventListener('dojo:filter-cleared', () => {
+      this._selectedPriorities.clear();
+      this._selectedLabelIds.clear();
+      this._activeFilter = {};
+      this._renderTable();
     });
 
-    // Búsqueda con debounce 300 ms
-    searchInput.addEventListener('input', () => {
-      if (this._filterDebounceTimer !== null) clearTimeout(this._filterDebounceTimer);
-      this._filterDebounceTimer = setTimeout(() => {
-        this._filterDebounceTimer = null;
-        const text = searchInput.value.trim();
-        this._activeFilter = { ...this._activeFilter, searchText: text || undefined };
-        this._updateClearAllVisibility();
-        this._renderTable();
-      }, 300);
-    });
-
-    return bar;
+    return this._filterBar;
   }
 
   private _rebuildLabelFilterChips(): void {
-    if (!this._filterLabelSection || !this._filterLabelChipsContainer) return;
+    if (!this._filterBar) return;
 
+    // Validar que todas las etiquetas seleccionadas aún existen
     const existingIds = new Set(this._labels.map(l => l.id));
     for (const id of [...this._selectedLabelIds]) {
       if (!existingIds.has(id)) this._selectedLabelIds.delete(id);
     }
 
-    this._filterLabelChipsContainer.innerHTML = '';
-
-    if (this._labels.length === 0) {
-      this._filterLabelSection.style.display = 'none';
-      return;
-    }
-
-    this._filterLabelSection.style.display = 'contents';
-
-    for (const lbl of this._labels) {
-      const btn = document.createElement('button');
-      btn.className = 'filter-chip';
-      btn.type = 'button';
-      btn.setAttribute('data-label-id', lbl.id);
-      const isActive = this._selectedLabelIds.has(lbl.id);
-      btn.setAttribute('aria-pressed', String(isActive));
-      btn.textContent = lbl.name;
-      if (isActive) btn.classList.add('active');
-
-      btn.addEventListener('click', () => {
-        const active = this._selectedLabelIds.has(lbl.id);
-        if (active) {
-          this._selectedLabelIds.delete(lbl.id);
-          btn.classList.remove('active');
-          btn.setAttribute('aria-pressed', 'false');
-        } else {
-          this._selectedLabelIds.add(lbl.id);
-          btn.classList.add('active');
-          btn.setAttribute('aria-pressed', 'true');
-        }
-        this._activeFilter = {
-          ...this._activeFilter,
-          labelIds: this._selectedLabelIds.size > 0 ? [...this._selectedLabelIds] : undefined,
-        };
-        this._updateClearAllVisibility();
-        this._renderTable();
-      });
-
-      this._filterLabelChipsContainer.appendChild(btn);
-    }
-
-    this._updateClearAllVisibility();
+    // Actualizar el combo de etiquetas en el filter-bar
+    this._filterBar.setLabels(this._labels);
+    this._filterBar.selectedLabelIds = this._selectedLabelIds;
   }
 
   private _updateClearAllVisibility(): void {
-    if (!this._filterClearAllBtn || !this._filterToggleBtn) return;
-    const hasActive =
-      (this._activeFilter.priorities?.length ?? 0) > 0 ||
-      (this._activeFilter.labelIds?.length ?? 0) > 0 ||
-      !!(this._activeFilter.searchText);
-    this._filterClearAllBtn.style.display = hasActive ? '' : 'none';
-    this._filterToggleBtn.classList.toggle('has-active', hasActive);
+    // La visibilidad del botón "Limpiar" es manejada internamente por DojoFilterBar
   }
 
   private _clearAllFilters(): void {
-    this._selectedPriorities.clear();
-    this._selectedLabelIds.clear();
-    if (this._filterDebounceTimer !== null) {
-      clearTimeout(this._filterDebounceTimer);
-      this._filterDebounceTimer = null;
+    if (this._filterBar) {
+      this._filterBar.clearAll();
     }
-    if (this._filterSearchInput) this._filterSearchInput.value = '';
-    if (this._filterBarContent) {
-      this._filterBarContent.querySelectorAll<HTMLButtonElement>('[data-priority]').forEach(b => {
-        b.classList.remove('active');
-        b.setAttribute('aria-pressed', 'false');
-      });
-      this._filterBarContent.querySelectorAll<HTMLButtonElement>('[data-label-id]').forEach(b => {
-        b.classList.remove('active');
-        b.setAttribute('aria-pressed', 'false');
-      });
-    }
-    this._activeFilter = {};
-    this._updateClearAllVisibility();
-    this._renderTable();
   }
 
   // ── Filtrado y ordenamiento ───────────────────────────────────────────────

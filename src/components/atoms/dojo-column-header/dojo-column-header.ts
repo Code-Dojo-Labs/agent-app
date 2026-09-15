@@ -82,10 +82,6 @@ export class DojoColumnHeader extends HTMLElement {
       ? `${this._count} / ${this._totalCount}`
       : `${this._count}`;
 
-    const accentStyle = this._accentColor
-      ? `border-top: 3px solid ${this._accentColor};`
-      : 'border-top: 3px solid var(--dojo-border);';
-
     this._shadow.innerHTML = '';
 
     // ── Estilos ────────────────────────────────────────────────────────────
@@ -101,7 +97,6 @@ export class DojoColumnHeader extends HTMLElement {
         padding: 0.75rem 1rem 0.5rem;
         background: var(--dojo-surface);
         border-radius: var(--dojo-radius) var(--dojo-radius) 0 0;
-        ${accentStyle}
         user-select: none;
       }
       .icon {

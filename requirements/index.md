@@ -40,6 +40,15 @@ Aplicación web de gestión de tareas tipo Trello con tablero Kanban, orientada 
 | IMP-13 | [improvements-13-wiki-update.md](./improvements-13-wiki-update.md) | Documentación | Actualización del wiki con las 10+ funcionalidades nuevas no documentadas (US-28 a US-37) |
 | IMP-14 | [improvements-14-kanban-metrics-dashboard.md](./improvements-14-kanban-metrics-dashboard.md) | Analytics | Dashboard de métricas Kanban: Cycle Time, Throughput, CFD y tasa de cumplimiento de fechas |
 | IMP-15 | [improvements-15-column-auto-order.md](./improvements-15-column-auto-order.md) | Tablero Kanban | Auto-orden por columna (menor a mayor) configurable por el usuario |
+| IMP-16 | [improvements-16-keyboard-shortcuts.md](./improvements-16-keyboard-shortcuts) | Improvement 16 — Paleta de Comandos Global con Atajos de Teclado | La aplicación carecía de una forma rápida de ejecutar acciones sin abandonar el teclado. Los usuarios debían hacer clic en múltiples botones para abrir diálogos, cambiar de vista o gestionar configuraciones.
+| IMP-17 | [improvements-17-filter-combo-multiselect.md](./improvements-17-filter-combo-multiselect.md) | UI/UX | Filtros con combo desplegable de múltiple selección para ahorrar espacio |
+| IMP-18 | [improvements-18-responsive-design.md](./improvements-18-responsive-design.md) | UI / Responsive | Diseño 100% responsivo mobile-first con breakpoints 640px/1024px |
+| IMP-19 | [improvements-19-label-manager.md](./improvements-19-label-manager.md) | Gestión de tareas | Gestor independiente de etiquetas con crear/editar/eliminar sin crear tarea |
+| IMP-20 | [improvements-20-ux-recommendations.md](./improvements-20-ux-recommendations.md) | UI/UX/Product | Consolidado de 12 recomendaciones UX: undo/redo, búsqueda global, atajos, confirmaciones |
+| IMP-21 | [improvements-21-supabase-data-sync.md](./improvements-21-supabase-data-sync.md) | Sync & Persistencia | Sincronización real-time, identificador de tablero en URL y solución a duplicidad de datos en Supabase |
+
+
+
 
 ---
 
